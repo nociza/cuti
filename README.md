@@ -1,6 +1,6 @@
-# ccutils
+# cuti
 
-> **Production-ready ccutils system with prompt aliases, task expansion, web interface, and comprehensive monitoring.**
+> **Production-ready cuti system with prompt aliases, task expansion, web interface, and comprehensive monitoring.**
 
 A sophisticated queue management system for Claude Code that automatically handles rate limits, provides powerful prompt aliases for common development scenarios, expands complex tasks into manageable subtasks, and offers both CLI and modern web interfaces with real-time monitoring.
 
@@ -107,7 +107,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 pip install uv
 ```
 
-### Install ccutils
+### Install cuti
 
 #### Option 1: Development Setup (Recommended)
 ```bash
@@ -333,7 +333,7 @@ Create `~/.claude-queue/config.json`:
 
 ```
 claude-code-queue/
-├── src/ccutils/
+├── src/cuti/
 │   ├── cli.py                 # Modern CLI interface
 │   ├── queue_manager.py       # Core queue management  
 │   ├── models.py             # Data models
@@ -430,7 +430,7 @@ uv run pytest
 uv run pytest tests/test_aliases.py
 
 # With coverage
-uv run pytest --cov=ccutils
+uv run pytest --cov=cuti
 ```
 
 ### Contributing
@@ -530,7 +530,7 @@ MIT License - see LICENSE file for details.
 - [ ] **Advanced Analytics**: ML-powered usage insights
 
 ### Long-term Vision
-Transform ccutils into the ultimate AI-powered development workflow platform, enabling teams to automate complex development tasks, maintain high code quality, and accelerate delivery through intelligent task management and execution.
+Transform cuti into the ultimate AI-powered development workflow platform, enabling teams to automate complex development tasks, maintain high code quality, and accelerate delivery through intelligent task management and execution.
 
 ---
 

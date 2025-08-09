@@ -1,5 +1,5 @@
 """
-ccutils - A tool to queue prompts and execute them when token limits reset.
+cuti - A tool to queue prompts and execute them when token limits reset.
 """
 
 from .models import (

@@ -17,7 +17,7 @@ classifiers = [
 description = "Production-ready claude code utils with command queuing, prompt aliases, web interface, and monitoring."
 keywords = ["ai", "automation", "claude", "cli", "queue"]
 license = "MIT"
-name = "ccutils"
+name = "cuti"
 readme = "README.md"
 requires-python = ">=3.9"
 version = "0.1.0"
@@ -47,12 +47,12 @@ dev = [
 ]
 
 [project.scripts]
-ccutils          = "ccutils.__main__:main"
-claude-queue     = "ccutils.cli:app"
-claude-queue-web = "ccutils.web.main:main"
+claude-queue     = "cuti.cli:app"
+claude-queue-web = "cuti.web.main:main"
+cuti             = "cuti.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ccutils"]
+packages = ["src/cuti"]
 
 [tool.hatch.build.targets.sdist]
 include = ["/LICENSE", "/README.md", "/src"]

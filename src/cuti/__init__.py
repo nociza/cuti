@@ -1,5 +1,5 @@
 """
-ccutils - Production-ready claude code utils with command queuing, web interface, and monitoring.
+cuti - Production-ready claude code utils with command queuing, web interface, and monitoring.
 """
 
 __version__ = "0.1.0"

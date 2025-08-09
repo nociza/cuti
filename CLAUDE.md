@@ -4,7 +4,7 @@ This file contains configuration and context for Claude Code usage within this p
 
 ## Project Overview
 
-This is a production-ready ccutils system that provides:
+This is a production-ready cuti system that provides:
 
 - **Queue Management**: Automatic handling of rate limits and retry logic
 - **Prompt Aliases**: Pre-built aliases for common development tasks

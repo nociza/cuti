@@ -1,5 +1,5 @@
 """
-FastAPI web application for ccutils.
+FastAPI web application for cuti.
 """
 
 from datetime import datetime
@@ -77,8 +77,8 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     """Create FastAPI application instance."""
     
     app = FastAPI(
-        title="ccutils",
-        description="Production-ready ccutils system with web interface",
+        title="cuti",
+        description="Production-ready cuti system with web interface",
         version="0.2.0",
         docs_url="/docs",
         redoc_url="/redoc"
@@ -124,7 +124,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
                 # Reflect stopped state
                 app.state.queue_running = False
 
-        thread = threading.Thread(target=_run_queue, name="ccutils-queue", daemon=True)
+        thread = threading.Thread(target=_run_queue, name="cuti-queue", daemon=True)
         app.state.queue_thread = thread
         app.state.queue_running = True
         thread.start()
@@ -148,7 +148,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ccutils</title>
+    <title>cuti</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -160,7 +160,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-2xl font-bold flex items-center">
                 <i class="fas fa-robot mr-2"></i>
-                ccutils
+                cuti
             </h1>
             <div class="flex space-x-4">
                 <button @click="activeTab = 'dashboard'" 
@@ -847,7 +847,7 @@ def main():
     """Main entry point for the web application."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="ccutils Web Interface")
+    parser = argparse.ArgumentParser(description="cuti Web Interface")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
     parser.add_argument("--storage-dir", default="~/.claude-queue", help="Storage directory")

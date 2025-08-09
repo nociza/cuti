@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for ccutils.
+Main entry point for cuti.
 Supports both uvx and direct execution.
 """
 
@@ -24,7 +24,7 @@ def check_uv_available():
 def install_with_uv():
     """Install the package with uv in development mode."""
     try:
-        print("Installing ccutils with uv...")
+        print("Installing cuti with uv...")
         result = subprocess.run(['uv', 'pip', 'install', '-e', '.'], 
                               check=True, cwd=Path(__file__).parent)
         print("✓ Installation completed")
@@ -60,7 +60,7 @@ def setup_environment():
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="ccutils - Production-ready queue system",
+        description="cuti - Production-ready queue system",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -130,16 +130,16 @@ Examples:
             sys.path.insert(0, str(src_path))
         
         # Try importing the package
-        import ccutils
+        import cuti
         
     except ImportError:
-        print("❌ ccutils not installed. Run: python run.py setup")
+        print("❌ cuti not installed. Run: python run.py setup")
         return 1
     
     # Handle web command
     if args.command == 'web':
         try:
-            from ccutils.web.main import create_app
+            from cuti.web.main import create_app
             import uvicorn
             
             app = create_app(args.storage_dir)
@@ -159,7 +159,7 @@ Examples:
     # Handle CLI command
     elif args.command == 'cli':
         try:
-            from ccutils.cli import app as cli_app
+            from cuti.cli import app as cli_app
             
             # Pass through CLI arguments
             if args.cli_args:
@@ -177,14 +177,14 @@ Examples:
     # Handle direct queue commands
     else:
         try:
-            from ccutils.queue_manager import QueueManager
-            from ccutils.models import QueuedPrompt
-            from ccutils.aliases import PromptAliasManager
+            from cuti.queue_manager import QueueManager
+            from cuti.models import QueuedPrompt
+            from cuti.aliases import PromptAliasManager
             
             manager = QueueManager(storage_dir=args.storage_dir)
             
             if args.command == 'start':
-                print("🚀 Starting ccutils processor...")
+                print("🚀 Starting cuti processor...")
                 print(f"📁 Storage directory: {args.storage_dir}")
                 print("Press Ctrl+C to stop")
                 
@@ -207,7 +207,7 @@ Examples:
                     import json
                     print(json.dumps(stats, indent=2))
                 else:
-                    print("📊 ccutils Status")
+                    print("📊 cuti Status")
                     print("=" * 40)
                     print(f"📝 Total prompts: {stats['total_prompts']}")
                     print(f"✅ Completed: {stats['total_processed']}")

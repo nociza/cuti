@@ -38,7 +38,7 @@ class QueueManager:
 
     def start(self, callback: Optional[Callable[[QueueState], None]] = None) -> None:
         """Start the queue processing loop."""
-        print("Starting ccutils Manager...")
+        print("Starting cuti Manager...")
 
         is_working, message = self.claude_interface.test_connection()
         if not is_working:

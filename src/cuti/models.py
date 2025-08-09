@@ -1,5 +1,5 @@
 """
-Data structures for ccutils system.
+Data structures for cuti system.
 """
 
 from dataclasses import dataclass, field

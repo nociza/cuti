@@ -1,3 +1,0 @@
-"""
-Web interface for ccutils.
-"""

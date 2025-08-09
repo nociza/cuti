@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ccutils - Modern CLI with Typer and prompt aliases.
+cuti - Modern CLI with Typer and prompt aliases.
 """
 
 from typing import Optional, List
@@ -21,7 +21,7 @@ from .history import PromptHistoryManager
 
 app = typer.Typer(
     name="claude-queue",
-    help="Production-ready ccutils system with aliases and monitoring",
+    help="Production-ready cuti system with aliases and monitoring",
     rich_markup_mode="rich",
 )
 
@@ -161,7 +161,7 @@ def status(
         return
 
     # Create a nice table
-    table = Table(title="ccutils Status")
+    table = Table(title="cuti Status")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="magenta")
     
