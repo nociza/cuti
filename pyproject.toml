@@ -47,17 +47,12 @@ dev = [
 ]
 
 [project.scripts]
-claude-queue     = "claude_code_queue.cli:app"
-claude-queue-web = "claude_code_queue.web.main:main"
-
-[project.urls]
-Documentation = "https://claude-code-queue.readthedocs.io/"
-Homepage      = "https://github.com/your-org/claude-code-queue"
-Issues        = "https://github.com/your-org/claude-code-queue/issues"
-Repository    = "https://github.com/your-org/claude-code-queue.git"
+ccutils          = "ccutils.__main__:main"
+claude-queue     = "ccutils.cli:app"
+claude-queue-web = "ccutils.web.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/claude_code_queue"]
+packages = ["src/ccutils"]
 
 [tool.hatch.build.targets.sdist]
 include = ["/LICENSE", "/README.md", "/src"]

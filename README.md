@@ -333,7 +333,7 @@ Create `~/.claude-queue/config.json`:
 
 ```
 claude-code-queue/
-├── src/claude_code_queue/
+├── src/ccutils/
 │   ├── cli.py                 # Modern CLI interface
 │   ├── queue_manager.py       # Core queue management  
 │   ├── models.py             # Data models
@@ -430,7 +430,7 @@ uv run pytest
 uv run pytest tests/test_aliases.py
 
 # With coverage
-uv run pytest --cov=claude_code_queue
+uv run pytest --cov=ccutils
 ```
 
 ### Contributing

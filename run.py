@@ -130,7 +130,7 @@ Examples:
             sys.path.insert(0, str(src_path))
         
         # Try importing the package
-        import claude_code_queue
+        import ccutils
         
     except ImportError:
         print("❌ ccutils not installed. Run: python run.py setup")
@@ -139,7 +139,7 @@ Examples:
     # Handle web command
     if args.command == 'web':
         try:
-            from claude_code_queue.web.main import create_app
+            from ccutils.web.main import create_app
             import uvicorn
             
             app = create_app(args.storage_dir)
@@ -159,7 +159,7 @@ Examples:
     # Handle CLI command
     elif args.command == 'cli':
         try:
-            from claude_code_queue.cli import app as cli_app
+            from ccutils.cli import app as cli_app
             
             # Pass through CLI arguments
             if args.cli_args:
@@ -177,9 +177,9 @@ Examples:
     # Handle direct queue commands
     else:
         try:
-            from claude_code_queue.queue_manager import QueueManager
-            from claude_code_queue.models import QueuedPrompt
-            from claude_code_queue.aliases import PromptAliasManager
+            from ccutils.queue_manager import QueueManager
+            from ccutils.models import QueuedPrompt
+            from ccutils.aliases import PromptAliasManager
             
             manager = QueueManager(storage_dir=args.storage_dir)
             

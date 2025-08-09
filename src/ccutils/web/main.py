@@ -5,6 +5,8 @@ FastAPI web application for ccutils.
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+import os
+import threading
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
@@ -108,6 +110,35 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     except RuntimeError:
         pass  # Directory might not exist, will create later
     
+    # Start queue processor in the background on app startup
+    @app.on_event("startup")
+    async def _start_background_processor():
+        # Avoid double-start in hot-reload or multiple workers
+        if getattr(app.state, "queue_thread", None) is not None:
+            return
+
+        def _run_queue():
+            try:
+                queue_manager.start()
+            finally:
+                # Reflect stopped state
+                app.state.queue_running = False
+
+        thread = threading.Thread(target=_run_queue, name="ccutils-queue", daemon=True)
+        app.state.queue_thread = thread
+        app.state.queue_running = True
+        thread.start()
+
+    @app.on_event("shutdown")
+    async def _stop_background_processor():
+        try:
+            queue_manager.stop()
+        except Exception:
+            pass
+        thread = getattr(app.state, "queue_thread", None)
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=5)
+
     @app.get("/", response_class=HTMLResponse)
     async def dashboard():
         """Main dashboard page."""
@@ -458,7 +489,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
                 historyEntries: [],
                 systemStatus: {},
                 performanceMetrics: {},
-                queueRunning: false,
+                queueRunning: true,
                 showAddPromptModal: false,
                 showCreateAliasModal: false,
                 showTaskExpansionModal: false,
@@ -822,9 +853,16 @@ def main():
     parser.add_argument("--storage-dir", default="~/.claude-queue", help="Storage directory")
     
     args = parser.parse_args()
-    
-    app = create_app(args.storage_dir)
-    uvicorn.run(app, host=args.host, port=args.port)
+
+    # Allow environment variables to override CLI
+    host = os.getenv("CLAUDE_QUEUE_WEB_HOST", args.host)
+    port_str = os.getenv("CLAUDE_QUEUE_WEB_PORT")
+    port = int(port_str) if port_str else args.port
+    storage_dir = os.getenv("CLAUDE_QUEUE_STORAGE_DIR", args.storage_dir)
+
+    app = create_app(storage_dir)
+    # Uvicorn will trigger FastAPI startup event where the queue starts in background
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
