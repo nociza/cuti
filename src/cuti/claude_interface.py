@@ -262,3 +262,56 @@ class ClaudeCodeInterface:
         """Execute a simple prompt without full QueuedPrompt object."""
         simple_prompt = QueuedPrompt(content=prompt_text, working_directory=working_dir)
         return self.execute_prompt(simple_prompt)
+    
+    async def stream_prompt(self, prompt_text: str, working_dir: str = "."):
+        """Stream output from Claude Code CLI asynchronously."""
+        import asyncio
+        
+        # Prepare command
+        cmd = [
+            self.claude_command,
+            prompt_text
+        ]
+        
+        try:
+            # Change to working directory
+            original_cwd = os.getcwd()
+            working_path = Path(working_dir).resolve()
+            if not working_path.exists():
+                working_path.mkdir(parents=True, exist_ok=True)
+            os.chdir(working_path)
+            
+            # Start the process
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ}
+            )
+            
+            # Stream stdout line by line
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                yield line.decode('utf-8', errors='replace')
+            
+            # Wait for process to complete
+            await process.wait()
+            
+            # Change back to original directory
+            os.chdir(original_cwd)
+            
+            # If there's stderr, yield it
+            if process.returncode != 0:
+                stderr = await process.stderr.read()
+                if stderr:
+                    yield f"\n[Error] {stderr.decode('utf-8', errors='replace')}"
+                    
+        except Exception as e:
+            # Ensure we change back to original directory
+            try:
+                os.chdir(original_cwd)
+            except:
+                pass
+            yield f"\n[Error] {str(e)}"

@@ -24,6 +24,7 @@ from ..models import QueuedPrompt, PromptStatus
 from ..aliases import PromptAliasManager
 from ..history import PromptHistoryManager
 from ..task_expansion import TaskExpansionEngine
+from ..claude_interface import ClaudeCodeInterface
 from .monitoring import SystemMonitor
 
 
@@ -84,6 +85,10 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
         redoc_url="/redoc"
     )
     
+    # Get working directory from environment or use current directory
+    working_dir = os.environ.get("CUTI_WORKING_DIR", os.getcwd())
+    app.state.working_directory = working_dir
+    
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
@@ -94,7 +99,16 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     )
     
     # Initialize managers
-    queue_manager = QueueManager(storage_dir=storage_dir)
+    try:
+        queue_manager = QueueManager(storage_dir=storage_dir)
+        claude_interface = ClaudeCodeInterface()
+    except RuntimeError as e:
+        # Handle case where Claude CLI is not available
+        print(f"Warning: {e}")
+        print("Web interface will start in demo mode.")
+        queue_manager = None
+        claude_interface = None
+    
     alias_manager = PromptAliasManager(storage_dir)
     history_manager = PromptHistoryManager(storage_dir)
     task_engine = TaskExpansionEngine(storage_dir)
@@ -141,7 +155,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard():
-        """Main dashboard page."""
+        """Main chat interface page."""
         template_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -153,16 +167,40 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chat-message { white-space: pre-wrap; word-wrap: break-word; }
+        .chat-message pre { background: #f5f5f5; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+        .chat-message code { background: #f5f5f5; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
+        .streaming::after { content: '●●●'; animation: dots 1.5s infinite; }
+        @keyframes dots {
+            0%, 20% { content: '●'; }
+            40% { content: '●●'; }
+            60%, 100% { content: '●●●'; }
+        }
+        .todo-item { padding: 8px; margin: 4px 0; background: #f0f7ff; border-radius: 6px; border-left: 4px solid #0066cc; }
+        .todo-item.completed { background: #f0fff0; border-left-color: #00cc00; text-decoration: line-through; }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen" x-data="dashboard()">
     <!-- Navigation -->
     <nav class="bg-blue-600 text-white p-4 shadow-lg">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold flex items-center">
-                <i class="fas fa-robot mr-2"></i>
-                cuti
-            </h1>
+            <div>
+                <h1 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-robot mr-2"></i>
+                    cuti
+                </h1>
+                <p class="text-sm text-blue-200 mt-1">
+                    <i class="fas fa-folder-open mr-1"></i>
+                    Working Directory: """ + str(app.state.working_directory) + """
+                </p>
+            </div>
             <div class="flex space-x-4">
+                <button @click="activeTab = 'chat'" 
+                        :class="activeTab === 'chat' ? 'bg-blue-800' : 'bg-blue-500'"
+                        class="px-4 py-2 rounded hover:bg-blue-700 transition">
+                    <i class="fas fa-comments mr-1"></i> Chat
+                </button>
                 <button @click="activeTab = 'dashboard'" 
                         :class="activeTab === 'dashboard' ? 'bg-blue-800' : 'bg-blue-500'"
                         class="px-4 py-2 rounded hover:bg-blue-700 transition">
@@ -193,6 +231,85 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     </nav>
 
     <div class="container mx-auto p-6">
+        <!-- Chat Tab -->
+        <div x-show="activeTab === 'chat'" class="space-y-4">
+            <div class="flex gap-4">
+                <!-- Chat Area -->
+                <div class="flex-1">
+                    <div class="bg-white rounded-lg shadow h-[calc(100vh-280px)] flex flex-col">
+                        <!-- Messages -->
+                        <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                            <template x-for="message in chatMessages" :key="message.id">
+                                <div class="flex" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+                                    <div class="max-w-3xl">
+                                        <div class="text-xs text-gray-500 mb-1" x-text="message.role"></div>
+                                        <div class="chat-message rounded-lg p-3"
+                                             :class="message.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'"
+                                             x-html="formatMessage(message.content)"></div>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="isStreaming" class="flex justify-start">
+                                <div class="max-w-3xl">
+                                    <div class="text-xs text-gray-500 mb-1">assistant</div>
+                                    <div class="bg-gray-100 rounded-lg p-3">
+                                        <span class="streaming"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Input -->
+                        <div class="border-t p-4">
+                            <div class="flex gap-2">
+                                <textarea
+                                    x-model="chatInput"
+                                    @keydown.enter.prevent="if(!$event.shiftKey) sendChatMessage()"
+                                    placeholder="Type your message..."
+                                    class="flex-1 px-4 py-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    rows="3"
+                                    :disabled="isStreaming"></textarea>
+                                <button
+                                    @click="sendChatMessage()"
+                                    :disabled="isStreaming || !chatInput.trim()"
+                                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Todo List Sidebar -->
+                <div class="w-80">
+                    <div class="bg-white rounded-lg shadow p-4 h-[calc(100vh-280px)] overflow-y-auto">
+                        <h3 class="font-semibold mb-4 flex items-center">
+                            <i class="fas fa-tasks mr-2"></i>
+                            Claude's Todo List
+                        </h3>
+                        <div x-show="todos.length === 0" class="text-gray-500 text-center py-8">
+                            No todos yet
+                        </div>
+                        <div class="space-y-2">
+                            <template x-for="todo in todos" :key="todo.id">
+                                <div class="todo-item" :class="todo.completed && 'completed'">
+                                    <div class="flex items-start gap-2">
+                                        <input
+                                            type="checkbox"
+                                            :checked="todo.completed"
+                                            @change="toggleTodo(todo.id)"
+                                            class="mt-1">
+                                        <div class="flex-1">
+                                            <div x-text="todo.text" class="text-sm"></div>
+                                            <div x-show="todo.timestamp" class="text-xs text-gray-500 mt-1" x-text="formatTime(todo.timestamp)"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Dashboard Tab -->
         <div x-show="activeTab === 'dashboard'" class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -482,7 +599,17 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     <script>
         function dashboard() {
             return {
-                activeTab: 'dashboard',
+                activeTab: 'chat',
+                // Chat functionality
+                chatMessages: [],
+                chatInput: '',
+                isStreaming: false,
+                chatWs: null,
+                currentStreamingMessage: null,
+                todos: [],
+                nextTodoId: 1,
+                
+                // Dashboard data
                 stats: {},
                 prompts: [],
                 aliases: [],
@@ -508,8 +635,9 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
                     await this.loadHistory();
                     await this.loadSystemStatus();
                     
-                    // Set up WebSocket connection
+                    // Set up WebSocket connections
                     this.connectWebSocket();
+                    this.connectChatWebSocket();
                     
                     // Refresh data periodically
                     setInterval(() => {
@@ -517,6 +645,123 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
                         this.loadPrompts();
                         this.loadSystemStatus();
                     }, 5000);
+                },
+                
+                // Chat functionality
+                connectChatWebSocket() {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    this.chatWs = new WebSocket(`${protocol}//${window.location.host}/chat-ws`);
+                    
+                    this.chatWs.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'start') {
+                            this.isStreaming = true;
+                            this.currentStreamingMessage = {
+                                id: Date.now(),
+                                role: 'assistant',
+                                content: '',
+                                timestamp: new Date()
+                            };
+                        } else if (data.type === 'stream' && this.currentStreamingMessage) {
+                            this.currentStreamingMessage.content += data.content;
+                            this.extractTodosFromContent(data.content);
+                        } else if (data.type === 'end') {
+                            if (this.currentStreamingMessage) {
+                                this.chatMessages.push(this.currentStreamingMessage);
+                                this.currentStreamingMessage = null;
+                                this.scrollChatToBottom();
+                            }
+                            this.isStreaming = false;
+                        } else if (data.type === 'error') {
+                            this.chatMessages.push({
+                                id: Date.now(),
+                                role: 'system',
+                                content: 'Error: ' + data.content,
+                                timestamp: new Date()
+                            });
+                            this.isStreaming = false;
+                        }
+                    };
+                    
+                    this.chatWs.onclose = () => {
+                        setTimeout(() => this.connectChatWebSocket(), 3000);
+                    };
+                },
+                
+                sendChatMessage() {
+                    if (!this.chatInput.trim() || this.isStreaming || !this.chatWs) return;
+                    
+                    // Add user message
+                    this.chatMessages.push({
+                        id: Date.now(),
+                        role: 'user',
+                        content: this.chatInput,
+                        timestamp: new Date()
+                    });
+                    
+                    // Send to server
+                    this.chatWs.send(JSON.stringify({
+                        type: 'message',
+                        content: this.chatInput
+                    }));
+                    
+                    this.chatInput = '';
+                    this.scrollChatToBottom();
+                },
+                
+                extractTodosFromContent(content) {
+                    // Extract todos from Claude's output using regex patterns
+                    const todoPatterns = [
+                        /^\d+\.\s*(.+)$/gm,  // Numbered lists
+                        /^[-*]\s*(.+)$/gm,   // Bullet points
+                        /TODO:\s*(.+)$/gim,  // Explicit TODO
+                        /\\[\\s*\\]\s*(.+)$/gm // Checkbox format
+                    ];
+                    
+                    for (const pattern of todoPatterns) {
+                        const matches = content.matchAll(pattern);
+                        for (const match of matches) {
+                            const todoText = match[1].trim();
+                            if (todoText.length > 10 && !this.todos.find(t => t.text === todoText)) {
+                                this.todos.push({
+                                    id: this.nextTodoId++,
+                                    text: todoText,
+                                    completed: false,
+                                    timestamp: new Date()
+                                });
+                            }
+                        }
+                    }
+                },
+                
+                toggleTodo(todoId) {
+                    const todo = this.todos.find(t => t.id === todoId);
+                    if (todo) {
+                        todo.completed = !todo.completed;
+                    }
+                },
+                
+                formatMessage(content) {
+                    // Basic markdown-like formatting
+                    return content
+                        .replace(/`([^`]+)`/g, '<code>$1</code>')
+                        .replace(/```([\\s\\S]*?)```/g, '<pre><code>$1</code></pre>')
+                        .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>')
+                        .replace(/\\*([^*]+)\\*/g, '<em>$1</em>');
+                },
+                
+                formatTime(timestamp) {
+                    return new Date(timestamp).toLocaleTimeString();
+                },
+                
+                scrollChatToBottom() {
+                    this.$nextTick(() => {
+                        const chatMessages = document.getElementById('chatMessages');
+                        if (chatMessages) {
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    });
                 },
                 
                 async loadStats() {
@@ -654,16 +899,100 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
         except WebSocketDisconnect:
             websocket_manager.disconnect(websocket)
     
+    @app.websocket("/chat-ws")
+    async def chat_websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for streaming Claude chat responses."""
+        await websocket.accept()
+        
+        try:
+            while True:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                
+                if message["type"] == "message":
+                    # Start streaming response
+                    await websocket.send_text(json.dumps({
+                        "type": "start"
+                    }))
+                    
+                    try:
+                        if claude_interface is None:
+                            # Demo mode - show a sample response
+                            await websocket.send_text(json.dumps({
+                                "type": "stream",
+                                "content": "Demo Mode: Claude Code CLI not installed.\n\n"
+                            }))
+                            await websocket.send_text(json.dumps({
+                                "type": "stream", 
+                                "content": "To use the full chat interface:\n"
+                            }))
+                            await websocket.send_text(json.dumps({
+                                "type": "stream",
+                                "content": "1. Install Claude Code CLI\n"
+                            }))
+                            await websocket.send_text(json.dumps({
+                                "type": "stream",
+                                "content": "2. Restart the cuti web interface\n\n"
+                            }))
+                            await websocket.send_text(json.dumps({
+                                "type": "stream",
+                                "content": "Your message was: " + message["content"]
+                            }))
+                        else:
+                            # Stream Claude Code output
+                            async for chunk in claude_interface.stream_prompt(
+                                message["content"], 
+                                app.state.working_directory
+                            ):
+                                await websocket.send_text(json.dumps({
+                                    "type": "stream",
+                                    "content": chunk
+                                }))
+                        
+                        # End streaming
+                        await websocket.send_text(json.dumps({
+                            "type": "end"
+                        }))
+                        
+                    except Exception as e:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "content": str(e)
+                        }))
+                    
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            try:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "content": str(e)
+                }))
+            except:
+                pass
+    
     # Queue Management APIs
     @app.get("/api/queue/status")
     async def get_queue_status():
         """Get current queue status and statistics."""
+        if queue_manager is None:
+            return {
+                "total_prompts": 0,
+                "total_processed": 0, 
+                "failed_count": 0,
+                "success_rate": 0,
+                "working_directory": app.state.working_directory
+            }
         state = queue_manager.get_status()
-        return state.get_stats()
+        stats = state.get_stats()
+        stats["working_directory"] = app.state.working_directory
+        return stats
     
     @app.get("/api/queue/prompts")
     async def get_prompts():
         """Get all prompts in the queue."""
+        if queue_manager is None:
+            return []
         state = queue_manager.get_status()
         return [
             {
@@ -684,13 +1013,18 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     @app.post("/api/queue/prompts")
     async def add_prompt(request: PromptRequest):
         """Add a new prompt to the queue."""
+        # Use app's working directory if not specified
+        working_dir = request.working_directory
+        if working_dir == ".":
+            working_dir = app.state.working_directory
+        
         # Resolve alias if needed
-        resolved_content = alias_manager.resolve_alias(request.content, request.working_directory)
+        resolved_content = alias_manager.resolve_alias(request.content, working_dir)
         
         # Add to history
         history_manager.add_prompt_to_history(
             resolved_content,
-            request.working_directory,
+            working_dir,
             request.context_files,
             request.estimated_tokens
         )
@@ -698,7 +1032,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
         # Create queued prompt
         queued_prompt = QueuedPrompt(
             content=resolved_content,
-            working_directory=request.working_directory,
+            working_directory=working_dir,
             priority=request.priority,
             context_files=request.context_files,
             max_retries=request.max_retries,

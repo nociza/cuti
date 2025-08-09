@@ -93,13 +93,19 @@ def start(
 def add(
     prompt: str = typer.Argument(..., help="The prompt text or alias name"),
     priority: int = typer.Option(0, "-p", "--priority", help="Priority (lower = higher)"),
-    working_dir: str = typer.Option(".", "-d", "--working-dir", help="Working directory"),
+    working_dir: Optional[str] = typer.Option(None, "-d", "--working-dir", help="Working directory (default: current)"),
     context_files: List[str] = typer.Option([], "-f", "--context-files", help="Context files"),
     max_retries: int = typer.Option(3, "-r", "--max-retries", help="Maximum retry attempts"),
     estimated_tokens: Optional[int] = typer.Option(None, "-t", "--estimated-tokens", help="Estimated tokens"),
     storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
 ):
     """Add a prompt to the queue (supports aliases)."""
+    import os
+    
+    # Use current directory if not specified
+    if working_dir is None:
+        working_dir = os.getcwd()
+    
     manager = get_manager(storage_dir)
     alias_manager = get_alias_manager(storage_dir)
     history_manager = get_history_manager(storage_dir)
@@ -335,11 +341,17 @@ def create_alias(
     name: str = typer.Argument(..., help="Alias name"),
     prompt: str = typer.Argument(..., help="Prompt content"),
     description: str = typer.Option("", help="Alias description"),
-    working_dir: str = typer.Option(".", help="Default working directory"),
+    working_dir: Optional[str] = typer.Option(None, help="Default working directory (default: current)"),
     context_files: List[str] = typer.Option([], help="Default context files"),
     storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
 ):
     """Create a new prompt alias."""
+    import os
+    
+    # Use current directory if not specified
+    if working_dir is None:
+        working_dir = os.getcwd()
+        
     alias_manager = get_alias_manager(storage_dir)
     success = alias_manager.create_alias(name, prompt, description, working_dir, context_files)
     
