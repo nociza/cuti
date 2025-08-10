@@ -27,6 +27,7 @@ from ..task_expansion import TaskExpansionEngine
 from ..claude_interface import ClaudeCodeInterface
 from .monitoring import SystemMonitor
 from .terminal_main import get_terminal_template
+from ..claude_usage_monitor import ClaudeUsageMonitor, UsageStats
 
 
 class PromptRequest(BaseModel):
@@ -115,6 +116,9 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     task_engine = TaskExpansionEngine(storage_dir)
     system_monitor = SystemMonitor()
     websocket_manager = WebSocketManager()
+    
+    # Initialize Claude usage monitor
+    usage_monitor = ClaudeUsageMonitor(plan='pro', storage_dir=storage_dir)
     
     # Static files and templates
     web_dir = Path(__file__).parent
@@ -1035,6 +1039,31 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
         except WebSocketDisconnect:
             websocket_manager.disconnect(websocket)
     
+    @app.websocket("/usage-ws")
+    async def usage_websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for real-time usage monitoring."""
+        await websocket.accept()
+        
+        try:
+            while True:
+                # Send usage stats every 10 seconds
+                stats = usage_monitor.refresh_data()
+                await websocket.send_json({
+                    "type": "usage_update",
+                    "data": {
+                        "total_tokens": stats.total_tokens,
+                        "tokens_today": stats.tokens_today,
+                        "tokens_this_month": stats.tokens_this_month,
+                        "daily_percentage": stats.daily_percentage,
+                        "monthly_percentage": stats.monthly_percentage,
+                        "cost_today": stats.cost_today,
+                        "cost_this_month": stats.cost_this_month
+                    }
+                })
+                await asyncio.sleep(10)
+        except WebSocketDisconnect:
+            pass
+    
     @app.websocket("/chat-ws")
     async def chat_websocket_endpoint(websocket: WebSocket):
         """WebSocket endpoint for streaming Claude chat responses."""
@@ -1295,9 +1324,39 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     
     @app.get("/api/monitoring/tokens")
     async def get_token_usage():
-        """Get token usage statistics."""
-        # This would be implemented based on your token tracking needs
-        return {"daily_usage": [], "monthly_usage": [], "total_tokens": 0}
+        """Get token usage statistics from Claude Code."""
+        stats = usage_monitor.refresh_data()
+        history = usage_monitor.get_usage_history(days=30)
+        return {
+            "current_stats": {
+                "total_tokens": stats.total_tokens,
+                "total_cost": stats.total_cost,
+                "total_requests": stats.total_requests,
+                "tokens_today": stats.tokens_today,
+                "cost_today": stats.cost_today,
+                "requests_today": stats.requests_today,
+                "tokens_this_month": stats.tokens_this_month,
+                "cost_this_month": stats.cost_this_month,
+                "requests_this_month": stats.requests_this_month,
+                "daily_limit": stats.daily_limit,
+                "monthly_limit": stats.monthly_limit,
+                "daily_remaining": stats.daily_remaining,
+                "monthly_remaining": stats.monthly_remaining,
+                "daily_percentage": stats.daily_percentage,
+                "monthly_percentage": stats.monthly_percentage
+            },
+            "history": history
+        }
+    
+    @app.post("/api/monitoring/configure")
+    async def configure_usage_monitor(plan: str = 'pro', daily_limit: Optional[int] = None, monthly_limit: Optional[int] = None):
+        """Configure usage monitoring settings."""
+        if plan == 'custom' and daily_limit and monthly_limit:
+            usage_monitor.update_plan_limits(daily_limit, monthly_limit)
+        elif plan in ['pro', 'max5', 'max20']:
+            usage_monitor.plan = plan
+            usage_monitor.limits = usage_monitor.PLAN_LIMITS[plan]
+        return {"status": "configured", "plan": plan, "limits": usage_monitor.limits}
     
     @app.get("/api/monitoring/performance")
     async def get_performance_metrics():

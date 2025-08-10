@@ -61,10 +61,10 @@ def get_terminal_template(working_directory: str) -> str:
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            height: 100vh;
             color: var(--text-primary);
             position: relative;
-            overflow-x: hidden;
+            overflow: hidden;
         }}
         
         /* Animated Background */
@@ -194,7 +194,7 @@ def get_terminal_template(working_directory: str) -> str:
             display: flex;
             flex: 1;
             margin-top: 72px;
-            height: calc(100vh - 72px);
+            height: calc(100vh - 72px - 32px); /* Account for header (72px) and status bar (32px) */
         }}
         
         /* Main Content */
@@ -207,6 +207,7 @@ def get_terminal_template(working_directory: str) -> str:
             -webkit-backdrop-filter: blur(20px);
             margin: 24px;
             margin-right: 12px;
+            margin-bottom: 0; /* Remove bottom margin to prevent overlap */
             border-radius: 24px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
             overflow: hidden;
@@ -268,6 +269,7 @@ def get_terminal_template(working_directory: str) -> str:
             font-family: 'JetBrains Mono', monospace;
             font-size: 14px;
             line-height: 1.8;
+            min-height: 0; /* Allow proper flexbox scrolling */
         }}
         
         /* Terminal Message Styles */
@@ -406,12 +408,13 @@ def get_terminal_template(working_directory: str) -> str:
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            margin: 24px 24px 24px 12px;
+            margin: 24px 24px 0 12px; /* Remove bottom margin */
             border-radius: 24px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
         }}
         
         .sidebar.collapsed {{
@@ -990,18 +993,20 @@ def get_terminal_template(working_directory: str) -> str:
                 }},
                 
                 extractTodosFromContent(content) {{
+                    // Only extract actual TODO items, not random lists
                     const todoPatterns = [
-                        /^\d+\.\s*(.+)$/gm,
-                        /^[-*]\s*(.+)$/gm,
                         /TODO:\s*(.+)$/gim,
-                        /\\[\\s*\\]\s*(.+)$/gm
+                        /\\[\\s*\\]\s*(.+)$/gm,
+                        /TASK:\s*(.+)$/gim,
+                        /FIX:\s*(.+)$/gim,
+                        /FIXME:\s*(.+)$/gim
                     ];
                     
                     for (const pattern of todoPatterns) {{
                         const matches = content.matchAll(pattern);
                         for (const match of matches) {{
                             const todoText = match[1].trim();
-                            if (todoText.length > 10 && !this.todos.find(t => t.text === todoText)) {{
+                            if (todoText.length > 5 && !this.todos.find(t => t.text === todoText)) {{
                                 this.todos.push({{
                                     id: this.nextTodoId++,
                                     text: todoText,
