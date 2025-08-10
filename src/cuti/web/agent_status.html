@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cuti - Agent Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f14;
+            color: #f7f7f8;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: #a1a1aa;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            color: #f7f7f8;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .stat-label {
+            color: #71717a;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #f7f7f8;
+        }
+        
+        .agents-section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #f7f7f8;
+        }
+        
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .agent-card {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .agent-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .agent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .agent-name {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .agent-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-available {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        .status-busy {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        .status-offline {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .agent-details {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        
+        .detail-label {
+            color: #71717a;
+        }
+        
+        .detail-value {
+            color: #f7f7f8;
+        }
+        
+        .token-usage-section {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .usage-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .usage-item {
+            text-align: center;
+        }
+        
+        .usage-label {
+            color: #71717a;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .usage-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #f7f7f8;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #71717a;
+            padding: 40px;
+        }
+        
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Agent Status</h1>
+            <div class="nav-links">
+                <a href="/">Chat Interface</a>
+                <a href="/api/docs">API Docs</a>
+            </div>
+        </div>
+        
+        <!-- Real-time Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-label">Queue Status</div>
+                <div class="stat-value" id="queueCount">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Agents</div>
+                <div class="stat-value" id="activeAgents">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value" id="successRate">-</div>
+            </div>
+        </div>
+        
+        <!-- Agents Section -->
+        <div class="agents-section">
+            <h2 class="section-title">Available Agents</h2>
+            <div class="agents-grid" id="agentsGrid">
+                <div class="loading">Loading agents...</div>
+            </div>
+        </div>
+        
+        <!-- Token Usage Section -->
+        <div class="token-usage-section">
+            <h2 class="section-title">Token Usage (Real Data)</h2>
+            <div class="usage-grid" id="tokenUsage">
+                <div class="usage-item">
+                    <div class="usage-label">Today's Tokens</div>
+                    <div class="usage-value" id="todayTokens">-</div>
+                </div>
+                <div class="usage-item">
+                    <div class="usage-label">Today's Cost</div>
+                    <div class="usage-value" id="todayCost">-</div>
+                </div>
+                <div class="usage-item">
+                    <div class="usage-label">Total Requests</div>
+                    <div class="usage-value" id="totalRequests">-</div>
+                </div>
+                <div class="usage-item">
+                    <div class="usage-label">Avg Tokens/Request</div>
+                    <div class="usage-value" id="avgTokens">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Fetch and display real data
+        async function fetchData() {
+            try {
+                // Fetch queue status
+                const queueRes = await fetch('/api/queue/status');
+                if (queueRes.ok) {
+                    const queueData = await queueRes.json();
+                    document.getElementById('queueCount').textContent = 
+                        `${queueData.queued || 0} queued`;
+                    
+                    const total = queueData.total_prompts || 0;
+                    const completed = queueData.completed || 0;
+                    const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+                    document.getElementById('successRate').textContent = `${successRate}%`;
+                }
+                
+                // Fetch agents
+                const agentsRes = await fetch('/api/agents');
+                if (agentsRes.ok) {
+                    const agents = await agentsRes.json();
+                    displayAgents(agents);
+                    
+                    const activeCount = agents.filter(a => a.status === 'available' || a.status === 'busy').length;
+                    document.getElementById('activeAgents').textContent = activeCount;
+                }
+                
+                // Fetch token usage
+                const tokenRes = await fetch('/api/monitoring/tokens');
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json();
+                    displayTokenUsage(tokenData);
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+        
+        function displayAgents(agents) {
+            const grid = document.getElementById('agentsGrid');
+            
+            if (!agents || agents.length === 0) {
+                grid.innerHTML = '<div class="loading">No agents available</div>';
+                return;
+            }
+            
+            grid.innerHTML = agents.map(agent => `
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <div class="agent-name">${agent.name}</div>
+                        <div class="agent-status status-${agent.status}">${agent.status}</div>
+                    </div>
+                    <div class="agent-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Type:</span>
+                            <span class="detail-value">${agent.type}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Load:</span>
+                            <span class="detail-value">${Math.round((agent.current_load || 0) * 100)}%</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Capabilities:</span>
+                            <span class="detail-value">${agent.capabilities || 0}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function displayTokenUsage(data) {
+            if (!data || !data.totals) return;
+            
+            const totals = data.totals;
+            document.getElementById('todayTokens').textContent = 
+                (totals.total_tokens || 0).toLocaleString();
+            document.getElementById('todayCost').textContent = 
+                `$${(totals.total_cost || 0).toFixed(4)}`;
+            document.getElementById('totalRequests').textContent = 
+                (totals.total_requests || 0).toLocaleString();
+            document.getElementById('avgTokens').textContent = 
+                Math.round(totals.avg_tokens_per_request || 0).toLocaleString();
+        }
+        
+        // Initial load
+        fetchData();
+        
+        // Refresh every 5 seconds
+        setInterval(fetchData, 5000);
+    </script>
+</body>
+</html>

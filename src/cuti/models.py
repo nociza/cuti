@@ -202,6 +202,7 @@ class ExecutionResult:
     error: str = ""
     rate_limit_info: Optional[RateLimitInfo] = None
     execution_time: float = 0.0
+    tokens_used: int = 0
 
     @property
     def is_rate_limited(self) -> bool:

@@ -28,6 +28,7 @@ from ..claude_interface import ClaudeCodeInterface
 from .monitoring import SystemMonitor
 from .terminal_main import get_terminal_template
 from ..claude_usage_monitor import ClaudeUsageMonitor, UsageStats
+from pathlib import Path
 
 
 class PromptRequest(BaseModel):
@@ -160,9 +161,18 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard():
-        """Main terminal chat interface page."""
-        # Old template removed - using new terminal interface
+        """Main terminal chat interface."""
         return HTMLResponse(content=get_terminal_template(str(app.state.working_directory)))
+    
+    @app.get("/agents", response_class=HTMLResponse)
+    async def agents_dashboard():
+        """Agent status dashboard page."""
+        status_path = Path(__file__).parent / "agent_status.html"
+        if status_path.exists():
+            with open(status_path, 'r') as f:
+                return HTMLResponse(content=f.read())
+        else:
+            return HTMLResponse(content=get_terminal_template(str(app.state.working_directory)))
     
     # Old dashboard code for reference (commented out)
     '''
@@ -856,7 +866,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
                         /^\d+\.\s*(.+)$/gm,  // Numbered lists
                         /^[-*]\s*(.+)$/gm,   // Bullet points
                         /TODO:\s*(.+)$/gim,  // Explicit TODO
-                        /\\[\\s*\\]\s*(.+)$/gm // Checkbox format
+                        /\\[\\s*\\]\\s*(.+)$/gm // Checkbox format
                     ];
                     
                     for (const pattern of todoPatterns) {
@@ -1063,6 +1073,44 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
                 await asyncio.sleep(10)
         except WebSocketDisconnect:
             pass
+    
+    @app.websocket("/agent-ws")
+    async def agent_websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for real-time agent updates."""
+        await websocket.accept()
+        
+        try:
+            while True:
+                # Send agent status updates every 5 seconds
+                await asyncio.sleep(5)
+                
+                # Mock agent status data (replace with real agent pool data when available)
+                agent_status = {
+                    "type": "agent_status",
+                    "agents": [
+                        {"name": "Claude Code", "status": "available", "load": 0.2},
+                        {"name": "Gemini Pro", "status": "available", "load": 0.1},
+                    ]
+                }
+                await websocket.send_json(agent_status)
+                
+                # Mock metrics update
+                metrics_update = {
+                    "type": "metrics_update",
+                    "metrics": {
+                        "total_tasks": 247,
+                        "success_rate": 96.8,
+                        "avg_response": 1.4,
+                        "tokens_used": 45200,
+                        "cost_today": 12.45
+                    }
+                }
+                await websocket.send_json(metrics_update)
+                
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            print(f"Agent WebSocket error: {e}")
     
     @app.websocket("/chat-ws")
     async def chat_websocket_endpoint(websocket: WebSocket):
@@ -1315,6 +1363,146 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
                 for task in breakdown.subtasks
             ]
         }
+    
+    # Agent Management APIs
+    @app.get("/api/agents")
+    async def get_agents():
+        """Get all registered agents and their status."""
+        # Mock agent data for now (replace with real agent pool when integrated)
+        return [
+            {
+                "id": "claude-001",
+                "name": "Claude Code",
+                "type": "claude",
+                "status": "available",
+                "capabilities": ["code_generation", "debugging", "refactoring", "testing", "architecture"],
+                "metrics": {
+                    "success_rate": 98,
+                    "avg_response_time": 1.2,
+                    "tokens_capacity": 200000,
+                    "current_load": 0.2
+                }
+            },
+            {
+                "id": "gemini-001",
+                "name": "Gemini Pro",
+                "type": "gemini",
+                "status": "available",
+                "capabilities": ["data_analysis", "research", "documentation", "multimodal"],
+                "metrics": {
+                    "success_rate": 95,
+                    "avg_response_time": 0.8,
+                    "tokens_capacity": 1000000,
+                    "current_load": 0.1
+                }
+            }
+        ]
+    
+    @app.get("/api/agents/{agent_id}")
+    async def get_agent_details(agent_id: str):
+        """Get detailed information about a specific agent."""
+        # Mock implementation
+        agents = {
+            "claude-001": {
+                "id": "claude-001",
+                "name": "Claude Code",
+                "type": "claude",
+                "status": "available",
+                "version": "1.0",
+                "capabilities": ["code_generation", "debugging", "refactoring", "testing", "architecture"],
+                "metrics": {
+                    "success_rate": 98,
+                    "avg_response_time": 1.2,
+                    "tokens_capacity": 200000,
+                    "tokens_used_today": 45200,
+                    "current_load": 0.2,
+                    "tasks_completed": 142,
+                    "tasks_failed": 3
+                },
+                "configuration": {
+                    "max_retries": 3,
+                    "timeout": 120,
+                    "temperature": 0.7
+                }
+            }
+        }
+        
+        if agent_id in agents:
+            return agents[agent_id]
+        else:
+            raise HTTPException(status_code=404, detail="Agent not found")
+    
+    @app.post("/api/agents/{agent_id}/execute")
+    async def execute_with_agent(agent_id: str, request: PromptRequest):
+        """Execute a prompt with a specific agent."""
+        # This would integrate with the agent pool to route to specific agent
+        return {
+            "status": "queued",
+            "agent_id": agent_id,
+            "prompt_id": f"prompt-{datetime.now().timestamp()}",
+            "estimated_time": 5
+        }
+    
+    @app.get("/api/routing/strategies")
+    async def get_routing_strategies():
+        """Get available routing strategies."""
+        return [
+            {
+                "name": "capability_based",
+                "description": "Routes tasks based on agent capabilities",
+                "active": True,
+                "priority": "high"
+            },
+            {
+                "name": "load_balanced",
+                "description": "Distributes tasks evenly across agents",
+                "active": True,
+                "priority": "medium"
+            },
+            {
+                "name": "cost_optimized",
+                "description": "Minimizes token usage and costs",
+                "active": False,
+                "priority": "low"
+            }
+        ]
+    
+    @app.post("/api/routing/strategy")
+    async def set_routing_strategy(strategy: str):
+        """Set the active routing strategy."""
+        valid_strategies = ["capability_based", "load_balanced", "cost_optimized", "speed_optimized"]
+        if strategy not in valid_strategies:
+            raise HTTPException(status_code=400, detail="Invalid routing strategy")
+        
+        return {"status": "success", "strategy": strategy}
+    
+    @app.get("/api/agents/timeline")
+    async def get_execution_timeline(limit: int = 20):
+        """Get recent agent execution timeline."""
+        # Mock timeline data
+        import random
+        agents = ["Claude Code", "Gemini Pro"]
+        tasks = [
+            "Refactoring authentication module",
+            "Analyzing performance metrics",
+            "Generated test suite for API endpoints",
+            "Optimizing database queries",
+            "Creating documentation",
+            "Debugging race condition"
+        ]
+        
+        timeline = []
+        for i in range(limit):
+            timeline.append({
+                "id": f"exec-{i}",
+                "agent": random.choice(agents),
+                "task": random.choice(tasks),
+                "timestamp": datetime.now().isoformat(),
+                "duration": f"{random.randint(10, 120)}s",
+                "status": "completed"
+            })
+        
+        return timeline
     
     # Monitoring APIs
     @app.get("/api/monitoring/system")

@@ -714,6 +714,9 @@ def get_terminal_template(working_directory: str) -> str:
                         class="nav-pill">
                     Settings
                 </button>
+                <a href="/agents" class="nav-pill" style="text-decoration: none;">
+                    Agent Status
+                </a>
             </nav>
             
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -996,7 +999,7 @@ def get_terminal_template(working_directory: str) -> str:
                     // Only extract actual TODO items, not random lists
                     const todoPatterns = [
                         /TODO:\s*(.+)$/gim,
-                        /\\[\\s*\\]\s*(.+)$/gm,
+                        /\\[\\s*\\]\\s*(.+)$/gm,
                         /TASK:\s*(.+)$/gim,
                         /FIX:\s*(.+)$/gim,
                         /FIXME:\s*(.+)$/gim
@@ -1028,7 +1031,7 @@ def get_terminal_template(working_directory: str) -> str:
                 formatTerminalMessage(content) {{
                     return content
                         .replace(/`([^`]+)`/g, '<span style="background: rgba(59, 130, 246, 0.2); padding: 2px 6px; border-radius: 4px; color: #60a5fa;">$1</span>')
-                        .replace(/```([\\s\\S]*?)```/g, '<div style="background: rgba(16, 185, 129, 0.1); padding: 12px; margin: 8px 0; border-left: 3px solid #10b981; border-radius: 4px; font-family: JetBrains Mono, monospace;">$1</div>')
+                        .replace(/```([\\\\s\\\\S]*?)```/g, '<div style="background: rgba(16, 185, 129, 0.1); padding: 12px; margin: 8px 0; border-left: 3px solid #10b981; border-radius: 4px; font-family: JetBrains Mono, monospace;">$1</div>')
                         .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong style="color: #34d399;">$1</strong>')
                         .replace(/\\*([^*]+)\\*/g, '<em style="color: #fbbf24;">$1</em>')
                         .replace(/\\n/g, '<br>');
