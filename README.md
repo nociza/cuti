@@ -11,7 +11,7 @@ The fastest way to get started:
 ```bash
 # Clone and set up
 git clone <repository-url>
-cd claude-code-queue
+cd cuti
 
 # Quick setup with uvx
 uvx run ./run.py setup
@@ -28,13 +28,15 @@ Open http://127.0.0.1:8000 in your browser for the full web interface!
 ## ✨ Features
 
 ### 🎯 Core Queue Management
+
 - **Smart Rate Limit Handling**: Automatically detects and waits for Claude Code rate limit resets
 - **Priority System**: Execute high-priority prompts first
-- **Retry Logic**: Configurable retry attempts with exponential backoff  
+- **Retry Logic**: Configurable retry attempts with exponential backoff
 - **Persistent Storage**: Queue survives system restarts
 - **Markdown Templates**: Rich prompt templates with YAML frontmatter
 
 ### 🔗 Prompt Aliases System
+
 - **Pre-built Aliases**: 10+ ready-to-use aliases for common development tasks
 - **Custom Aliases**: Create your own reusable prompt templates
 - **Variable Substitution**: Dynamic variables like `${PROJECT_NAME}`, `${DATE}`
@@ -42,20 +44,21 @@ Open http://127.0.0.1:8000 in your browser for the full web interface!
 
 #### Built-in Development Aliases
 
-| Alias | Description | Use Case |
-|-------|-------------|----------|
-| `explore-codebase` | Comprehensive codebase analysis and documentation | Understanding new projects |
-| `document-api` | Generate OpenAPI/Swagger documentation | API documentation |
-| `security-audit` | Comprehensive security vulnerability assessment | Security reviews |
-| `optimize-performance` | Performance analysis and optimization recommendations | Performance tuning |
-| `write-tests` | Complete test suite creation (unit/integration/e2e) | Test automation |
-| `refactor-code` | Code quality improvement and refactoring | Code maintenance |
-| `setup-cicd` | CI/CD pipeline configuration | DevOps automation |
-| `add-logging` | Structured logging implementation | Observability |
-| `fix-bugs` | Systematic bug identification and resolution | Bug fixing |
-| `modernize-stack` | Technology stack modernization | Tech debt |
+| Alias                    | Description                                           | Use Case                   |
+| ------------------------ | ----------------------------------------------------- | -------------------------- |
+| `explore-codebase`     | Comprehensive codebase analysis and documentation     | Understanding new projects |
+| `document-api`         | Generate OpenAPI/Swagger documentation                | API documentation          |
+| `security-audit`       | Comprehensive security vulnerability assessment       | Security reviews           |
+| `optimize-performance` | Performance analysis and optimization recommendations | Performance tuning         |
+| `write-tests`          | Complete test suite creation (unit/integration/e2e)   | Test automation            |
+| `refactor-code`        | Code quality improvement and refactoring              | Code maintenance           |
+| `setup-cicd`           | CI/CD pipeline configuration                          | DevOps automation          |
+| `add-logging`          | Structured logging implementation                     | Observability              |
+| `fix-bugs`             | Systematic bug identification and resolution          | Bug fixing                 |
+| `modernize-stack`      | Technology stack modernization                        | Tech debt                  |
 
 ### 📊 Task Expansion Engine
+
 - **Smart Task Breakdown**: Automatically breaks complex tasks into manageable subtasks
 - **Complexity Analysis**: Analyzes task complexity and estimates effort
 - **Dependency Management**: Identifies task dependencies and execution order
@@ -64,6 +67,7 @@ Open http://127.0.0.1:8000 in your browser for the full web interface!
 - **Template System**: Uses templates for common task patterns
 
 ### 🌐 Modern Web Interface
+
 - **Real-time Dashboard**: Live queue status and system metrics
 - **Interactive Management**: Add, cancel, and monitor prompts
 - **Alias Management**: Create and manage prompt aliases
@@ -72,12 +76,14 @@ Open http://127.0.0.1:8000 in your browser for the full web interface!
 - **Performance Metrics**: Token usage tracking and cost estimation
 
 ### 📱 Enhanced CLI Experience
+
 - **Rich Terminal UI**: Beautiful tables, colors, and icons using Rich
 - **Intuitive Commands**: Modern CLI with Typer framework
 - **JSON Output**: Machine-readable output for scripting
 - **Progress Indicators**: Visual progress bars and spinners
 
 ### 📈 Comprehensive Monitoring
+
 - **System Metrics**: CPU, memory, disk, and network monitoring
 - **Token Usage Tracking**: Detailed token consumption and cost analysis
 - **Performance Analytics**: Response times, success rates, and throughput
@@ -86,6 +92,7 @@ Open http://127.0.0.1:8000 in your browser for the full web interface!
 - **Data Export**: Export metrics in JSON/CSV formats
 
 ### 💾 Prompt History System
+
 - **SQLite Storage**: Fast, reliable prompt history storage
 - **Smart Search**: Full-text search across prompt content and metadata
 - **Similarity Detection**: Find similar prompts to avoid duplication
@@ -96,11 +103,13 @@ Open http://127.0.0.1:8000 in your browser for the full web interface!
 ## 📋 Installation
 
 ### Prerequisites
+
 - Python 3.9+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 
 ### Install uv (if not already installed)
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 # or
@@ -110,6 +119,7 @@ pip install uv
 ### Install cuti
 
 #### Option 1: Development Setup (Recommended)
+
 ```bash
 git clone <repository-url>
 cd claude-code-queue
@@ -117,11 +127,13 @@ python run.py setup
 ```
 
 #### Option 2: Direct Installation with uv
+
 ```bash
 uv add git+<repository-url>
 ```
 
 #### Option 3: Traditional pip Installation
+
 ```bash
 pip install git+<repository-url>
 ```
@@ -141,10 +153,11 @@ claude-queue web --host 0.0.0.0 --port 8000
 ```
 
 Features:
+
 - 📊 **Real-time Dashboard**: Live metrics and queue status
 - ➕ **Quick Actions**: Add prompts, expand tasks, manage queue
 - 🔗 **Alias Management**: Create and manage prompt aliases
-- 📚 **History Browser**: Search and analyze prompt history  
+- 📚 **History Browser**: Search and analyze prompt history
 - 📈 **Monitoring**: System performance and token usage tracking
 - 🔄 **WebSocket Updates**: Real-time updates without page refresh
 
@@ -177,6 +190,7 @@ claude-queue expand "Build a REST API for user management"
 ### Prompt Aliases in Action
 
 #### Using Built-in Aliases
+
 ```bash
 # Comprehensive codebase analysis
 claude-queue add "explore-codebase" --working-dir /path/to/project
@@ -189,6 +203,7 @@ claude-queue add "optimize-performance"
 ```
 
 #### Creating Custom Aliases
+
 ```bash
 # Create a reusable deployment alias
 claude-queue alias create deploy-app \
@@ -202,9 +217,11 @@ claude-queue add "deploy-app"
 ```
 
 #### Variable Substitution
+
 Aliases support dynamic variables:
+
 - `${PROJECT_NAME}` - Current project/directory name
-- `${WORKING_DIR}` - Working directory path  
+- `${WORKING_DIR}` - Working directory path
 - `${DATE}` - Current date (YYYY-MM-DD)
 - `${DATETIME}` - Current datetime (YYYY-MM-DD HH:MM:SS)
 
@@ -218,6 +235,7 @@ claude-queue expand "Build a production-ready web application with user authenti
 ```
 
 This automatically generates:
+
 - ✅ **Subtask Breakdown**: Detailed subtasks with time estimates
 - 🔄 **Dependency Mapping**: Task dependencies and execution order
 - ⚡ **Parallel Execution**: Tasks that can run simultaneously
@@ -227,6 +245,7 @@ This automatically generates:
 ### Advanced Queue Management
 
 #### Template-based Prompts
+
 Create rich prompt templates:
 
 ```bash
@@ -234,6 +253,7 @@ claude-queue template feature-implementation --priority 1
 ```
 
 Edit the generated `.md` file:
+
 ```markdown
 ---
 priority: 1
@@ -285,6 +305,7 @@ curl http://localhost:8000/api/monitoring/performance
 ## 🔧 Configuration
 
 ### Environment Variables
+
 ```bash
 # Storage location
 export CLAUDE_QUEUE_STORAGE_DIR="/custom/path"
@@ -302,6 +323,7 @@ export CLAUDE_QUEUE_CLEANUP_INTERVAL_HOURS="24"
 ```
 
 ### Configuration File
+
 Create `~/.claude-queue/config.json`:
 
 ```json
@@ -373,31 +395,37 @@ claude-code-queue/
 ### REST API Endpoints
 
 #### Queue Management
+
 - `GET /api/queue/status` - Get queue status and statistics
 - `GET /api/queue/prompts` - List all prompts
 - `POST /api/queue/prompts` - Add new prompt
 - `DELETE /api/queue/prompts/{id}` - Cancel prompt
 
-#### Alias Management  
+#### Alias Management
+
 - `GET /api/aliases` - List all aliases
 - `POST /api/aliases` - Create new alias
 - `GET /api/aliases/{name}` - Get specific alias
 - `DELETE /api/aliases/{name}` - Delete alias
 
 #### History & Analytics
+
 - `GET /api/history` - Get prompt history
 - `GET /api/history/search?query={q}` - Search history
 - `GET /api/history/stats` - Get history statistics
 
 #### Task Expansion
+
 - `POST /api/tasks/expand` - Expand task into subtasks
 
 #### Monitoring
+
 - `GET /api/monitoring/system` - System metrics
 - `GET /api/monitoring/tokens` - Token usage statistics
 - `GET /api/monitoring/performance` - Performance metrics
 
 ### WebSocket Events
+
 - `status_update` - Real-time queue status updates
 - `prompt_completed` - Prompt completion notifications
 - `system_alert` - System health alerts
@@ -405,6 +433,7 @@ claude-code-queue/
 ## 🧪 Development
 
 ### Setup Development Environment
+
 ```bash
 git clone <repository-url>
 cd claude-code-queue
@@ -422,6 +451,7 @@ uv run ruff check .
 ```
 
 ### Running Tests
+
 ```bash
 # All tests
 uv run pytest
@@ -441,7 +471,7 @@ uv run pytest --cov=cuti
 4. Format code: `uv run black . && uv run ruff check .`
 5. Run tests: `uv run pytest`
 6. Commit changes: `git commit -m 'Add amazing feature'`
-7. Push to branch: `git push origin feature/amazing-feature`  
+7. Push to branch: `git push origin feature/amazing-feature`
 8. Open a Pull Request
 
 ## 🚨 Troubleshooting
@@ -449,6 +479,7 @@ uv run pytest --cov=cuti
 ### Common Issues
 
 **Queue not processing:**
+
 ```bash
 # Check Claude Code connection
 claude-queue test
@@ -461,6 +492,7 @@ claude-queue start --verbose
 ```
 
 **Web interface not starting:**
+
 ```bash
 # Check if port is available
 lsof -i :8000
@@ -473,12 +505,14 @@ claude-queue web --log-level debug
 ```
 
 **Rate limit issues:**
+
 - The system automatically handles rate limits
 - Check rate limit status: `claude-queue status`
 - Prompts will automatically retry after cooldown period
 
 **Alias not resolving:**
-```bash  
+
+```bash
 # List available aliases
 claude-queue alias list
 
@@ -492,6 +526,7 @@ claude-queue add "alias-name" --dry-run
 ## 📊 Performance & Scaling
 
 ### Performance Characteristics
+
 - **Queue Processing**: ~10-50 prompts/hour (depends on Claude Code limits)
 - **Web Interface**: Handles 100+ concurrent connections
 - **Database**: SQLite handles millions of history records efficiently
@@ -499,8 +534,9 @@ claude-queue add "alias-name" --dry-run
 - **CPU Usage**: Minimal when idle, 10-30% during active processing
 
 ### Scaling Recommendations
+
 - Use SSD storage for better database performance
-- Monitor disk space (history and metrics grow over time)  
+- Monitor disk space (history and metrics grow over time)
 - Configure appropriate retention policies
 - Use reverse proxy (nginx) for production web deployments
 - Consider database cleanup automation for long-running instances
@@ -513,16 +549,17 @@ MIT License - see LICENSE file for details.
 
 - [Claude](https://claude.ai) for the amazing AI capabilities
 - [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
-- [Typer](https://typer.tiangolo.com/) for the modern CLI framework  
+- [Typer](https://typer.tiangolo.com/) for the modern CLI framework
 - [Rich](https://rich.readthedocs.io/) for beautiful terminal output
 - [uv](https://docs.astral.sh/uv/) for fast Python package management
 
 ## 🔮 Roadmap
 
 ### Upcoming Features
+
 - [ ] **Multi-Model Support**: Support for other AI models beyond Claude
 - [ ] **Team Collaboration**: Shared queues and collaboration features
-- [ ] **Advanced Scheduling**: Cron-like scheduling for recurring prompts  
+- [ ] **Advanced Scheduling**: Cron-like scheduling for recurring prompts
 - [ ] **Plugin System**: Extensible plugin architecture
 - [ ] **Docker Support**: Containerized deployment options
 - [ ] **Cloud Integration**: AWS/GCP/Azure integration
@@ -530,6 +567,7 @@ MIT License - see LICENSE file for details.
 - [ ] **Advanced Analytics**: ML-powered usage insights
 
 ### Long-term Vision
+
 Transform cuti into the ultimate AI-powered development workflow platform, enabling teams to automate complex development tasks, maintain high code quality, and accelerate delivery through intelligent task management and execution.
 
 ---
