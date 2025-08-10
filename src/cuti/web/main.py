@@ -26,6 +26,7 @@ from ..history import PromptHistoryManager
 from ..task_expansion import TaskExpansionEngine
 from ..claude_interface import ClaudeCodeInterface
 from .monitoring import SystemMonitor
+from .terminal_main import get_terminal_template
 
 
 class PromptRequest(BaseModel):
@@ -155,7 +156,12 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard():
-        """Main chat interface page."""
+        """Main terminal chat interface page."""
+        # Old template removed - using new terminal interface
+        return HTMLResponse(content=get_terminal_template(str(app.state.working_directory)))
+    
+    # Old dashboard code for reference (commented out)
+    '''
         template_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -167,68 +173,198 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
     <style>
-        .chat-message { white-space: pre-wrap; word-wrap: break-word; }
-        .chat-message pre { background: #f5f5f5; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
-        .chat-message code { background: #f5f5f5; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
-        .streaming::after { content: '●●●'; animation: dots 1.5s infinite; }
-        @keyframes dots {
-            0%, 20% { content: '●'; }
-            40% { content: '●●'; }
-            60%, 100% { content: '●●●'; }
+        * { scrollbar-width: thin; scrollbar-color: #333 #111; }
+        *::-webkit-scrollbar { width: 6px; }
+        *::-webkit-scrollbar-track { background: #111; }
+        *::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        *::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        body { 
+            font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            overflow: hidden;
         }
-        .todo-item { padding: 8px; margin: 4px 0; background: #f0f7ff; border-radius: 6px; border-left: 4px solid #0066cc; }
-        .todo-item.completed { background: #f0fff0; border-left-color: #00cc00; text-decoration: line-through; }
+        
+        .terminal {
+            background: linear-gradient(135deg, #0a0a0a 0%, #111111 100%);
+            border: 1px solid #1a1a1a;
+        }
+        
+        .terminal-output {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .user-input { color: #00ccff; }
+        .assistant-output { color: #00ff00; }
+        .system-message { color: #ffaa00; }
+        .error-message { color: #ff6666; }
+        .timestamp { color: #666; font-size: 11px; }
+        
+        .cursor {
+            background: #00ff00;
+            width: 8px;
+            height: 16px;
+            display: inline-block;
+            animation: blink 1s infinite;
+        }
+        
+        .streaming-cursor::after {
+            content: '█';
+            color: #00ff00;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .typewriter {
+            animation: typing 0.02s steps(1);
+        }
+        
+        @keyframes typing {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .prompt-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #00ccff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            width: 100%;
+            caret-color: #00ccff;
+        }
+        
+        .prompt-input::placeholder {
+            color: #444;
+        }
+        
+        .sidebar {
+            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
+            border-left: 1px solid #333;
+        }
+        
+        .tab-button {
+            background: linear-gradient(135deg, #1a1a1a 0%, #222 100%);
+            border: 1px solid #333;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button:hover {
+            background: linear-gradient(135deg, #222 0%, #2a2a2a 100%);
+            border-color: #555;
+        }
+        
+        .tab-button.active {
+            background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+            color: #000;
+            border-color: #00ff00;
+        }
+        
+        .todo-item {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 4px;
+            padding: 8px;
+            margin: 4px 0;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .todo-item:hover {
+            background: rgba(0, 255, 0, 0.2);
+            border-color: rgba(0, 255, 0, 0.5);
+        }
+        
+        .todo-item.completed {
+            background: rgba(102, 255, 102, 0.1);
+            border-color: rgba(102, 255, 102, 0.3);
+            opacity: 0.7;
+            text-decoration: line-through;
+        }
+        
+        .todo-checkbox {
+            accent-color: #00ff00;
+        }
+        
+        .status-bar {
+            background: linear-gradient(90deg, #1a1a1a 0%, #222 50%, #1a1a1a 100%);
+            border-top: 1px solid #333;
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .glow {
+            text-shadow: 0 0 10px currentColor;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen" x-data="dashboard()">
-    <!-- Navigation -->
-    <nav class="bg-blue-600 text-white p-4 shadow-lg">
-        <div class="container mx-auto flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold flex items-center">
-                    <i class="fas fa-robot mr-2"></i>
-                    cuti
-                </h1>
-                <p class="text-sm text-blue-200 mt-1">
-                    <i class="fas fa-folder-open mr-1"></i>
-                    Working Directory: """ + str(app.state.working_directory) + """
-                </p>
+<body class="h-screen overflow-hidden" x-data="dashboard()">
+    <!-- Modern Minimal Header -->
+    <div class="flex h-full">
+        <!-- Main Terminal Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header Bar -->
+            <div class="terminal flex items-center justify-between px-4 py-2 border-b border-gray-800">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <div class="text-sm glow">cuti</div>
+                </div>
+                <div class="text-xs text-gray-500">""" + str(app.state.working_directory) + """</div>
+                <div class="flex space-x-1 text-xs">
+                    <button @click="activeTab = 'chat'" 
+                            :class="activeTab === 'chat' ? 'tab-button active' : 'tab-button'"
+                            class="px-2 py-1 rounded text-xs">
+                        CHAT
+                    </button>
+                    <button @click="activeTab = 'dashboard'" 
+                            :class="activeTab === 'dashboard' ? 'tab-button active' : 'tab-button'"
+                            class="px-2 py-1 rounded text-xs">
+                        DASH
+                    </button>
+                    <button @click="activeTab = 'queue'" 
+                            :class="activeTab === 'queue' ? 'tab-button active' : 'tab-button'"
+                            class="px-2 py-1 rounded text-xs">
+                        QUEUE
+                    </button>
+                    <button @click="activeTab = 'aliases'" 
+                            :class="activeTab === 'aliases' ? 'tab-button active' : 'tab-button'"
+                            class="px-2 py-1 rounded text-xs">
+                        ALIAS
+                    </button>
+                    <button @click="showTodos = !showTodos" 
+                            :class="showTodos ? 'tab-button active' : 'tab-button'"
+                            class="px-2 py-1 rounded text-xs">
+                        TODO
+                    </button>
+                </div>
             </div>
-            <div class="flex space-x-4">
-                <button @click="activeTab = 'chat'" 
-                        :class="activeTab === 'chat' ? 'bg-blue-800' : 'bg-blue-500'"
-                        class="px-4 py-2 rounded hover:bg-blue-700 transition">
-                    <i class="fas fa-comments mr-1"></i> Chat
-                </button>
-                <button @click="activeTab = 'dashboard'" 
-                        :class="activeTab === 'dashboard' ? 'bg-blue-800' : 'bg-blue-500'"
-                        class="px-4 py-2 rounded hover:bg-blue-700 transition">
-                    <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
-                </button>
-                <button @click="activeTab = 'queue'" 
-                        :class="activeTab === 'queue' ? 'bg-blue-800' : 'bg-blue-500'"
-                        class="px-4 py-2 rounded hover:bg-blue-700 transition">
-                    <i class="fas fa-list mr-1"></i> Queue
-                </button>
-                <button @click="activeTab = 'aliases'" 
-                        :class="activeTab === 'aliases' ? 'bg-blue-800' : 'bg-blue-500'"
-                        class="px-4 py-2 rounded hover:bg-blue-700 transition">
-                    <i class="fas fa-bookmark mr-1"></i> Aliases
-                </button>
-                <button @click="activeTab = 'history'" 
-                        :class="activeTab === 'history' ? 'bg-blue-800' : 'bg-blue-500'"
-                        class="px-4 py-2 rounded hover:bg-blue-700 transition">
-                    <i class="fas fa-history mr-1"></i> History
-                </button>
-                <button @click="activeTab = 'monitoring'" 
-                        :class="activeTab === 'monitoring' ? 'bg-blue-800' : 'bg-blue-500'"
-                        class="px-4 py-2 rounded hover:bg-blue-700 transition">
-                    <i class="fas fa-chart-line mr-1"></i> Monitoring
-                </button>
-            </div>
-        </div>
-    </nav>
 
     <div class="container mx-auto p-6">
         <!-- Chat Tab -->
@@ -888,7 +1024,7 @@ def create_app(storage_dir: str = "~/.claude-queue") -> FastAPI:
 </body>
 </html>
         """
-        return HTMLResponse(content=template_content)
+    '''
     
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
