@@ -849,9 +849,9 @@
                                        style="opacity: 0.6; cursor: not-allowed;">
                                 <div class="form-hint">Agent names cannot be changed</div>
                             </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Agent Prompt</label>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Agent Prompt</label>
                     <div class="prompt-editor-wrapper">
                         <div class="prompt-editor-header">
                             <span class="editor-label">System Instructions</span>
@@ -913,15 +913,16 @@
                     <div class="form-hint">Tools the agent can use (e.g., read, write, edit, bash)</div>
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label">Context Files (Optional)</label>
-                    <input type="text" 
-                           x-model="formData.context_files_str" 
-                           class="form-input" 
-                           placeholder="Comma-separated file paths">
-                    <div class="form-hint">Files to include as context (e.g., README.md, src/main.py)</div>
-                </div>
-                
+                            <div class="form-group">
+                                <label class="form-label">Context Files (Optional)</label>
+                                <input type="text" 
+                                       x-model="formData.context_files_str" 
+                                       class="form-input" 
+                                       placeholder="Comma-separated file paths">
+                                <div class="form-hint">Files to include as context (e.g., README.md, src/main.py)</div>
+                            </div>
+                        </div>
+                    </template>
                 </form>
             </div>
             
@@ -1162,10 +1163,16 @@ function agentManager() {
         },
         
         isFormValid() {
-            return this.formData.name && 
-                   this.formData.description && 
-                   this.formData.prompt && 
-                   this.promptCharCount <= 4000;
+            if (this.editingAgent) {
+                // For editing, we need the prompt
+                return this.formData.name && 
+                       this.formData.description && 
+                       this.formData.prompt && 
+                       this.promptCharCount <= 4000;
+            } else {
+                // For creating, we just need name and description
+                return this.formData.name && this.formData.description;
+            }
         }
     }
 }

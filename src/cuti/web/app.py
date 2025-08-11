@@ -19,11 +19,13 @@ from ..services.monitoring import SystemMonitor
 from ..core.claude_interface import ClaudeCodeInterface
 from ..services.claude_usage_monitor import ClaudeUsageMonitor
 from ..services.claude_agent_manager import ClaudeCodeAgentManager
+from ..services.claude_settings_manager import ClaudeSettingsManager
 from .api.queue import queue_router
 from .api.agents import agents_router
 from .api.monitoring import monitoring_router
 from .api.websocket import websocket_router
 from .api.claude_code_agents import claude_code_agents_router
+from .api.claude_settings import claude_settings_router
 from .utils import WebSocketManager
 
 
@@ -73,6 +75,15 @@ def create_app(
         working_directory=working_directory
     )
     
+    # Initialize Claude settings manager
+    claude_settings_manager = ClaudeSettingsManager(
+        working_directory=working_directory
+    )
+    
+    # Initialize project settings if needed
+    if not (Path(working_directory or Path.cwd()) / ".claude").exists():
+        claude_settings_manager.initialize_project_settings()
+    
     # Store managers in app state
     app.state.queue_manager = queue_manager
     app.state.claude_interface = claude_interface
@@ -83,6 +94,7 @@ def create_app(
     app.state.websocket_manager = websocket_manager
     app.state.usage_monitor = usage_monitor
     app.state.claude_code_agent_manager = claude_code_agent_manager
+    app.state.claude_settings_manager = claude_settings_manager
     app.state.storage_dir = storage_dir
     app.state.working_directory = Path(working_directory or Path.cwd()).resolve()
     
@@ -101,6 +113,7 @@ def create_app(
     app.include_router(agents_router, prefix="/api")
     app.include_router(monitoring_router, prefix="/api")
     app.include_router(claude_code_agents_router, prefix="/api")
+    app.include_router(claude_settings_router, prefix="/api")
     app.include_router(websocket_router)
     
     # Include main routes

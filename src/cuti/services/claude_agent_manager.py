@@ -189,26 +189,62 @@ class ClaudeCodeAgentManager:
             # Ensure the local agents directory exists
             self.local_agents_dir.mkdir(parents=True, exist_ok=True)
             
-            # Create a simple prompt that Claude will flesh out
-            agent_prompt = f"Create an agent named '{name}' that {description}"
+            # Create the agent using Claude Code CLI
+            # Using a simple prompt that asks Claude to create the agent
+            prompt = f"/agent create {name} \"{description}\""
             
-            # Use Claude Code's /agent command to create the agent
-            # This will create the agent file in .claude/agents/
+            # Run Claude with the agent creation command
+            # Note: We need to run this in the proper working directory
+            cmd = ["claude", "-m", "opus"]
+            
+            # Create a subprocess with the command
             process = await asyncio.create_subprocess_exec(
-                'claude',
-                '--no-interactive',
+                *cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir)
             )
             
-            # Send the /agent command
-            command = f"/agent {name}\n{description}\n"
-            stdout, stderr = await process.communicate(command.encode())
+            # Send the agent creation command
+            stdout, stderr = await process.communicate(input=prompt.encode())
             
-            # Wait a moment for file creation
-            await asyncio.sleep(1)
+            # Check if the command was successful
+            if process.returncode != 0:
+                error_msg = stderr.decode() if stderr else "Unknown error"
+                # If the /agent command doesn't exist yet, fall back to creating a basic agent file
+                # This allows the system to work even before Claude fully implements /agent
+                agent_content = f"""# {name}
+
+## Description
+{description}
+
+## Tools
+You have access to all standard Claude Code tools including Read, Write, Edit, Bash, Search, etc.
+
+## Instructions
+You are a specialized AI assistant focused on: {description}
+
+Your primary responsibilities:
+1. Understand and execute tasks related to your specialization
+2. Provide clear, concise, and accurate responses
+3. Follow best practices and conventions
+4. Be proactive in identifying potential issues
+5. Suggest improvements when appropriate
+
+## Guidelines
+- Maintain consistency in your approach
+- Prioritize clarity and maintainability
+- Use appropriate tools for each task
+- Explain your reasoning when it helps understanding
+"""
+                
+                # Write the agent file
+                agent_file = self.local_agents_dir / f"{name}.md"
+                agent_file.write_text(agent_content)
+            
+            # Wait a moment for file system
+            await asyncio.sleep(0.5)
             
             # Reload agents to pick up the new one
             self.reload_agents()
@@ -224,7 +260,7 @@ class ClaudeCodeAgentManager:
             else:
                 return {
                     "success": False,
-                    "message": f"Failed to create agent: {stderr.decode() if stderr else 'Unknown error'}"
+                    "message": f"Failed to create agent"
                 }
                 
         except Exception as e:

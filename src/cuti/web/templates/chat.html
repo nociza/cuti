@@ -300,48 +300,114 @@
                     <div class="settings-section-header">
                         <div class="settings-section-icon">🤖</div>
                         <div class="settings-section-title">
-                            <h3>Claude AI Configuration</h3>
-                            <p class="settings-section-desc">Configure AI model settings</p>
+                            <h3>Claude Code Configuration</h3>
+                            <p class="settings-section-desc">Configure Claude Code settings (.claude/settings.local.json)</p>
                         </div>
                     </div>
                     <div class="settings-group">
                         <div class="settings-field">
                             <div class="settings-label">
-                                <span class="settings-label-text">Claude Command</span>
-                                <span class="settings-label-hint">CLI command to invoke Claude</span>
+                                <span class="settings-label-text">Model</span>
+                                <span class="settings-label-hint">Claude model to use</span>
                             </div>
-                            <div class="settings-input-wrapper">
-                                <input type="text" 
-                                       x-model="settings.claudeCommand" 
-                                       class="settings-input" 
-                                       placeholder="claude">
-                                <span class="settings-input-icon">⌘</span>
-                            </div>
+                            <select x-model="claudeSettings.model" class="settings-select">
+                                <option value="opus">Opus (Most Capable)</option>
+                                <option value="sonnet">Sonnet (Balanced)</option>
+                                <option value="haiku">Haiku (Fast)</option>
+                            </select>
                         </div>
+                        
                         <div class="settings-field">
                             <div class="settings-label">
-                                <span class="settings-label-text">Response Timeout</span>
-                                <span class="settings-label-hint">Max wait time in seconds</span>
+                                <span class="settings-label-text">Login Method</span>
+                                <span class="settings-label-hint">Authentication method</span>
+                            </div>
+                            <select x-model="claudeSettings.forceLoginMethod" class="settings-select">
+                                <option value="claudeai">Claude.ai (Default)</option>
+                                <option value="browser">Browser</option>
+                                <option value="api">API Key</option>
+                            </select>
+                        </div>
+                        
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Cleanup Period</span>
+                                <span class="settings-label-hint">Days to retain temporary files</span>
                             </div>
                             <div class="settings-input-wrapper">
                                 <input type="number" 
-                                       x-model="settings.timeout" 
+                                       x-model="claudeSettings.cleanupPeriodDays" 
                                        class="settings-input" 
-                                       min="30" max="3600"
-                                       placeholder="300">
-                                <span class="settings-input-icon">⏱️</span>
+                                       min="1" max="365"
+                                       placeholder="180">
+                                <span class="settings-input-icon">📅</span>
                             </div>
                         </div>
-                        <div class="settings-field">
-                            <div class="settings-label">
-                                <span class="settings-label-text">Model Selection</span>
-                                <span class="settings-label-hint">Choose Claude model version</span>
+                        
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Include Co-authored By</span>
+                                <span class="settings-toggle-desc">Add Claude attribution to commits</span>
                             </div>
-                            <select x-model="settings.model" class="settings-select">
-                                <option value="claude-3-opus">Claude 3 Opus (Most Capable)</option>
-                                <option value="claude-3-sonnet">Claude 3 Sonnet (Balanced)</option>
-                                <option value="claude-3-haiku">Claude 3 Haiku (Fast)</option>
-                            </select>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="claudeSettings.includeCoAuthoredBy">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Maintain Working Directory</span>
+                                <span class="settings-toggle-desc">Keep bash commands in project root</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="claudeSettings.maintainWorkingDir">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Auto Install Dependencies</span>
+                                <span class="settings-toggle-desc">Automatically install required packages</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="claudeSettings.autoInstall">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Cost Warnings</span>
+                                <span class="settings-toggle-desc">Show warnings for expensive operations</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="claudeSettings.costWarnings">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Enable Telemetry</span>
+                                <span class="settings-toggle-desc">Share usage data with Anthropic</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="claudeSettings.telemetry">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Auto Updater</span>
+                                <span class="settings-toggle-desc">Automatically update Claude Code</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="claudeSettings.autoUpdater">
+                                <span class="settings-switch-slider"></span>
+                            </label>
                         </div>
                     </div>
                 </div>

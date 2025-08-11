@@ -7,8 +7,8 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+# Add src to path for testing
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from cuti.cli import app
 from cuti.queue_manager import QueueManager

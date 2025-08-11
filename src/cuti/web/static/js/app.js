@@ -100,10 +100,25 @@ function terminalInterface() {
         selectedSuggestionIndex: 0,
         selectedAgent: null,
         
+        // Claude settings
+        claudeSettings: {
+            model: 'opus',
+            cleanupPeriodDays: 180,
+            includeCoAuthoredBy: false,
+            forceLoginMethod: 'claudeai',
+            telemetry: false,
+            autoInstall: true,
+            maintainWorkingDir: true,
+            costWarnings: true,
+            errorReporting: true,
+            autoUpdater: true
+        },
+        
         async init() {
             this.connectChatWebSocket();
             this.loadHistory();
             this.loadSettings();
+            this.loadClaudeSettings();
             // Focus input after Alpine initializes
             this.$nextTick(() => {
                 if (this.$refs.promptInput) {
@@ -400,11 +415,41 @@ function terminalInterface() {
         
         saveSettings() {
             localStorage.setItem('cuti_settings', JSON.stringify(this.settings));
+            this.saveClaudeSettings(); // Also save Claude settings
             this.settingsSaved = true;
             // Show success for 3 seconds
             setTimeout(() => {
                 this.settingsSaved = false;
             }, 3000);
+        },
+        
+        // Claude settings methods
+        async loadClaudeSettings() {
+            try {
+                const response = await fetch('/api/claude-settings/essential');
+                if (response.ok) {
+                    this.claudeSettings = await response.json();
+                }
+            } catch (error) {
+                console.error('Error loading Claude settings:', error);
+            }
+        },
+        
+        async saveClaudeSettings() {
+            try {
+                const response = await fetch('/api/claude-settings/essential', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.claudeSettings)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Error saving Claude settings:', error);
+                }
+            } catch (error) {
+                console.error('Error saving Claude settings:', error);
+            }
         },
         
         exportSettings() {
@@ -717,11 +762,41 @@ function dashboard() {
         
         saveSettings() {
             localStorage.setItem('cuti_settings', JSON.stringify(this.settings));
+            this.saveClaudeSettings(); // Also save Claude settings
             this.settingsSaved = true;
             // Show success for 3 seconds
             setTimeout(() => {
                 this.settingsSaved = false;
             }, 3000);
+        },
+        
+        // Claude settings methods
+        async loadClaudeSettings() {
+            try {
+                const response = await fetch('/api/claude-settings/essential');
+                if (response.ok) {
+                    this.claudeSettings = await response.json();
+                }
+            } catch (error) {
+                console.error('Error loading Claude settings:', error);
+            }
+        },
+        
+        async saveClaudeSettings() {
+            try {
+                const response = await fetch('/api/claude-settings/essential', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.claudeSettings)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Error saving Claude settings:', error);
+                }
+            } catch (error) {
+                console.error('Error saving Claude settings:', error);
+            }
         },
         
         exportSettings() {
