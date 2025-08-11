@@ -1,0 +1,27 @@
+<!-- Status Bar -->
+<div class="status-bar">
+    <div class="status-section">
+        <div class="status-item">
+            <span>cuti v0.2.0</span>
+        </div>
+        {% if status_info %}
+        {% for item in status_info.left %}
+        <div class="status-item">
+            <span>{{ item }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+    <div class="status-section">
+        {% if status_info %}
+        {% for item in status_info.right %}
+        <div class="status-item">
+            {% if item.indicator %}
+            <div class="status-indicator {{ item.indicator }}"></div>
+            {% endif %}
+            <span>{{ item.text }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>

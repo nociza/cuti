@@ -1,0 +1,1173 @@
+{% extends "base.html" %}
+
+{% block title %}cuti - Claude Code Agents{% endblock %}
+
+{% block head %}
+<style>
+    /* Agent Management Specific Styles - Professional Modern Design */
+    .agents-page {
+        padding: var(--space-3xl);
+        max-width: 1400px;
+        margin: 0 auto;
+        position: relative;
+        min-height: calc(100vh - 72px);
+    }
+    
+    /* Subtle Background Pattern */
+    .agents-page::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            radial-gradient(ellipse at top left, rgba(16, 185, 129, 0.03) 0%, transparent 40%),
+            radial-gradient(ellipse at bottom right, rgba(96, 165, 250, 0.03) 0%, transparent 40%);
+        pointer-events: none;
+        z-index: 0;
+    }
+    
+    .agents-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-3xl);
+        position: relative;
+        z-index: 1;
+    }
+    
+    .agents-title {
+        font-size: 32px;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.5px;
+    }
+    
+    .agents-subtitle {
+        font-size: 15px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+        letter-spacing: 0.2px;
+    }
+    
+    .agent-actions {
+        display: flex;
+        gap: var(--space-md);
+    }
+    
+    .btn-create-agent {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-create-agent:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 12px 32px rgba(16, 185, 129, 0.35);
+    }
+    
+    .btn-create-agent:active {
+        transform: translateY(0) scale(1);
+    }
+    
+    .agents-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: var(--space-2xl);
+        margin-bottom: var(--space-2xl);
+        position: relative;
+        z-index: 1;
+    }
+    
+    .agent-card {
+        background: linear-gradient(135deg, rgba(20, 30, 38, 0.8) 0%, rgba(20, 30, 38, 0.95) 100%);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius-lg);
+        padding: var(--space-2xl);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .agent-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .agent-card::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        pointer-events: none;
+    }
+    
+    .agent-card:hover {
+        transform: translateY(-6px) scale(1.02);
+        box-shadow: 
+            0 20px 40px rgba(0, 0, 0, 0.3),
+            0 0 60px rgba(16, 185, 129, 0.1);
+        border-color: rgba(16, 185, 129, 0.3);
+        background: linear-gradient(135deg, rgba(20, 30, 38, 0.9) 0%, rgba(20, 30, 38, 1) 100%);
+    }
+    
+    .agent-card:hover::before {
+        transform: scaleX(1);
+    }
+    
+    .agent-card:hover::after {
+        opacity: 1;
+    }
+    
+    .agent-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: var(--space-md);
+    }
+    
+    .agent-name {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .agent-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        background: rgba(96, 165, 250, 0.2);
+        color: var(--secondary);
+        border-radius: 4px;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    
+    .agent-menu {
+        position: relative;
+    }
+    
+    .agent-menu-button {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+    
+    .agent-menu-button:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+    }
+    
+    .agent-description {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: var(--space-lg);
+    }
+    
+    .agent-capabilities {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: var(--space-md);
+    }
+    
+    .capability-tag {
+        font-size: 12px;
+        padding: 4px 8px;
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--primary);
+        border-radius: 12px;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    
+    .agent-tools {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 12px;
+        margin-bottom: var(--space-md);
+    }
+    
+    .agent-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: var(--space-md);
+        border-top: 1px solid var(--border);
+    }
+    
+    .agent-meta {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+    
+    .agent-actions-row {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .btn-agent-action {
+        padding: 6px 12px;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-agent-action:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary);
+        border-color: var(--primary);
+    }
+    
+    .btn-use-agent {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--primary);
+        border-color: var(--primary);
+    }
+    
+    .btn-use-agent:hover {
+        background: var(--primary);
+        color: white;
+    }
+    
+    /* Enhanced Modal Styles - Professional Design */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        animation: modalFadeIn 0.3s ease;
+    }
+    
+    @keyframes modalFadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    
+    .modal-content {
+        background: linear-gradient(135deg, rgba(20, 30, 38, 0.98) 0%, rgba(15, 23, 30, 1) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: var(--radius-xl);
+        width: 90%;
+        max-width: 720px;
+        max-height: 85vh;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 
+            0 25px 50px rgba(0, 0, 0, 0.5),
+            0 0 100px rgba(16, 185, 129, 0.1);
+        animation: modalSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    @keyframes modalSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    
+    .modal-content::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 200px;
+        background: linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);
+        pointer-events: none;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-2xl) var(--space-2xl) var(--space-xl);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        position: relative;
+        z-index: 1;
+    }
+    
+    .modal-title {
+        font-size: 26px;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.5px;
+    }
+    
+    .modal-close {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--text-secondary);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .modal-close:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: var(--error);
+        transform: rotate(90deg);
+    }
+    
+    .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--space-2xl);
+        position: relative;
+        z-index: 1;
+    }
+    
+    .modal-body::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .modal-body::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+    }
+    
+    .modal-body::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+    
+    .modal-body::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .form-group {
+        margin-bottom: var(--space-2xl);
+        position: relative;
+    }
+    
+    .form-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .form-label::before {
+        content: '';
+        display: inline-block;
+        width: 3px;
+        height: 14px;
+        background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%);
+        border-radius: 2px;
+    }
+    
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        background: rgba(10, 15, 20, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius-md);
+        color: var(--text-primary);
+        font-size: 15px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .form-input:focus {
+        outline: none;
+        background: rgba(10, 15, 20, 0.8);
+        border-color: rgba(16, 185, 129, 0.5);
+        box-shadow: 
+            0 0 0 3px rgba(16, 185, 129, 0.1),
+            inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    
+    .form-input:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: rgba(10, 15, 20, 0.3);
+    }
+    
+    /* Enhanced Prompt Editor */
+    .prompt-editor-wrapper {
+        position: relative;
+        border-radius: var(--radius-md);
+        background: rgba(10, 15, 20, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .prompt-editor-wrapper:focus-within {
+        border-color: rgba(16, 185, 129, 0.5);
+        box-shadow: 
+            0 0 0 3px rgba(16, 185, 129, 0.1),
+            inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    
+    .prompt-editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .editor-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    
+    .editor-tools {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .editor-tool-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 12px;
+        padding: 4px 8px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+    
+    .editor-tool-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary);
+    }
+    
+    .form-textarea {
+        width: 100%;
+        min-height: 200px;
+        max-height: 400px;
+        resize: vertical;
+        padding: 16px;
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        transition: all 0.3s ease;
+    }
+    
+    .form-textarea:focus {
+        outline: none;
+        background: rgba(0, 0, 0, 0.2);
+    }
+    
+    .prompt-editor-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    
+    .char-count {
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .char-count.warning {
+        color: var(--warning);
+    }
+    
+    .char-count.error {
+        color: var(--error);
+    }
+    
+    .form-hint {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+    
+    .tag-input-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px;
+        background: rgba(10, 15, 20, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius-md);
+        min-height: 48px;
+        align-items: center;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .tag-input-container:focus-within {
+        background: rgba(10, 15, 20, 0.8);
+        border-color: rgba(16, 185, 129, 0.5);
+        box-shadow: 
+            0 0 0 3px rgba(16, 185, 129, 0.1),
+            inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    
+    .tag-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(96, 165, 250, 0.15) 100%);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: var(--primary);
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    
+    .tag-item:hover {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(96, 165, 250, 0.25) 100%);
+        transform: translateY(-1px);
+    }
+    
+    .tag-remove {
+        cursor: pointer;
+        opacity: 0.7;
+        transition: all 0.2s;
+        font-size: 16px;
+        line-height: 1;
+    }
+    
+    .tag-remove:hover {
+        opacity: 1;
+        color: var(--error);
+    }
+    
+    .tag-input {
+        flex: 1;
+        min-width: 120px;
+        border: none;
+        background: transparent;
+        outline: none;
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+    
+    .tag-input::placeholder {
+        color: var(--text-muted);
+    }
+    
+    .modal-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-xl) var(--space-2xl);
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .modal-actions-info {
+        font-size: 12px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .modal-actions-buttons {
+        display: flex;
+        gap: var(--space-md);
+    }
+    
+    .btn-modal {
+        padding: 12px 24px;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-cancel {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-secondary);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .btn-cancel:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+    }
+    
+    .btn-primary:active {
+        transform: translateY(0);
+    }
+    
+    .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: var(--space-3xl);
+        color: var(--text-secondary);
+    }
+    
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: var(--space-lg);
+        opacity: 0.5;
+    }
+    
+    .empty-state-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-md);
+    }
+    
+    .empty-state-description {
+        font-size: 14px;
+        color: var(--text-secondary);
+        max-width: 400px;
+        margin: 0 auto;
+    }
+</style>
+{% endblock %}
+
+{% set body_class = "" %}
+{% set alpine_data = "agentManager()" %}
+
+{% block content %}
+<div class="agents-page">
+    <!-- Page Header -->
+    <div class="agents-header">
+        <div>
+            <h1 class="agents-title">Claude Code Agents</h1>
+            <p class="agents-subtitle">Manage custom AI agents for specialized tasks</p>
+        </div>
+        <div class="agent-actions">
+            <button @click="openCreateModal()" class="btn-create-agent">
+                <i class="fas fa-plus"></i> Create Agent
+            </button>
+        </div>
+    </div>
+    
+    <!-- Agents Grid -->
+    <div class="agents-grid" x-show="agents.length > 0">
+        <template x-for="agent in agents" :key="agent.name">
+            <div class="agent-card">
+                <div class="agent-card-header">
+                    <div class="agent-name">
+                        <span x-text="agent.name"></span>
+                        <span x-show="isDefaultAgent(agent.name)" class="agent-badge">Default</span>
+                    </div>
+                    <div class="agent-menu">
+                        <button class="agent-menu-button" @click="toggleMenu(agent.name)">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="agent-description" x-text="agent.description"></div>
+                
+                <div class="agent-capabilities" x-show="agent.capabilities && agent.capabilities.length > 0">
+                    <template x-for="cap in agent.capabilities" :key="cap">
+                        <span class="capability-tag" x-text="cap"></span>
+                    </template>
+                </div>
+                
+                <div class="agent-tools" x-show="agent.tools && agent.tools.length > 0">
+                    <i class="fas fa-tools"></i>
+                    <span x-text="'Tools: ' + agent.tools.join(', ')"></span>
+                </div>
+                
+                <div class="agent-footer">
+                    <div class="agent-meta">
+                        <span x-text="formatDate(agent.updated_at || agent.created_at)"></span>
+                    </div>
+                    <div class="agent-actions-row">
+                        <button @click="editAgent(agent)" class="btn-agent-action">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button @click="useAgent(agent)" class="btn-agent-action btn-use-agent">
+                            <i class="fas fa-play"></i> Use
+                        </button>
+                        <button x-show="!isDefaultAgent(agent.name)" 
+                                @click="deleteAgent(agent.name)" 
+                                class="btn-agent-action">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Empty State -->
+    <div x-show="agents.length === 0" class="empty-state">
+        <div class="empty-state-icon">🤖</div>
+        <div class="empty-state-title">No Custom Agents Yet</div>
+        <div class="empty-state-description">
+            Create your first Claude Code agent to automate specialized tasks
+        </div>
+    </div>
+    
+    <!-- Create/Edit Agent Modal -->
+    <div x-show="showModal" class="modal-overlay" @click.self="closeModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" x-text="editingAgent ? 'Edit Agent' : 'Create New Agent'"></h2>
+                <button @click="closeModal()" class="modal-close">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <form @submit.prevent="saveAgent()" id="agentForm">
+                    <!-- Simple creation flow for new agents -->
+                    <template x-if="!editingAgent">
+                        <div>
+                            <div class="form-group">
+                                <label class="form-label">Agent Name</label>
+                                <input type="text" 
+                                       x-model="formData.name" 
+                                       class="form-input" 
+                                       placeholder="e.g., test-writer, docs-generator"
+                                       pattern="[a-z0-9-]+"
+                                       required>
+                                <div class="form-hint">A short name using lowercase letters and hyphens</div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">What should this agent do?</label>
+                                <textarea x-model="formData.description" 
+                                          class="form-input" 
+                                          style="min-height: 100px; font-family: inherit;"
+                                          placeholder="Example: writes comprehensive unit tests for Python code with pytest, focusing on edge cases and error handling"
+                                          required></textarea>
+                                <div class="form-hint">
+                                    <i class="fas fa-magic"></i> Describe in plain language - Claude will create the detailed agent for you!
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <!-- Full editor for existing agents -->
+                    <template x-if="editingAgent">
+                        <div>
+                            <div class="form-group">
+                                <label class="form-label">Agent Name</label>
+                                <input type="text" 
+                                       x-model="formData.name" 
+                                       :disabled="true"
+                                       class="form-input" 
+                                       style="opacity: 0.6; cursor: not-allowed;">
+                                <div class="form-hint">Agent names cannot be changed</div>
+                            </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Agent Prompt</label>
+                    <div class="prompt-editor-wrapper">
+                        <div class="prompt-editor-header">
+                            <span class="editor-label">System Instructions</span>
+                            <div class="editor-tools">
+                                <button type="button" class="editor-tool-btn" @click="formatPrompt()" title="Format">
+                                    <i class="fas fa-magic"></i> Format
+                                </button>
+                                <button type="button" class="editor-tool-btn" @click="clearPrompt()" title="Clear">
+                                    <i class="fas fa-eraser"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        <textarea x-model="formData.prompt" 
+                                  @input="updateCharCount()"
+                                  class="form-textarea" 
+                                  placeholder="Define the agent's behavior, capabilities, and constraints...\n\nExample:\nYou are an expert code reviewer focused on...\n\nYour responsibilities include:\n- Analyzing code quality\n- Identifying potential bugs\n- Suggesting improvements"
+                                  required></textarea>
+                        <div class="prompt-editor-footer">
+                            <span class="char-count" :class="getCharCountClass()">
+                                <span x-text="promptCharCount"></span> / 4000 characters
+                            </span>
+                            <span class="editor-hint">Markdown supported</span>
+                        </div>
+                    </div>
+                    <div class="form-hint">Write clear, specific instructions that define the agent's expertise and behavior</div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Capabilities</label>
+                    <div class="tag-input-container">
+                        <template x-for="(cap, index) in formData.capabilities" :key="index">
+                            <span class="tag-item">
+                                <span x-text="cap"></span>
+                                <span @click="removeCapability(index)" class="tag-remove">&times;</span>
+                            </span>
+                        </template>
+                        <input type="text" 
+                               @keydown.enter.prevent="addCapability($event)"
+                               class="tag-input"
+                               placeholder="Add capability...">
+                    </div>
+                    <div class="form-hint">Press Enter to add capabilities (e.g., code-analysis, debugging)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Tools</label>
+                    <div class="tag-input-container">
+                        <template x-for="(tool, index) in formData.tools" :key="index">
+                            <span class="tag-item">
+                                <span x-text="tool"></span>
+                                <span @click="removeTool(index)" class="tag-remove">&times;</span>
+                            </span>
+                        </template>
+                        <input type="text" 
+                               @keydown.enter.prevent="addTool($event)"
+                               class="tag-input"
+                               placeholder="Add tool...">
+                    </div>
+                    <div class="form-hint">Tools the agent can use (e.g., read, write, edit, bash)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Context Files (Optional)</label>
+                    <input type="text" 
+                           x-model="formData.context_files_str" 
+                           class="form-input" 
+                           placeholder="Comma-separated file paths">
+                    <div class="form-hint">Files to include as context (e.g., README.md, src/main.py)</div>
+                </div>
+                
+                </form>
+            </div>
+            
+            <div class="modal-actions">
+                <div class="modal-actions-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span x-show="!editingAgent">Creating a new agent</span>
+                    <span x-show="editingAgent">Editing agent configuration</span>
+                </div>
+                <div class="modal-actions-buttons">
+                    <button type="button" @click="closeModal()" class="btn-modal btn-cancel">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" form="agentForm" class="btn-modal btn-primary" :disabled="!isFormValid()">
+                        <i class="fas fa-save"></i>
+                        <span x-text="editingAgent ? 'Update Agent' : 'Create Agent'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function agentManager() {
+    return {
+        agents: [],
+        showModal: false,
+        editingAgent: null,
+        formData: {
+            name: '',
+            description: '',
+            prompt: '',
+            capabilities: [],
+            tools: [],
+            context_files_str: '',
+            working_directory: null,
+            environment: {}
+        },
+        promptCharCount: 0,
+        defaultAgents: ['code-reviewer', 'test-writer', 'docs-generator', 'refactor-assistant', 'bug-hunter'],
+        
+        async init() {
+            await this.loadAgents();
+        },
+        
+        async loadAgents() {
+            try {
+                const response = await fetch('/api/claude-code-agents/');
+                if (response.ok) {
+                    this.agents = await response.json();
+                }
+            } catch (error) {
+                console.error('Error loading agents:', error);
+            }
+        },
+        
+        isDefaultAgent(name) {
+            return this.defaultAgents.includes(name);
+        },
+        
+        openCreateModal() {
+            this.editingAgent = null;
+            this.formData = {
+                name: '',
+                description: '',
+                prompt: '',
+                capabilities: [],
+                tools: [],
+                context_files_str: '',
+                working_directory: null,
+                environment: {}
+            };
+            this.showModal = true;
+        },
+        
+        editAgent(agent) {
+            this.editingAgent = agent;
+            this.formData = {
+                name: agent.name,
+                description: agent.description,
+                content: agent.prompt, // Full markdown content
+                prompt: agent.prompt,
+                capabilities: agent.capabilities || [],
+                tools: agent.tools || []
+            };
+            this.promptCharCount = (agent.prompt || '').length;
+            this.showModal = true;
+        },
+        
+        closeModal() {
+            this.showModal = false;
+            this.editingAgent = null;
+        },
+        
+        async saveAgent() {
+            try {
+                let response;
+                if (this.editingAgent) {
+                    // Update existing agent (only content)
+                    response = await fetch(`/api/claude-code-agents/${this.editingAgent.name}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            content: this.formData.content || this.formData.prompt
+                        })
+                    });
+                } else {
+                    // Create new agent using Claude
+                    this.showModal = false; // Close modal to show loading
+                    alert('Creating agent with Claude... This may take a moment.');
+                    
+                    response = await fetch('/api/claude-code-agents/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: this.formData.name,
+                            description: this.formData.description
+                        })
+                    });
+                }
+                
+                if (response.ok) {
+                    await this.loadAgents();
+                    this.closeModal();
+                    if (!this.editingAgent) {
+                        alert('Agent created successfully!');
+                    }
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Error saving agent');
+                    if (!this.editingAgent) {
+                        this.showModal = true; // Reopen modal on error
+                    }
+                }
+            } catch (error) {
+                console.error('Error saving agent:', error);
+                alert('Error saving agent: ' + error.message);
+            }
+        },
+        
+        async deleteAgent(name) {
+            if (!confirm(`Are you sure you want to delete the agent "${name}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/claude-code-agents/${name}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    await this.loadAgents();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Error deleting agent');
+                }
+            } catch (error) {
+                console.error('Error deleting agent:', error);
+                alert('Error deleting agent');
+            }
+        },
+        
+        useAgent(agent) {
+            // Navigate to chat with agent pre-selected
+            window.location.href = `/?agent=${agent.name}`;
+        },
+        
+        addCapability(event) {
+            const value = event.target.value.trim();
+            if (value && !this.formData.capabilities.includes(value)) {
+                this.formData.capabilities.push(value);
+                event.target.value = '';
+            }
+        },
+        
+        removeCapability(index) {
+            this.formData.capabilities.splice(index, 1);
+        },
+        
+        addTool(event) {
+            const value = event.target.value.trim();
+            if (value && !this.formData.tools.includes(value)) {
+                this.formData.tools.push(value);
+                event.target.value = '';
+            }
+        },
+        
+        removeTool(index) {
+            this.formData.tools.splice(index, 1);
+        },
+        
+        formatDate(dateStr) {
+            if (!dateStr) return 'Recently created';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            
+            if (days === 0) return 'Today';
+            if (days === 1) return 'Yesterday';
+            if (days < 7) return `${days} days ago`;
+            if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+            return date.toLocaleDateString();
+        },
+        
+        toggleMenu(agentName) {
+            // Implement dropdown menu if needed
+        },
+        
+        updateCharCount() {
+            this.promptCharCount = this.formData.prompt.length;
+        },
+        
+        getCharCountClass() {
+            if (this.promptCharCount > 4000) return 'error';
+            if (this.promptCharCount > 3500) return 'warning';
+            return '';
+        },
+        
+        formatPrompt() {
+            // Simple formatting - trim whitespace and ensure proper line breaks
+            this.formData.prompt = this.formData.prompt
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line || this.formData.prompt.includes('\n\n'))
+                .join('\n');
+            this.updateCharCount();
+        },
+        
+        clearPrompt() {
+            if (confirm('Are you sure you want to clear the prompt?')) {
+                this.formData.prompt = '';
+                this.updateCharCount();
+            }
+        },
+        
+        isFormValid() {
+            return this.formData.name && 
+                   this.formData.description && 
+                   this.formData.prompt && 
+                   this.promptCharCount <= 4000;
+        }
+    }
+}
+</script>
+{% endblock %}

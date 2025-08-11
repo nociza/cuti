@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any, AsyncGenerator, Union
 import asyncio
 from datetime import datetime
 
-from ..models import QueuedPrompt, ExecutionResult
+from ..core.models import QueuedPrompt, ExecutionResult
 
 
 class AgentCapability(Enum):

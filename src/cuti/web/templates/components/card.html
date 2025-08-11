@@ -1,0 +1,24 @@
+<!-- Reusable Card Component -->
+<div class="{% if card_class %}{{ card_class }}{% else %}stat-card{% endif %}">
+    {% if card_before_indicator %}
+    <div class="card-indicator"></div>
+    {% endif %}
+    
+    {% if title %}
+    <div class="{% if title_class %}{{ title_class }}{% else %}stat-label{% endif %}">{{ title }}</div>
+    {% endif %}
+    
+    {% if value %}
+    <div class="{% if value_class %}{{ value_class }}{% else %}stat-value{% endif %}">{{ value }}</div>
+    {% endif %}
+    
+    {% if content %}
+    <div class="card-content">
+        {{ content|safe }}
+    </div>
+    {% endif %}
+    
+    {% if slot %}
+    {{ slot|safe }}
+    {% endif %}
+</div>

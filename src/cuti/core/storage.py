@@ -110,11 +110,11 @@ class MarkdownPromptParser:
     @staticmethod
     def get_base_filename(prompt: QueuedPrompt) -> str:
         """Get the base filename for a prompt (id and sanitized title, no status suffix)."""
-        sanitized_title = QueueStorage._sanitize_filename_static(prompt.content[:50])
+        sanitized_title = PromptStorage._sanitize_filename_static(prompt.content[:50])
         return f"{prompt.id}-{sanitized_title}.md"
 
 
-class QueueStorage:
+class PromptStorage:
     """Manages queue storage using markdown files and JSON state."""
 
     def __init__(self, base_dir: str = "~/.claude-queue"):

@@ -11,7 +11,7 @@ from datetime import datetime
 from .base import BaseAgent, AgentCapability, AgentExecutionContext
 from .pool import AgentPool
 from .context import SharedMemoryManager
-from ..models import QueuedPrompt, ExecutionResult
+from ..core.models import QueuedPrompt, ExecutionResult
 
 
 class TaskRoutingStrategy(Enum):

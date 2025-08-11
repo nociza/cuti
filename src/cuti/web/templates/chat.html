@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}cuti - Chat Interface{% endblock %}
+
+{% block head %}
+<!-- Any additional head elements for chat page -->
+{% endblock %}
+
+{% set body_class = "" %}
+{% set alpine_data = "terminalInterface()" %}
+
+{% block content %}
+<!-- Main Content Area -->
+<div class="main-content">
+    <!-- Terminal Container -->
+    <div class="terminal-container" x-show="activeTab === 'chat'">
+        <!-- Terminal Header -->
+        <div class="terminal-header">
+            <div class="terminal-controls">
+                <div class="terminal-dot red"></div>
+                <div class="terminal-dot yellow"></div>
+                <div class="terminal-dot green"></div>
+            </div>
+            <div class="terminal-title">claude-terminal@{{ working_directory }}</div>
+            <div style="width: 60px;"></div>
+        </div>
+        
+        <!-- Terminal Output -->
+        <div id="terminalOutput" class="terminal-output">
+            <!-- Welcome Message -->
+            <div class="system-message" x-show="chatMessages.length === 0 && !isStreaming">
+                <div class="timestamp">System</div>
+                <div>Welcome to cuti v0.2.0 - Claude Code Terminal Interface</div>
+                <div>Type your message below to start chatting with Claude...</div>
+                <div>&nbsp;</div>
+            </div>
+            
+            <!-- Chat Messages -->
+            <template x-for="message in chatMessages" :key="message.id">
+                <div class="terminal-message">
+                    <!-- User Input -->
+                    <div x-show="message.role === 'user'" class="user-input">
+                        <span class="timestamp" x-text="formatTime(message.timestamp)"></span>
+                        <span class="terminal-prompt">$</span>
+                        <span x-text="message.content"></span>
+                    </div>
+                    
+                    <!-- Assistant Output -->
+                    <div x-show="message.role === 'assistant'" class="assistant-output" 
+                         x-html="formatTerminalMessage(message.content)"></div>
+                    
+                    <!-- System Messages -->
+                    <div x-show="message.role === 'system'" class="system-message">
+                        <span class="timestamp" x-text="formatTime(message.timestamp)"></span>
+                        <span>[SYSTEM]</span> <span x-text="message.content"></span>
+                    </div>
+                    
+                    <!-- Error Messages -->
+                    <div x-show="message.role === 'error'" class="error-message">
+                        <span class="timestamp" x-text="formatTime(message.timestamp)"></span>
+                        <span>[ERROR]</span> <span x-text="message.content"></span>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- Current Streaming Message -->
+            <div x-show="isStreaming && currentStreamingMessage" class="terminal-message">
+                <div class="assistant-output">
+                    <span x-html="formatTerminalMessage(currentStreamingMessage.content)"></span>
+                    <span class="streaming-cursor"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modern Input Area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <span class="prompt-symbol">$</span>
+                <div style="flex: 1; position: relative;">
+                    <input
+                        x-model="chatInput"
+                        @input="checkForAgentSuggestion()"
+                        @keydown.enter="sendChatMessage()"
+                        @keydown.ctrl.c="clearTerminal()"
+                        @keydown.tab.prevent="acceptSuggestion()"
+                        @keydown.escape="closeSuggestions()"
+                        placeholder="Type your message or @agent-name..."
+                        class="prompt-input"
+                        :disabled="isStreaming"
+                        x-ref="promptInput"
+                        style="width: 100%;">
+                    
+                    <!-- Agent Suggestions Dropdown -->
+                    <div x-show="showAgentSuggestions && agentSuggestions.length > 0" 
+                         class="agent-suggestions"
+                         @click.away="closeSuggestions()">
+                        <template x-for="(suggestion, index) in agentSuggestions" :key="suggestion.name">
+                            <div class="agent-suggestion-item"
+                                 :class="{'active': selectedSuggestionIndex === index}"
+                                 @click="selectAgent(suggestion)"
+                                 @mouseenter="selectedSuggestionIndex = index">
+                                <div class="suggestion-name" x-text="suggestion.command"></div>
+                                <div class="suggestion-description" x-text="suggestion.description"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div x-show="isStreaming" class="processing-indicator">
+                    <div class="processing-dot"></div>
+                    <div class="processing-dot"></div>
+                    <div class="processing-dot"></div>
+                    <span>Processing</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- History Tab - Beautiful Modern Design -->
+    <div x-show="activeTab === 'history'" class="history-container" x-transition:enter="fade-in">
+        <div class="history-header">
+            <div class="history-title-section">
+                <div>
+                    <h2 class="history-title">
+                        <span>📜</span>
+                        Command History
+                    </h2>
+                    <p class="history-subtitle">Browse and rerun your previous commands</p>
+                </div>
+                <div class="history-stats">
+                    <div class="history-stat">
+                        <div class="history-stat-value" x-text="commandHistory.length">0</div>
+                        <div class="history-stat-label">Total Commands</div>
+                    </div>
+                    <div class="history-stat">
+                        <div class="history-stat-value" x-text="successCount">0</div>
+                        <div class="history-stat-label">Successful</div>
+                    </div>
+                    <div class="history-stat">
+                        <div class="history-stat-value" x-text="todayCount">0</div>
+                        <div class="history-stat-label">Today</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="history-controls">
+                <div class="history-search-wrapper">
+                    <span class="history-search-icon">🔍</span>
+                    <input type="text" 
+                           x-model="historySearch" 
+                           @input="filterHistory()"
+                           placeholder="Search commands, dates, or status..." 
+                           class="history-search">
+                </div>
+                <div class="history-filter-pills">
+                    <button @click="historyFilter = 'all'" 
+                            :class="{'filter-pill': true, 'active': historyFilter === 'all'}">All</button>
+                    <button @click="historyFilter = 'success'" 
+                            :class="{'filter-pill': true, 'active': historyFilter === 'success'}">Success</button>
+                    <button @click="historyFilter = 'error'" 
+                            :class="{'filter-pill': true, 'active': historyFilter === 'error'}">Failed</button>
+                    <button @click="historyFilter = 'today'" 
+                            :class="{'filter-pill': true, 'active': historyFilter === 'today'}">Today</button>
+                </div>
+                <button @click="clearHistory()" class="btn-danger">Clear All</button>
+            </div>
+        </div>
+        
+        <div class="history-list-wrapper">
+            <div class="history-list">
+                <template x-for="item in filteredHistory" :key="item.id">
+                    <div class="history-item" @click="rerunCommand(item.content)">
+                        <div class="history-item-header">
+                            <div class="history-item-meta">
+                                <span class="history-time" x-text="formatTime(item.timestamp)"></span>
+                                <span class="history-duration" x-text="item.duration || '< 1s'"></span>
+                            </div>
+                            <span class="history-status" :class="item.status" x-text="item.status"></span>
+                        </div>
+                        <div class="history-content" x-text="item.content"></div>
+                        <div class="history-item-footer">
+                            <div class="history-tokens">
+                                <div class="token-stat">
+                                    <span class="token-icon">💬</span>
+                                    <span x-text="item.tokens || '0'"></span>
+                                </div>
+                                <div class="token-stat">
+                                    <span class="token-icon">💰</span>
+                                    <span x-text="'$' + (item.cost || '0.00')"></span>
+                                </div>
+                            </div>
+                            <div class="history-actions">
+                                <button @click.stop="copyCommand(item.content)" class="history-action-btn">Copy</button>
+                                <button @click.stop="rerunCommand(item.content)" class="history-action-btn">Rerun</button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="filteredHistory.length === 0" class="history-empty">
+                    <div class="history-empty-icon">📭</div>
+                    <h3 class="history-empty-title">
+                        <span x-show="historySearch">No matching commands found</span>
+                        <span x-show="!historySearch">No command history yet</span>
+                    </h3>
+                    <p class="history-empty-text">
+                        <span x-show="historySearch">Try adjusting your search terms or filters</span>
+                        <span x-show="!historySearch">Your command history will appear here</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Settings Tab - Beautiful Modern Design -->
+    <div x-show="activeTab === 'settings'" class="settings-container" x-transition:enter="fade-in">
+        <div class="settings-header">
+            <h2 class="settings-title">⚙️ Settings</h2>
+            <p class="settings-subtitle">Customize your cuti experience</p>
+            
+            <nav class="settings-nav">
+                <button @click="settingsSection = 'general'" 
+                        :class="{'settings-nav-item': true, 'active': settingsSection === 'general'}">
+                    <span class="settings-nav-icon">🎨</span>
+                    General
+                </button>
+                <button @click="settingsSection = 'claude'" 
+                        :class="{'settings-nav-item': true, 'active': settingsSection === 'claude'}">
+                    <span class="settings-nav-icon">🤖</span>
+                    Claude AI
+                </button>
+                <button @click="settingsSection = 'queue'" 
+                        :class="{'settings-nav-item': true, 'active': settingsSection === 'queue'}">
+                    <span class="settings-nav-icon">📋</span>
+                    Queue
+                </button>
+                <button @click="settingsSection = 'advanced'" 
+                        :class="{'settings-nav-item': true, 'active': settingsSection === 'advanced'}">
+                    <span class="settings-nav-icon">🔧</span>
+                    Advanced
+                </button>
+            </nav>
+        </div>
+        
+        <div class="settings-content-wrapper">
+            <div class="settings-content">
+                <!-- General Settings -->
+                <div class="settings-section" x-show="settingsSection === 'general' || settingsSection === 'all'">
+                    <div class="settings-section-header">
+                        <div class="settings-section-icon">🎨</div>
+                        <div class="settings-section-title">
+                            <h3>General Preferences</h3>
+                            <p class="settings-section-desc">Customize appearance and behavior</p>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Dark Mode</span>
+                                <span class="settings-toggle-desc">Use dark theme for the interface</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="settings.darkMode">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Show Timestamps</span>
+                                <span class="settings-toggle-desc">Display time for each message</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="settings.showTimestamps">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Auto-scroll</span>
+                                <span class="settings-toggle-desc">Automatically scroll to new messages</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="settings.autoScroll">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-toggle">
+                            <div class="settings-toggle-label">
+                                <span class="settings-toggle-text">Notification Sounds</span>
+                                <span class="settings-toggle-desc">Play sounds for notifications</span>
+                            </div>
+                            <label class="settings-switch">
+                                <input type="checkbox" x-model="settings.enableSound">
+                                <span class="settings-switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Claude Configuration -->
+                <div class="settings-section" x-show="settingsSection === 'claude' || settingsSection === 'all'">
+                    <div class="settings-section-header">
+                        <div class="settings-section-icon">🤖</div>
+                        <div class="settings-section-title">
+                            <h3>Claude AI Configuration</h3>
+                            <p class="settings-section-desc">Configure AI model settings</p>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Claude Command</span>
+                                <span class="settings-label-hint">CLI command to invoke Claude</span>
+                            </div>
+                            <div class="settings-input-wrapper">
+                                <input type="text" 
+                                       x-model="settings.claudeCommand" 
+                                       class="settings-input" 
+                                       placeholder="claude">
+                                <span class="settings-input-icon">⌘</span>
+                            </div>
+                        </div>
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Response Timeout</span>
+                                <span class="settings-label-hint">Max wait time in seconds</span>
+                            </div>
+                            <div class="settings-input-wrapper">
+                                <input type="number" 
+                                       x-model="settings.timeout" 
+                                       class="settings-input" 
+                                       min="30" max="3600"
+                                       placeholder="300">
+                                <span class="settings-input-icon">⏱️</span>
+                            </div>
+                        </div>
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Model Selection</span>
+                                <span class="settings-label-hint">Choose Claude model version</span>
+                            </div>
+                            <select x-model="settings.model" class="settings-select">
+                                <option value="claude-3-opus">Claude 3 Opus (Most Capable)</option>
+                                <option value="claude-3-sonnet">Claude 3 Sonnet (Balanced)</option>
+                                <option value="claude-3-haiku">Claude 3 Haiku (Fast)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Queue Settings -->
+                <div class="settings-section" x-show="settingsSection === 'queue' || settingsSection === 'all'">
+                    <div class="settings-section-header">
+                        <div class="settings-section-icon">📋</div>
+                        <div class="settings-section-title">
+                            <h3>Queue Management</h3>
+                            <p class="settings-section-desc">Configure task queue behavior</p>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Check Interval</span>
+                                <span class="settings-label-hint">Queue polling frequency (seconds)</span>
+                            </div>
+                            <div class="settings-input-wrapper">
+                                <input type="number" 
+                                       x-model="settings.checkInterval" 
+                                       class="settings-input" 
+                                       min="10" max="300"
+                                       placeholder="60">
+                                <span class="settings-input-icon">🔄</span>
+                            </div>
+                        </div>
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Max Retries</span>
+                                <span class="settings-label-hint">Failed task retry attempts</span>
+                            </div>
+                            <div class="settings-input-wrapper">
+                                <input type="number" 
+                                       x-model="settings.maxRetries" 
+                                       class="settings-input" 
+                                       min="0" max="10"
+                                       placeholder="3">
+                                <span class="settings-input-icon">🔁</span>
+                            </div>
+                        </div>
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Concurrent Tasks</span>
+                                <span class="settings-label-hint">Max parallel processing</span>
+                            </div>
+                            <div class="settings-input-wrapper">
+                                <input type="number" 
+                                       x-model="settings.concurrentTasks" 
+                                       class="settings-input" 
+                                       min="1" max="5"
+                                       placeholder="2">
+                                <span class="settings-input-icon">⚡</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Advanced Settings -->
+                <div class="settings-section" x-show="settingsSection === 'advanced' || settingsSection === 'all'">
+                    <div class="settings-section-header">
+                        <div class="settings-section-icon">🔧</div>
+                        <div class="settings-section-title">
+                            <h3>Advanced Options</h3>
+                            <p class="settings-section-desc">Power user settings</p>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-checkbox-group">
+                            <label class="settings-checkbox">
+                                <input type="checkbox" x-model="settings.debugMode">
+                                <span class="settings-checkbox-label">Enable Debug Mode</span>
+                            </label>
+                            <label class="settings-checkbox">
+                                <input type="checkbox" x-model="settings.verboseLogging">
+                                <span class="settings-checkbox-label">Verbose Logging</span>
+                            </label>
+                            <label class="settings-checkbox">
+                                <input type="checkbox" x-model="settings.experimentalFeatures">
+                                <span class="settings-checkbox-label">Experimental Features</span>
+                            </label>
+                            <label class="settings-checkbox">
+                                <input type="checkbox" x-model="settings.collectAnalytics">
+                                <span class="settings-checkbox-label">Share Usage Analytics</span>
+                            </label>
+                        </div>
+                        <div class="settings-field">
+                            <div class="settings-label">
+                                <span class="settings-label-text">Storage Path</span>
+                                <span class="settings-label-hint">Custom data storage location</span>
+                            </div>
+                            <div class="settings-input-wrapper">
+                                <input type="text" 
+                                       x-model="settings.storagePath" 
+                                       class="settings-input" 
+                                       placeholder="~/.cuti/">
+                                <span class="settings-input-icon">📁</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-actions">
+            <div class="settings-actions-info">
+                <span>✅</span>
+                <span x-show="settingsSaved">Settings saved successfully!</span>
+                <span x-show="!settingsSaved">Unsaved changes</span>
+            </div>
+            <div class="settings-actions-buttons">
+                <button @click="exportSettings()" class="btn-secondary">
+                    <span>📤</span>
+                    Export
+                </button>
+                <button @click="resetSettings()" class="btn-secondary">
+                    <span>↺</span>
+                    Reset
+                </button>
+                <button @click="saveSettings()" class="btn-primary">
+                    <span>💾</span>
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'components/sidebar.html' %}
+{% endblock %}
+
+{% block scripts %}
+<!-- Any additional scripts for chat page -->
+{% endblock %}

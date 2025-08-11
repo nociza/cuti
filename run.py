@@ -139,7 +139,7 @@ Examples:
     # Handle web command
     if args.command == 'web':
         try:
-            from cuti.web.main import create_app
+            from cuti.web.app import create_app
             import uvicorn
             
             app = create_app(args.storage_dir)
@@ -159,13 +159,13 @@ Examples:
     # Handle CLI command
     elif args.command == 'cli':
         try:
-            from cuti.cli import app as cli_app
+            from cuti.cli.app import app as cli_app
             
             # Pass through CLI arguments
             if args.cli_args:
-                sys.argv = ['claude-queue'] + args.cli_args
+                sys.argv = ['cuti'] + args.cli_args
             else:
-                sys.argv = ['claude-queue', '--help']
+                sys.argv = ['cuti', '--help']
                 
             cli_app()
             
@@ -177,9 +177,9 @@ Examples:
     # Handle direct queue commands
     else:
         try:
-            from cuti.queue_manager import QueueManager
-            from cuti.models import QueuedPrompt
-            from cuti.aliases import PromptAliasManager
+            from cuti.services.queue_service import QueueManager
+            from cuti.core.models import QueuedPrompt
+            from cuti.services.aliases import PromptAliasManager
             
             manager = QueueManager(storage_dir=args.storage_dir)
             

@@ -48,9 +48,8 @@ dev = [
 ]
 
 [project.scripts]
-claude-queue     = "cuti.cli:app"
-claude-queue-web = "cuti.web.main:main"
-cuti             = "cuti.__main__:main"
+cuti = "cuti.cli.app:app"
+cuti-web = "cuti.web.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cuti"]

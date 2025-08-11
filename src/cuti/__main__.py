@@ -9,7 +9,7 @@ import argparse
 import os
 from pathlib import Path
 
-from .web.main import main as web_main
+from .web.app import main as web_main
 
 
 def main():

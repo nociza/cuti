@@ -17,7 +17,7 @@ from .base import (
     AgentConfig,
     AgentExecutionContext
 )
-from ..models import QueuedPrompt, ExecutionResult
+from ..core.models import QueuedPrompt, ExecutionResult
 
 
 class GeminiAgent(BaseAgent):

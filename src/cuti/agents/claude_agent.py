@@ -15,8 +15,8 @@ from .base import (
     AgentConfig,
     AgentExecutionContext
 )
-from ..models import QueuedPrompt, ExecutionResult
-from ..claude_interface import ClaudeCodeInterface
+from ..core.models import QueuedPrompt, ExecutionResult
+from ..core.claude_interface import ClaudeCodeInterface
 
 
 class ClaudeAgent(BaseAgent):

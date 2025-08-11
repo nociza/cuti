@@ -1,27 +1,6 @@
 """
-cuti - A tool to queue prompts and execute them when token limits reset.
+cuti - Production-ready claude code utils with command queuing, web interface, and monitoring.
 """
 
-from .models import (
-    QueuedPrompt,
-    QueueState,
-    PromptStatus,
-    ExecutionResult,
-    RateLimitInfo,
-)
-from .storage import QueueStorage, MarkdownPromptParser
-from .claude_interface import ClaudeCodeInterface
-from .queue_manager import QueueManager
-
+# This file is intentionally minimal - the main package is in src/cuti/
 __version__ = "0.1.0"
-__all__ = [
-    "QueuedPrompt",
-    "QueueState",
-    "PromptStatus",
-    "ExecutionResult",
-    "RateLimitInfo",
-    "QueueStorage",
-    "MarkdownPromptParser",
-    "ClaudeCodeInterface",
-    "QueueManager",
-]

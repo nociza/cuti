@@ -10,7 +10,7 @@ from enum import Enum
 from .base import BaseAgent, AgentConfig, AgentStatus, AgentCapability
 from .claude_agent import ClaudeAgent
 from .gemini_agent import GeminiAgent
-from ..models import QueuedPrompt
+from ..core.models import QueuedPrompt
 
 
 class AgentType(Enum):

@@ -1,0 +1,57 @@
+<!-- Modern Sidebar -->
+<aside class="sidebar" :class="showTodos ? '' : 'collapsed'">
+    <div class="sidebar-header">
+        <div class="sidebar-title">{{ sidebar_title | default('Task Tracker') }}</div>
+        <div class="sidebar-subtitle">{{ sidebar_subtitle | default('AI-extracted tasks from conversation') }}</div>
+        
+        <div class="sidebar-stats">
+            <div class="stat-item">
+                <div class="stat-value" x-text="todos.filter(t => !t.completed).length"></div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" x-text="todos.filter(t => t.completed).length"></div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" x-text="todos.length"></div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="sidebar-content">
+        <div x-show="todos.length === 0" class="empty-state">
+            <div class="empty-icon">📝</div>
+            <div style="font-weight: 500; margin-bottom: 8px;">No tasks yet</div>
+            <div style="font-size: 14px;">Tasks will be automatically extracted from your conversation with Claude</div>
+        </div>
+        
+        <div x-show="todos.length > 0" class="todo-list">
+            <template x-for="todo in todos" :key="todo.id">
+                <div class="todo-item" :class="todo.completed && 'completed'">
+                    <div class="todo-content">
+                        <input
+                            type="checkbox"
+                            :checked="todo.completed"
+                            @change="toggleTodo(todo.id)"
+                            class="todo-checkbox">
+                        <div class="todo-details">
+                            <div class="todo-text" x-text="todo.text"></div>
+                            <div x-show="todo.timestamp" class="todo-meta">
+                                <span x-text="formatTime(todo.timestamp)"></span>
+                                <span>•</span>
+                                <span x-text="todo.completed ? 'Completed' : 'Active'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</aside>
+
+<!-- Sidebar Toggle Button -->
+<button @click="showTodos = !showTodos" class="sidebar-toggle">
+    <span class="sidebar-toggle-icon">📋</span>
+</button>
