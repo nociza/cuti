@@ -399,6 +399,77 @@
     animation-duration: 1.5s;
 }
 
+/* Gemini Badge */
+.agent-badge-gemini {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, 
+        rgba(139, 92, 246, 0.15) 0%, 
+        rgba(99, 102, 241, 0.15) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: #a78bfa;
+}
+
+.agent-badge-gemini i {
+    color: #a78bfa;
+    font-size: 10px;
+    filter: drop-shadow(0 0 2px rgba(139, 92, 246, 0.5));
+}
+
+/* Disabled State */
+.agent-disabled {
+    opacity: 0.6;
+    position: relative;
+}
+
+.agent-disabled::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.2) 0%, 
+        rgba(0, 0, 0, 0.1) 100%);
+    pointer-events: none;
+    border-radius: var(--radius-lg);
+}
+
+.agent-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: var(--radius-sm);
+    color: #f87171;
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+.agent-warning i {
+    color: #fbbf24;
+}
+
+.btn-disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.btn-disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 /* Animations */
 @keyframes shimmerAppear {
     from {

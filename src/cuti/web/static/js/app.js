@@ -272,14 +272,13 @@ function terminalInterface() {
         async checkForAgentSuggestion() {
             const input = this.chatInput;
             const atIndex = input.lastIndexOf('@');
+            console.log('checkForAgentSuggestion:', { input, atIndex });
             
             if (atIndex >= 0 && (atIndex === 0 || input[atIndex - 1] === ' ')) {
                 const prefix = input.substring(atIndex + 1);
-                if (prefix.length > 0) {
-                    await this.fetchAgentSuggestions(prefix);
-                } else {
-                    await this.fetchAgentSuggestions('');
-                }
+                console.log('Found @ at position', atIndex, 'prefix:', prefix);
+                // Always fetch suggestions, using _all for empty prefix
+                await this.fetchAgentSuggestions(prefix);
             } else {
                 this.closeSuggestions();
             }
@@ -287,11 +286,18 @@ function terminalInterface() {
         
         async fetchAgentSuggestions(prefix) {
             try {
-                const response = await fetch(`/api/claude-code-agents/suggestions/${prefix || '_all'}`);
+                // Use _all for empty prefix to avoid URL issues
+                const pathParam = (!prefix || prefix === '') ? '_all' : prefix;
+                const url = `/api/claude-code-agents/suggestions/${pathParam}`;
+                console.log('Fetching suggestions from:', url, 'prefix:', prefix);
+                const response = await fetch(url);
                 if (response.ok) {
                     this.agentSuggestions = await response.json();
                     this.showAgentSuggestions = this.agentSuggestions.length > 0;
                     this.selectedSuggestionIndex = 0;
+                    console.log('Got suggestions:', this.agentSuggestions.length, 'showAgentSuggestions:', this.showAgentSuggestions);
+                } else {
+                    console.error('Failed to fetch suggestions:', response.status);
                 }
             } catch (error) {
                 console.error('Error fetching agent suggestions:', error);

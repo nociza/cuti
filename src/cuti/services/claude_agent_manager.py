@@ -26,6 +26,7 @@ class ClaudeAgent:
         is_builtin: bool = False,
         capabilities: Optional[List[str]] = None,
         tools: Optional[List[str]] = None,
+        agent_type: str = "claude",
         **kwargs
     ):
         self.name = name
@@ -34,6 +35,7 @@ class ClaudeAgent:
         self.file_path = file_path
         self.is_local = is_local
         self.is_builtin = is_builtin
+        self.agent_type = agent_type  # "claude" or "gemini"
         # Use provided capabilities/tools or extract from prompt
         self.capabilities = capabilities if capabilities is not None else self._extract_capabilities(prompt)
         self.tools = tools if tools is not None else self._extract_tools(prompt)
@@ -73,6 +75,7 @@ class ClaudeAgent:
             "tools": self.tools,
             "is_local": self.is_local,
             "is_builtin": self.is_builtin,
+            "agent_type": self.agent_type,
             "file_path": str(self.file_path) if self.file_path else None
         }
 
@@ -93,8 +96,17 @@ class ClaudeCodeAgentManager:
         except:
             self.builtin_agents_dir = None
         self.agents: Dict[str, ClaudeAgent] = {}
+        self.gemini_available = self._check_gemini_cli()
         self._ensure_directories()
         self._load_agents()
+    
+    def _check_gemini_cli(self) -> bool:
+        """Check if Gemini CLI is installed and available."""
+        try:
+            result = subprocess.run(['which', 'gemini'], capture_output=True, text=True)
+            return result.returncode == 0
+        except:
+            return False
     
     def _ensure_directories(self):
         """Ensure necessary directories exist and copy built-in agents if needed."""
@@ -159,6 +171,13 @@ class ClaudeCodeAgentManager:
             capabilities = None
             tools = None
             
+            # Detect if this is a Gemini agent based on filename or content
+            agent_type = "claude"
+            if "gemini" in name.lower():
+                agent_type = "gemini"
+            elif "gemini" in content.lower()[:500]:  # Check first 500 chars
+                agent_type = "gemini"
+            
             # Check for YAML frontmatter
             if content.startswith('---'):
                 try:
@@ -174,6 +193,7 @@ class ClaudeCodeAgentManager:
                         is_builtin = frontmatter.get('builtin', is_builtin)
                         capabilities = frontmatter.get('capabilities', [])
                         tools = frontmatter.get('tools', [])
+                        agent_type = frontmatter.get('agent_type', agent_type)
                     else:
                         prompt = content
                 except:
@@ -201,7 +221,8 @@ class ClaudeCodeAgentManager:
                 is_local=is_local,
                 is_builtin=is_builtin,
                 capabilities=capabilities,
-                tools=tools
+                tools=tools,
+                agent_type=agent_type
             )
         except Exception as e:
             print(f"Error parsing agent file {file_path}: {e}")

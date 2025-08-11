@@ -21,6 +21,8 @@ from ..services.claude_usage_monitor import ClaudeUsageMonitor
 from ..services.claude_agent_manager import ClaudeCodeAgentManager
 from ..services.claude_settings_manager import ClaudeSettingsManager
 from ..services.claude_logs_reader import ClaudeLogsReader
+from ..services.workspace_manager import WorkspaceManager
+from ..services.log_sync import LogSyncService
 from .api.queue import queue_router
 from .api.agents import agents_router
 from .api.monitoring import monitoring_router
@@ -52,9 +54,15 @@ def create_app(
         allow_headers=["*"],
     )
     
-    # Initialize managers
+    # Initialize workspace manager first
+    workspace_manager = WorkspaceManager(working_directory=working_directory)
+    
+    # Use workspace-specific storage
+    workspace_storage = str(workspace_manager.cuti_dir)
+    
+    # Initialize managers with workspace storage
     try:
-        queue_manager = QueueManager(storage_dir=storage_dir)
+        queue_manager = QueueManager(storage_dir=workspace_storage)
         claude_interface = ClaudeCodeInterface()
     except RuntimeError as e:
         # Handle case where Claude CLI is not available
@@ -63,14 +71,21 @@ def create_app(
         queue_manager = None
         claude_interface = None
     
-    alias_manager = PromptAliasManager(storage_dir)
-    history_manager = PromptHistoryManager(storage_dir)
-    task_engine = TaskExpansionEngine(storage_dir)
-    system_monitor = SystemMonitor(base_dir=storage_dir)
+    alias_manager = PromptAliasManager(workspace_storage)
+    history_manager = PromptHistoryManager(workspace_storage)
+    task_engine = TaskExpansionEngine(workspace_storage)
+    system_monitor = SystemMonitor(base_dir=workspace_storage)
     websocket_manager = WebSocketManager()
     
     # Initialize Claude usage monitor
-    usage_monitor = ClaudeUsageMonitor(plan='pro', storage_dir=storage_dir)
+    usage_monitor = ClaudeUsageMonitor(plan='pro', storage_dir=workspace_storage)
+    
+    # Initialize log sync service
+    log_sync_service = LogSyncService(workspace_manager)
+    # Perform initial sync
+    log_sync_service.sync_all()
+    # Start auto-sync in background
+    log_sync_service.auto_sync(interval=300)  # Sync every 5 minutes
     
     # Initialize Claude Code agent manager (reads from .claude/agents)
     claude_code_agent_manager = ClaudeCodeAgentManager(
@@ -103,7 +118,9 @@ def create_app(
     app.state.claude_code_agent_manager = claude_code_agent_manager
     app.state.claude_settings_manager = claude_settings_manager
     app.state.claude_logs_reader = claude_logs_reader
-    app.state.storage_dir = storage_dir
+    app.state.workspace_manager = workspace_manager
+    app.state.log_sync_service = log_sync_service
+    app.state.storage_dir = workspace_storage
     app.state.working_directory = Path(working_directory or Path.cwd()).resolve()
     
     # Static files and templates

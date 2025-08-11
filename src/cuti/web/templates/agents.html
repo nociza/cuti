@@ -48,10 +48,14 @@
         <!-- Multi-Column Grid -->
         <div class="agents-grid">
             <template x-for="agent in filteredAgents" :key="agent.name">
-            <div class="agent-card">
+            <div class="agent-card" :class="{'agent-disabled': agent.agent_type === 'gemini' && !geminiAvailable}">
                 <div class="agent-card-header">
                     <div class="agent-name">
                         <span x-text="agent.name"></span>
+                        <span x-show="agent.agent_type === 'gemini'" class="agent-badge-gemini">
+                            <i class="fas fa-gem"></i>
+                            <span>Gemini</span>
+                        </span>
                         <span x-show="agent.is_builtin" class="agent-badge-builtin">
                             <i class="fas fa-sparkles"></i>
                             <span>Created by cuti</span>
@@ -64,6 +68,11 @@
                 </div>
                 
                 <div class="agent-description" x-text="agent.description || 'No description available'"></div>
+                
+                <div x-show="agent.agent_type === 'gemini' && !geminiAvailable" class="agent-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Gemini CLI not installed. Run: npm install -g @genkit-ai/cli</span>
+                </div>
                 
                 <div class="agent-capabilities" x-show="agent.capabilities && agent.capabilities.length > 0">
                     <template x-for="cap in agent.capabilities" :key="cap">
@@ -85,7 +94,10 @@
                             <i class="fas fa-edit"></i>
                             <span>Edit</span>
                         </button>
-                        <button @click="useAgent(agent)" class="btn-agent btn-use">
+                        <button @click="useAgent(agent)" 
+                                :disabled="agent.agent_type === 'gemini' && !geminiAvailable"
+                                :class="{'btn-agent': true, 'btn-use': true, 'btn-disabled': agent.agent_type === 'gemini' && !geminiAvailable}"
+                                :title="agent.agent_type === 'gemini' && !geminiAvailable ? 'Gemini CLI not installed' : ''">
                             <i class="fas fa-play"></i>
                             <span>Use</span>
                         </button>
@@ -275,6 +287,7 @@ function agentManager() {
         editingAgent: null,
         compactMode: false,
         showScrollHint: true,
+        geminiAvailable: false,
         formData: {
             name: '',
             description: '',
@@ -290,6 +303,7 @@ function agentManager() {
         
         async init() {
             await this.loadAgents();
+            await this.checkAgentStatus();
             // Auto-enable compact mode for many agents
             this.compactMode = this.agents.length > 15;
             // Show scroll hint briefly
@@ -297,6 +311,18 @@ function agentManager() {
                 setTimeout(() => {
                     this.showScrollHint = false;
                 }, 5000);
+            }
+        },
+        
+        async checkAgentStatus() {
+            try {
+                const response = await fetch('/api/claude-code-agents/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    this.geminiAvailable = status.gemini_available;
+                }
+            } catch (error) {
+                console.error('Error checking agent status:', error);
             }
         },
         

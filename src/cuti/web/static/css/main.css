@@ -659,22 +659,22 @@ body::after {
     overflow: hidden;
     box-shadow: inset 0 2px 20px rgba(0, 0, 0, 0.3);
     position: relative;
+    z-index: 1;  /* Ensure proper stacking */
 }
 
 /* Agent Suggestions Dropdown */
 .agent-suggestions {
     position: absolute;
-    bottom: 100%;
-    left: 0;
+    bottom: calc(100% + 8px);  /* Position above input with gap */
+    left: 40px;  /* Align with input (after prompt symbol) */
     right: 0;
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: 2px solid var(--primary);
     border-radius: var(--radius-md);
-    margin-bottom: 8px;
     max-height: 200px;
     overflow-y: auto;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
-    z-index: 100;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 9999;
 }
 
 .agent-suggestion-item {
@@ -824,6 +824,7 @@ body::after {
     align-items: center;
     gap: var(--space-md);
     background: rgba(255, 255, 255, 0.03);
+    position: relative;  /* Make this the positioning context for suggestions */
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: var(--space-md) var(--space-lg);
@@ -907,7 +908,8 @@ body::after {
 
 .sidebar-header {
     padding: var(--space-2xl);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+    background: linear-gradient(180deg, rgba(20, 30, 38, 0.4) 0%, transparent 100%);
 }
 
 .sidebar-title {
@@ -915,22 +917,48 @@ body::after {
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: var(--space-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.sidebar-title::before {
+    content: '📋';
+    font-size: 20px;
+    filter: grayscale(20%);
 }
 
 .sidebar-subtitle {
     font-size: var(--text-sm);
     color: var(--text-secondary);
+    opacity: 0.9;
+    line-height: 1.4;
 }
 
 .sidebar-stats {
     display: flex;
     gap: var(--space-lg);
-    margin-top: var(--space-lg);
+    margin-top: var(--space-xl);
+    padding: var(--space-md);
+    background: rgba(16, 185, 129, 0.05);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(16, 185, 129, 0.1);
 }
 
 .stat-item {
     flex: 1;
     text-align: center;
+    position: relative;
+}
+
+.stat-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 20%;
+    height: 60%;
+    width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(16, 185, 129, 0.3), transparent);
 }
 
 .stat-value {
@@ -940,14 +968,16 @@ body::after {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    font-family: 'JetBrains Mono', monospace;
 }
 
 .stat-label {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-top: var(--space-xs);
+    font-weight: 500;
 }
 
 .sidebar-content {
@@ -966,12 +996,31 @@ body::after {
     width: 64px;
     height: 64px;
     margin: 0 auto 16px;
-    background: rgba(0, 0, 0, 0.05);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(96, 165, 250, 0.1) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.empty-icon::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, transparent 70%);
+    animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(0.8); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 0.8; }
 }
 
 /* Todo Items */
@@ -982,29 +1031,52 @@ body::after {
 }
 
 .todo-item {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.6) 0%, rgba(15, 23, 30, 0.8) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.15);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
     transition: all var(--transition-base);
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.todo-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%);
+    opacity: 0;
+    transition: opacity var(--transition-base);
 }
 
 .todo-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    border-color: rgba(16, 185, 129, 0.3);
-    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-color: rgba(16, 185, 129, 0.4);
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.8) 0%, rgba(15, 23, 30, 0.95) 100%);
+}
+
+.todo-item:hover::before {
+    opacity: 1;
 }
 
 .todo-item.completed {
-    opacity: 0.6;
-    background: rgba(255, 255, 255, 0.02);
+    opacity: 0.5;
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.3) 0%, rgba(15, 23, 30, 0.4) 100%);
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 .todo-item.completed .todo-text {
     text-decoration: line-through;
     color: var(--text-muted);
+}
+
+.todo-item.completed::before {
+    background: linear-gradient(180deg, var(--text-muted) 0%, var(--text-muted) 100%);
 }
 
 .todo-content {
@@ -1016,14 +1088,19 @@ body::after {
 .todo-checkbox {
     width: 20px;
     height: 20px;
-    border: 2px solid rgba(16, 185, 129, 0.3);
+    border: 2px solid rgba(16, 185, 129, 0.5);
     border-radius: var(--radius-sm);
-    background: white;
+    background: rgba(20, 30, 38, 0.8);
     cursor: pointer;
     transition: all var(--transition-base);
     flex-shrink: 0;
     margin-top: 2px;
     position: relative;
+}
+
+.todo-checkbox:hover {
+    border-color: var(--primary);
+    background: rgba(16, 185, 129, 0.1);
 }
 
 .todo-checkbox:checked {
@@ -1048,17 +1125,19 @@ body::after {
 
 .todo-text {
     font-size: var(--text-sm);
-    color: #1f2937; /* Keep light mode text for white bg */
+    color: var(--text-primary); /* Fixed: Use proper text color for dark background */
     line-height: 1.5;
     margin-bottom: 6px;
+    font-weight: 500;
 }
 
 .todo-meta {
     font-size: 11px;
-    color: #6b7280; /* Keep light mode text for white bg */
+    color: var(--text-secondary); /* Fixed: Use proper secondary text color */
     display: flex;
     align-items: center;
     gap: var(--space-sm);
+    opacity: 0.8;
 }
 
 /* Toggle Button */
@@ -1068,28 +1147,49 @@ body::after {
     bottom: 24px;
     width: 56px;
     height: 56px;
-    background: white;
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.95) 0%, rgba(15, 23, 30, 0.98) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 2px solid rgba(16, 185, 129, 0.3);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 40px rgba(16, 185, 129, 0.1);
     cursor: pointer;
     transition: all 0.3s ease;
     z-index: 50;
+    position: relative;
+    overflow: hidden;
+}
+
+.sidebar-toggle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.3s ease;
 }
 
 .sidebar-toggle:hover {
     transform: scale(1.1);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 60px rgba(16, 185, 129, 0.2);
+    border-color: var(--primary);
+}
+
+.sidebar-toggle:hover::before {
+    transform: translate(-50%, -50%) scale(1.5);
 }
 
 .sidebar-toggle-icon {
     font-size: var(--text-xl);
-    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    position: relative;
+    z-index: 1;
+    filter: grayscale(0%) brightness(1.2);
 }
 
 /* STATUS BAR - Removed per user request */

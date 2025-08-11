@@ -40,6 +40,19 @@ async def list_agents(request: Request) -> List[Dict[str, Any]]:
     return [agent.to_dict() for agent in agents]
 
 
+@claude_code_agents_router.get("/status")
+async def get_agent_status(request: Request) -> Dict[str, Any]:
+    """Get agent system status including Gemini availability."""
+    agent_manager = request.app.state.claude_code_agent_manager
+    return {
+        "gemini_available": agent_manager.gemini_available,
+        "total_agents": len(agent_manager.agents),
+        "builtin_agents": sum(1 for a in agent_manager.agents.values() if a.is_builtin),
+        "local_agents": sum(1 for a in agent_manager.agents.values() if a.is_local),
+        "gemini_agents": sum(1 for a in agent_manager.agents.values() if a.agent_type == "gemini")
+    }
+
+
 @claude_code_agents_router.get("/{agent_name}", response_model=AgentResponse)
 async def get_agent(request: Request, agent_name: str) -> Dict[str, Any]:
     """Get a specific agent by name."""
