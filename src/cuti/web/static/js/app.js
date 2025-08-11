@@ -119,12 +119,23 @@ function terminalInterface() {
             this.loadHistory();
             this.loadSettings();
             this.loadClaudeSettings();
+            this.loadGroundTruthData();
+            
+            // Check if an agent was selected from the agent manager
+            const selectedAgent = sessionStorage.getItem('selectedAgent');
+            if (selectedAgent) {
+                this.chatInput = selectedAgent + ' ';
+                sessionStorage.removeItem('selectedAgent');
+            }
+            
             // Focus input after Alpine initializes
             this.$nextTick(() => {
                 if (this.$refs.promptInput) {
                     this.$refs.promptInput.focus();
                 }
             });
+            // Refresh ground truth data periodically
+            setInterval(() => this.loadGroundTruthData(), 5000);
         },
         
         connectChatWebSocket() {
@@ -308,24 +319,58 @@ function terminalInterface() {
             this.selectedSuggestionIndex = 0;
         },
         
-        // History methods
-        loadHistory() {
-            // Load command history from localStorage
-            const saved = localStorage.getItem('cuti_command_history');
-            if (saved) {
-                this.commandHistory = JSON.parse(saved);
-            } else {
-                this.commandHistory = [];
+        navigateSuggestions(direction) {
+            if (!this.showAgentSuggestions || this.agentSuggestions.length === 0) return;
+            
+            this.selectedSuggestionIndex += direction;
+            
+            // Wrap around
+            if (this.selectedSuggestionIndex < 0) {
+                this.selectedSuggestionIndex = this.agentSuggestions.length - 1;
+            } else if (this.selectedSuggestionIndex >= this.agentSuggestions.length) {
+                this.selectedSuggestionIndex = 0;
             }
-            
-            // Calculate stats
-            this.successCount = this.commandHistory.filter(item => item.status === 'success').length;
-            const today = new Date().toDateString();
-            this.todayCount = this.commandHistory.filter(item => 
-                new Date(item.timestamp).toDateString() === today
-            ).length;
-            
-            this.filterHistory();
+        },
+        
+        // History methods
+        async loadHistory() {
+            // Load from Claude's ground truth logs instead of localStorage
+            try {
+                const response = await fetch('/api/claude-logs/history?limit=100');
+                if (response.ok) {
+                    const data = await response.json();
+                    // Transform Claude log format to our UI format
+                    this.commandHistory = data.prompts
+                        .filter(p => p.type === 'user')
+                        .map(prompt => ({
+                            id: prompt.id,
+                            content: prompt.content,
+                            timestamp: prompt.timestamp,
+                            status: 'success',
+                            cwd: prompt.cwd,
+                            git_branch: prompt.git_branch
+                        }));
+                    
+                    // Calculate stats
+                    this.successCount = this.commandHistory.length;
+                    const today = new Date().toDateString();
+                    this.todayCount = this.commandHistory.filter(item => 
+                        new Date(item.timestamp).toDateString() === today
+                    ).length;
+                    
+                    this.filterHistory();
+                }
+            } catch (error) {
+                console.error('Error loading history from Claude logs:', error);
+                // Fallback to localStorage if needed
+                const saved = localStorage.getItem('cuti_command_history');
+                if (saved) {
+                    this.commandHistory = JSON.parse(saved);
+                } else {
+                    this.commandHistory = [];
+                }
+                this.filterHistory();
+            }
         },
         
         filterHistory() {
@@ -483,6 +528,36 @@ function terminalInterface() {
                     model: 'claude-3-opus'
                 };
                 this.saveSettings();
+            }
+        },
+        
+        // Load ground truth data from Claude logs
+        async loadGroundTruthData() {
+            try {
+                // Load todos from Claude logs
+                const todosResponse = await fetch('/api/claude-logs/todos');
+                if (todosResponse.ok) {
+                    const todosData = await todosResponse.json();
+                    if (todosData.todos && todosData.todos.length > 0) {
+                        // Update todos from ground truth
+                        this.todos = todosData.todos.map((todo, index) => ({
+                            id: todo.id || index + 1,
+                            text: todo.content,
+                            completed: todo.status === 'completed',
+                            timestamp: new Date()
+                        }));
+                    }
+                }
+                
+                // Load session stats
+                const statsResponse = await fetch('/api/claude-logs/stats');
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    // Store stats for display if needed
+                    this.sessionStats = stats;
+                }
+            } catch (error) {
+                console.error('Error loading ground truth data:', error);
             }
         }
     }
@@ -652,23 +727,44 @@ function dashboard() {
         },
         
         // History methods
-        loadHistory() {
-            // Load command history from localStorage
-            const saved = localStorage.getItem('cuti_command_history');
-            if (saved) {
-                this.commandHistory = JSON.parse(saved);
-            } else {
-                this.commandHistory = [];
+        async loadHistory() {
+            // Load from Claude's ground truth logs instead of localStorage
+            try {
+                const response = await fetch('/api/claude-logs/history?limit=100');
+                if (response.ok) {
+                    const data = await response.json();
+                    // Transform Claude log format to our UI format
+                    this.commandHistory = data.prompts
+                        .filter(p => p.type === 'user')
+                        .map(prompt => ({
+                            id: prompt.id,
+                            content: prompt.content,
+                            timestamp: prompt.timestamp,
+                            status: 'success',
+                            cwd: prompt.cwd,
+                            git_branch: prompt.git_branch
+                        }));
+                    
+                    // Calculate stats
+                    this.successCount = this.commandHistory.length;
+                    const today = new Date().toDateString();
+                    this.todayCount = this.commandHistory.filter(item => 
+                        new Date(item.timestamp).toDateString() === today
+                    ).length;
+                    
+                    this.filterHistory();
+                }
+            } catch (error) {
+                console.error('Error loading history from Claude logs:', error);
+                // Fallback to localStorage if needed
+                const saved = localStorage.getItem('cuti_command_history');
+                if (saved) {
+                    this.commandHistory = JSON.parse(saved);
+                } else {
+                    this.commandHistory = [];
+                }
+                this.filterHistory();
             }
-            
-            // Calculate stats
-            this.successCount = this.commandHistory.filter(item => item.status === 'success').length;
-            const today = new Date().toDateString();
-            this.todayCount = this.commandHistory.filter(item => 
-                new Date(item.timestamp).toDateString() === today
-            ).length;
-            
-            this.filterHistory();
         },
         
         filterHistory() {

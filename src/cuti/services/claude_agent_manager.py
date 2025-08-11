@@ -4,6 +4,8 @@ Claude Code Agent Manager - Reads and manages Claude Code agents from .claude/ag
 
 import os
 import re
+import shutil
+import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -21,6 +23,9 @@ class ClaudeAgent:
         prompt: str = "",
         file_path: Optional[Path] = None,
         is_local: bool = False,
+        is_builtin: bool = False,
+        capabilities: Optional[List[str]] = None,
+        tools: Optional[List[str]] = None,
         **kwargs
     ):
         self.name = name
@@ -28,9 +33,10 @@ class ClaudeAgent:
         self.prompt = prompt
         self.file_path = file_path
         self.is_local = is_local
-        # Extract capabilities and tools from prompt if available
-        self.capabilities = self._extract_capabilities(prompt)
-        self.tools = self._extract_tools(prompt)
+        self.is_builtin = is_builtin
+        # Use provided capabilities/tools or extract from prompt
+        self.capabilities = capabilities if capabilities is not None else self._extract_capabilities(prompt)
+        self.tools = tools if tools is not None else self._extract_tools(prompt)
     
     def _extract_capabilities(self, prompt: str) -> List[str]:
         """Extract capabilities from the agent prompt."""
@@ -66,6 +72,7 @@ class ClaudeAgent:
             "capabilities": self.capabilities,
             "tools": self.tools,
             "is_local": self.is_local,
+            "is_builtin": self.is_builtin,
             "file_path": str(self.file_path) if self.file_path else None
         }
 
@@ -78,55 +85,123 @@ class ClaudeCodeAgentManager:
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
         self.local_agents_dir = self.working_dir / ".claude" / "agents"
         self.global_agents_dir = Path.home() / ".claude" / "agents"
+        # Get built-in agents directory from package
+        try:
+            import cuti
+            package_dir = Path(cuti.__file__).parent
+            self.builtin_agents_dir = package_dir / "builtin_agents"
+        except:
+            self.builtin_agents_dir = None
         self.agents: Dict[str, ClaudeAgent] = {}
+        self._ensure_directories()
         self._load_agents()
     
+    def _ensure_directories(self):
+        """Ensure necessary directories exist and copy built-in agents if needed."""
+        # Create local agents directory if it doesn't exist
+        self.local_agents_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Copy built-in agents to local directory if they don't exist
+        if self.builtin_agents_dir and self.builtin_agents_dir.exists():
+            for builtin_agent in self.builtin_agents_dir.glob("*.md"):
+                local_agent_path = self.local_agents_dir / builtin_agent.name
+                if not local_agent_path.exists():
+                    shutil.copy2(builtin_agent, local_agent_path)
+    
     def _load_agents(self):
-        """Load agents from both local and global directories."""
+        """Load agents from built-in, global, and local directories."""
         self.agents = {}
         
-        # Load global agents first
-        if self.global_agents_dir.exists():
-            for agent_file in self.global_agents_dir.glob("*.md"):
-                agent = self._parse_agent_file(agent_file, is_local=False)
+        # Load built-in agents first (lowest priority)
+        if self.builtin_agents_dir and self.builtin_agents_dir.exists():
+            for agent_file in self.builtin_agents_dir.glob("*.md"):
+                agent = self._parse_agent_file(agent_file, is_local=False, is_builtin=True)
                 if agent:
                     self.agents[agent.name] = agent
         
-        # Load local agents (override global if same name)
-        if self.local_agents_dir.exists():
-            for agent_file in self.local_agents_dir.glob("*.md"):
-                agent = self._parse_agent_file(agent_file, is_local=True)
+        # Load global agents (medium priority)
+        if self.global_agents_dir.exists():
+            for agent_file in self.global_agents_dir.glob("*.md"):
+                agent = self._parse_agent_file(agent_file, is_local=False, is_builtin=False)
                 if agent:
                     self.agents[agent.name] = agent
+        
+        # Load local agents (highest priority - override others if same name)
+        if self.local_agents_dir.exists():
+            for agent_file in self.local_agents_dir.glob("*.md"):
+                agent = self._parse_agent_file(agent_file, is_local=True, is_builtin=False)
+                if agent:
+                    # Check if this is a built-in agent in local directory
+                    if self._is_builtin_copy(agent_file):
+                        agent.is_builtin = True
+                    self.agents[agent.name] = agent
     
-    def _parse_agent_file(self, file_path: Path, is_local: bool) -> Optional[ClaudeAgent]:
-        """Parse an agent markdown file."""
+    def _is_builtin_copy(self, file_path: Path) -> bool:
+        """Check if a local agent file is a copy of a built-in agent."""
+        if not self.builtin_agents_dir:
+            return False
+        builtin_path = self.builtin_agents_dir / file_path.name
+        if builtin_path.exists():
+            # Check if content matches or has builtin flag
+            try:
+                content = file_path.read_text()
+                return 'builtin: true' in content or content == builtin_path.read_text()
+            except:
+                return False
+        return False
+    
+    def _parse_agent_file(self, file_path: Path, is_local: bool, is_builtin: bool = False) -> Optional[ClaudeAgent]:
+        """Parse an agent markdown file with optional YAML frontmatter."""
         try:
             content = file_path.read_text()
             name = file_path.stem
-            
-            # Extract description from first heading or first paragraph
             description = ""
-            lines = content.split('\n')
-            for line in lines:
-                line = line.strip()
-                if line.startswith('#'):
-                    # Remove heading markers
-                    description = re.sub(r'^#+\s*', '', line)
-                    break
-                elif line and not line.startswith('```'):
-                    description = line
-                    break
+            capabilities = None
+            tools = None
             
-            # The entire content is the prompt
-            prompt = content
+            # Check for YAML frontmatter
+            if content.startswith('---'):
+                try:
+                    # Extract frontmatter
+                    parts = content.split('---', 2)
+                    if len(parts) >= 3:
+                        frontmatter = yaml.safe_load(parts[1])
+                        prompt = parts[2].strip()
+                        
+                        # Extract metadata from frontmatter
+                        name = frontmatter.get('name', name)
+                        description = frontmatter.get('description', '')
+                        is_builtin = frontmatter.get('builtin', is_builtin)
+                        capabilities = frontmatter.get('capabilities', [])
+                        tools = frontmatter.get('tools', [])
+                    else:
+                        prompt = content
+                except:
+                    # If YAML parsing fails, treat entire content as prompt
+                    prompt = content
+            else:
+                # No frontmatter, extract description from first heading or paragraph
+                prompt = content
+                lines = content.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('#'):
+                        # Remove heading markers
+                        description = re.sub(r'^#+\s*', '', line)
+                        break
+                    elif line and not line.startswith('```'):
+                        description = line
+                        break
             
             return ClaudeAgent(
                 name=name,
                 description=description or f"Agent: {name}",
                 prompt=prompt,
                 file_path=file_path,
-                is_local=is_local
+                is_local=is_local,
+                is_builtin=is_builtin,
+                capabilities=capabilities,
+                tools=tools
             )
         except Exception as e:
             print(f"Error parsing agent file {file_path}: {e}")
@@ -167,7 +242,7 @@ class ClaudeCodeAgentManager:
                     "name": agent.name,
                     "description": agent.description,
                     "command": f"@{agent.name}",
-                    "is_local": agent.is_local
+                    "is_local": str(agent.is_local)  # Convert boolean to string
                 })
         else:
             # Filter by prefix
@@ -178,7 +253,7 @@ class ClaudeCodeAgentManager:
                         "name": agent.name,
                         "description": agent.description,
                         "command": f"@{agent.name}",
-                        "is_local": agent.is_local
+                        "is_local": str(agent.is_local)  # Convert boolean to string
                     })
         
         return suggestions[:8]  # Limit to 8 suggestions
@@ -285,11 +360,17 @@ Your primary responsibilities:
             }
         
         try:
-            # Only allow deleting local agents
+            # Only allow deleting local agents that are not built-in
             if not agent.is_local:
                 return {
                     "success": False,
                     "message": "Cannot delete global agents. Only local agents can be deleted."
+                }
+            
+            if agent.is_builtin:
+                return {
+                    "success": False,
+                    "message": "Cannot delete built-in agents provided by cuti."
                 }
             
             # Delete the file
@@ -321,6 +402,12 @@ Your primary responsibilities:
             return {
                 "success": False,
                 "message": "Cannot edit global agents. Only local agents can be modified."
+            }
+        
+        if agent.is_builtin:
+            return {
+                "success": False,
+                "message": "Cannot edit built-in agents. Create a custom copy instead."
             }
         
         try:

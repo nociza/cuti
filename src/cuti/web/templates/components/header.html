@@ -2,33 +2,40 @@
 <header class="header">
     <div class="header-content">
         <div class="logo-section">
-            <div class="logo">AI</div>
+            <div class="logo">
+                <i class="fas fa-terminal"></i>
+            </div>
             <div>
                 <div class="app-title">cuti</div>
-                <div class="app-subtitle">AI Terminal Interface</div>
+                <div class="app-subtitle">Claude Code Terminal</div>
             </div>
         </div>
         
         <!-- Navigation Pills -->
         <nav class="nav-pills">
             {% for nav_item in nav_items %}
-            {% if nav_item.onclick %}
-            <button @click="{{ nav_item.onclick }}" 
-                    :class="{'nav-pill': true, 'active': activeTab === '{{ nav_item.tab_id }}'}">
-                {{ nav_item.label }}
-            </button>
-            {% else %}
             <a href="{{ nav_item.url }}" 
                class="nav-pill{% if nav_item.active %} active{% endif %}"
                {% if nav_item.target %}target="{{ nav_item.target }}"{% endif %}>
-                {{ nav_item.label }}
+                {% if nav_item.label == "Chat" %}
+                <i class="fas fa-comments"></i>
+                {% elif nav_item.label == "Agent Manager" %}
+                <i class="fas fa-robot"></i>
+                {% endif %}
+                <span>{{ nav_item.label }}</span>
             </a>
-            {% endif %}
             {% endfor %}
         </nav>
         
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 12px; color: var(--text-muted);">{{ working_directory }}</span>
+        <div class="header-status">
+            <div class="status-indicator">
+                <span class="status-dot active"></span>
+                <span class="status-text">Connected</span>
+            </div>
+            <div class="working-dir">
+                <i class="fas fa-folder"></i>
+                <span>{{ working_directory | truncate(30) }}</span>
+            </div>
         </div>
     </div>
 </header>

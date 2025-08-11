@@ -142,40 +142,71 @@ async def agent_websocket_endpoint(websocket: WebSocket):
 
 @websocket_router.websocket("/chat-ws")
 async def chat_websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for chat interface."""
+    """WebSocket endpoint for chat interface with Claude Code proxy."""
     await websocket_manager.connect(websocket, "chat")
+    
+    # Get app from websocket scope
+    app = websocket.scope.get("app")
+    
+    # Get Claude interface from app state
+    claude_interface = app.state.claude_interface if app else None
+    
     try:
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
             
-            if message_data.get("type") == "execute_prompt":
-                # Handle prompt execution
-                prompt = message_data.get("prompt", "")
+            if message_data.get("type") == "message":
+                # Handle chat message
+                content = message_data.get("content", "")
                 
-                # Send acknowledgment
-                await websocket_manager.send_personal_message(
-                    json.dumps({
-                        "type": "execution_started",
-                        "prompt": prompt,
-                        "timestamp": "2024-01-01T00:00:00Z"
-                    }),
-                    websocket
-                )
+                # Send start signal
+                await websocket.send_text(json.dumps({
+                    "type": "start",
+                    "timestamp": "2024-01-01T00:00:00Z"
+                }))
                 
-                # Here you would actually execute the prompt
-                # For now, just simulate a response
-                await asyncio.sleep(2)
+                try:
+                    # Check if message contains @ agent reference
+                    # The @ syntax will be handled by Claude Code itself
+                    # We just proxy the message directly
+                    
+                    if claude_interface:
+                        # Execute through Claude Code CLI
+                        # Stream the response back
+                        # Get working directory from app state
+                        working_dir = str(app.state.working_directory) if app else "."
+                        
+                        async for chunk in claude_interface.stream_prompt(content, working_dir):
+                            await websocket.send_text(json.dumps({
+                                "type": "stream",
+                                "content": chunk
+                            }))
+                    else:
+                        # Fallback for demo mode
+                        demo_response = f"I received your message: {content}"
+                        if "@" in content:
+                            demo_response += "\n\nNote: Agent invocation detected. In production, this would be handled by Claude Code."
+                        
+                        # Simulate streaming
+                        for word in demo_response.split():
+                            await websocket.send_text(json.dumps({
+                                "type": "stream",
+                                "content": word + " "
+                            }))
+                            await asyncio.sleep(0.05)
+                    
+                except Exception as e:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "content": f"Error executing prompt: {str(e)}"
+                    }))
                 
-                await websocket_manager.send_personal_message(
-                    json.dumps({
-                        "type": "execution_completed",
-                        "prompt": prompt,
-                        "result": "Simulated response for: " + prompt,
-                        "timestamp": "2024-01-01T00:00:00Z"
-                    }),
-                    websocket
-                )
+                # Send end signal
+                await websocket.send_text(json.dumps({
+                    "type": "end",
+                    "timestamp": "2024-01-01T00:00:00Z"
+                }))
             
     except WebSocketDisconnect:
         websocket_manager.disconnect(websocket, "chat")

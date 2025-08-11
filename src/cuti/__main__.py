@@ -50,8 +50,8 @@ Access the dashboard at http://localhost:8000
     )
     parser.add_argument(
         "--storage-dir", 
-        default="~/.claude-queue",
-        help="Storage directory (default: ~/.claude-queue)"
+        default="~/.cuti",
+        help="Storage directory (default: ~/.cuti)"
     )
     parser.add_argument(
         "--version",

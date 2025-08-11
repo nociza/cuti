@@ -32,7 +32,7 @@ if __name__ == "__main__":
         mock_claude.stream_prompt = lambda prompt, working_dir: iter(["Mock response from Claude Code CLI"])
         
         # Create the app
-        app = create_app("~/.claude-queue")
+        app = create_app("~/.cuti")
         
         # Override the claude interface with mock for testing
         # This allows us to test the interface without Claude CLI installed

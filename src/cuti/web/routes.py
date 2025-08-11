@@ -8,17 +8,21 @@ from fastapi.responses import HTMLResponse
 main_router = APIRouter()
 
 
+def get_nav_items(current_page: str = "chat"):
+    """Get navigation items with proper active state."""
+    nav_items = [
+        {"url": "/", "label": "Chat", "active": current_page == "chat"},
+        {"url": "/agents", "label": "Agent Manager", "active": current_page == "agents"}
+    ]
+    return nav_items
+
+
 @main_router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main terminal chat interface."""
     templates = request.app.state.templates
     
-    nav_items = [
-        {"label": "Chat", "onclick": "activeTab = 'chat'", "tab_id": "chat"},
-        {"label": "History", "onclick": "activeTab = 'history'", "tab_id": "history"},
-        {"label": "Settings", "onclick": "activeTab = 'settings'", "tab_id": "settings"},
-        {"url": "/agents", "label": "Agent Status", "active": False}
-    ]
+    nav_items = get_nav_items("chat")
     
     status_info = {
         "left": ["0 messages"],
@@ -41,13 +45,10 @@ async def agents_dashboard(request: Request):
     """Agent status dashboard page."""
     templates = request.app.state.templates
     
-    nav_items = [
-        {"url": "/", "label": "Chat", "active": False},
-        {"url": "/agents", "label": "Agent Status", "active": True}
-    ]
+    nav_items = get_nav_items("agents")
     
     return templates.TemplateResponse("agents.html", {
         "request": request,
-        "working_directory": "System Monitor",
+        "working_directory": str(request.app.state.working_directory),
         "nav_items": nav_items
     })

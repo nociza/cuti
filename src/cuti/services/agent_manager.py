@@ -103,7 +103,7 @@ class ClaudeAgentManager:
         }
     ]
     
-    def __init__(self, storage_dir: str = "~/.claude-queue"):
+    def __init__(self, storage_dir: str = "~/.cuti"):
         """Initialize the agent manager."""
         self.storage_dir = Path(storage_dir).expanduser()
         self.agents_file = self.storage_dir / "agents.json"

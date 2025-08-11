@@ -3,7 +3,7 @@ Shared constants for cuti.
 """
 
 # Default configuration values
-DEFAULT_STORAGE_DIR = "~/.claude-queue"
+DEFAULT_STORAGE_DIR = "~/.cuti"
 DEFAULT_CLAUDE_COMMAND = "claude"
 DEFAULT_CHECK_INTERVAL = 30
 DEFAULT_TIMEOUT = 3600

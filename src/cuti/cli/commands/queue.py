@@ -32,7 +32,7 @@ def get_managers(storage_dir: str):
 
 @queue_app.command("start")
 def start_queue(
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
     claude_command: str = typer.Option("claude", help="Claude CLI command"),
     check_interval: int = typer.Option(30, help="Check interval in seconds"),
     timeout: int = typer.Option(3600, help="Command timeout in seconds"),
@@ -60,7 +60,7 @@ def add_prompt(
     context_files: List[str] = typer.Option([], "-f", "--context-files", help="Context files"),
     max_retries: int = typer.Option(3, "-r", "--max-retries", help="Maximum retry attempts"),
     estimated_tokens: Optional[int] = typer.Option(None, "-t", "--estimated-tokens", help="Estimated tokens"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Add a prompt to the queue (supports aliases)."""
     # Use current directory if not specified
@@ -101,7 +101,7 @@ def add_prompt(
 def create_template(
     filename: str = typer.Argument(..., help="Template filename"),
     priority: int = typer.Option(0, "-p", "--priority", help="Default priority"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Create a prompt template file."""
     manager, _, _ = get_managers(storage_dir)
@@ -114,7 +114,7 @@ def create_template(
 def show_status(
     detailed: bool = typer.Option(False, "-d", "--detailed", help="Show detailed info"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Show queue status."""
     manager, _, _ = get_managers(storage_dir)
@@ -180,7 +180,7 @@ def show_status(
 @queue_app.command("remove")
 def remove_prompt(
     prompt_id: str = typer.Argument(..., help="Prompt ID to remove"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Remove/cancel a prompt from the queue."""
     manager, _, _ = get_managers(storage_dir)
@@ -196,7 +196,7 @@ def remove_prompt(
 @queue_app.command("list")
 def list_prompts(
     status_filter: Optional[str] = typer.Option(None, "-s", "--status", help="Filter by status"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """List all prompts in the queue."""
     manager, _, _ = get_managers(storage_dir)

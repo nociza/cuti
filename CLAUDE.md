@@ -74,7 +74,7 @@ python run.py status
 
 ### Storage Structure
 ```
-~/.claude-queue/
+~/.cuti/
 ├── queue/              # Active prompts
 ├── completed/          # Completed prompts  
 ├── failed/            # Failed prompts
@@ -95,7 +95,7 @@ python run.py status
 
 ### Custom Alias Creation
 ```bash
-claude-queue alias create my-task "Custom task description with ${PROJECT_NAME}" \
+cuti alias create my-task "Custom task description with ${PROJECT_NAME}" \
   --description "My custom task" \
   --working-dir "." \
   --context-files "src/main.py"
@@ -129,7 +129,7 @@ Access via web interface at `/monitoring` or REST API at `/api/monitoring/*`
 - `CLAUDE_QUEUE_WEB_PORT`: Web interface port
 
 ### Config File
-Optional `~/.claude-queue/config.json` for detailed configuration.
+Optional `~/.cuti/config.json` for detailed configuration.
 
 ## Performance Considerations
 

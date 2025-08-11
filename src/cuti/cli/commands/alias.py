@@ -28,7 +28,7 @@ def create_alias(
     description: str = typer.Option("", "-d", "--description", help="Alias description"),
     working_dir: str = typer.Option(".", "-w", "--working-dir", help="Working directory"),
     context_files: List[str] = typer.Option([], "-f", "--context-files", help="Context files"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Create a new prompt alias."""
     alias_manager = get_alias_manager(storage_dir)
@@ -44,7 +44,7 @@ def create_alias(
 @alias_app.command("list")
 def list_aliases(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """List all aliases."""
     alias_manager = get_alias_manager(storage_dir)
@@ -78,7 +78,7 @@ def list_aliases(
 @alias_app.command("delete")
 def delete_alias(
     name: str = typer.Argument(..., help="Alias name to delete"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Delete an alias."""
     alias_manager = get_alias_manager(storage_dir)
@@ -94,7 +94,7 @@ def delete_alias(
 @alias_app.command("show")
 def show_alias(
     name: str = typer.Argument(..., help="Alias name to show"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Show alias details."""
     alias_manager = get_alias_manager(storage_dir)
@@ -119,7 +119,7 @@ def update_alias(
     prompt: Optional[str] = typer.Option(None, "-p", "--prompt", help="New prompt content"),
     description: Optional[str] = typer.Option(None, "-d", "--description", help="New description"),
     working_dir: Optional[str] = typer.Option(None, "-w", "--working-dir", help="New working directory"),
-    storage_dir: str = typer.Option("~/.claude-queue", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
 ):
     """Update an existing alias."""
     alias_manager = get_alias_manager(storage_dir)

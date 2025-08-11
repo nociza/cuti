@@ -29,7 +29,7 @@ _history_manager: Optional[PromptHistoryManager] = None
 
 
 def get_manager(
-    storage_dir: str = "~/.claude-queue",
+    storage_dir: str = "~/.cuti",
     claude_command: str = "claude",
     check_interval: int = 30,
     timeout: int = 3600,
@@ -46,7 +46,7 @@ def get_manager(
     return _manager
 
 
-def get_alias_manager(storage_dir: str = "~/.claude-queue") -> PromptAliasManager:
+def get_alias_manager(storage_dir: str = "~/.cuti") -> PromptAliasManager:
     """Get or create alias manager instance."""
     global _alias_manager
     if _alias_manager is None:
@@ -54,7 +54,7 @@ def get_alias_manager(storage_dir: str = "~/.claude-queue") -> PromptAliasManage
     return _alias_manager
 
 
-def get_history_manager(storage_dir: str = "~/.claude-queue") -> PromptHistoryManager:
+def get_history_manager(storage_dir: str = "~/.cuti") -> PromptHistoryManager:
     """Get or create history manager instance."""
     global _history_manager
     if _history_manager is None:
@@ -79,7 +79,7 @@ app.command("status")(show_status)
 def web(
     host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind to"),
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
-    storage_dir: str = typer.Option("~/.claude-queue", "--storage-dir", help="Storage directory"),
+    storage_dir: str = typer.Option("~/.cuti", "--storage-dir", help="Storage directory"),
     working_directory: Optional[str] = typer.Option(None, "--working-dir", "-w", help="Working directory"),
 ):
     """Start the web interface."""

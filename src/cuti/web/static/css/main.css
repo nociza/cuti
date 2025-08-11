@@ -68,6 +68,22 @@
     --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Animations */
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-enter-active {
+    animation: fade-in 0.3s ease;
+}
+
 /* Custom Scrollbar */
 *::-webkit-scrollbar {
     width: 10px;
@@ -137,15 +153,15 @@ body::after {
     left: 0;
     right: 0;
     height: 72px;
-    background: rgba(255, 255, 255, 0.95);
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.98) 0%, rgba(15, 23, 30, 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     z-index: 100;
     display: flex;
     align-items: center;
     padding: 0 var(--space-3xl);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
 }
 
 .header-content {
@@ -175,6 +191,15 @@ body::after {
     color: white;
     font-size: 18px;
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    transition: transform var(--transition-base);
+}
+
+.logo:hover {
+    transform: scale(1.05);
+}
+
+.logo i {
+    font-size: 20px;
 }
 
 .app-title {
@@ -184,19 +209,21 @@ body::after {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    letter-spacing: -0.5px;
 }
 
 .app-subtitle {
     font-size: var(--text-xs);
     color: var(--text-muted);
     margin-top: 2px;
+    letter-spacing: 0.5px;
 }
 
 /* Navigation Pills - unified design */
 .nav-pills {
     display: flex;
     gap: var(--space-sm);
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.05);
     padding: 6px;
     border-radius: var(--radius-lg);
 }
@@ -213,18 +240,76 @@ body::after {
     transition: all var(--transition-base);
     position: relative;
     text-decoration: none;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-pill i {
+    font-size: 14px;
 }
 
 .nav-pill:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .nav-pill.active {
     color: white;
     background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Header Status Section */
+.header-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2xl);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-lg);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: pulse 2s infinite;
+}
+
+.status-dot.active {
+    background: var(--primary);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.status-text {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.working-dir {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.working-dir i {
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 /* LAYOUT COMPONENTS */
@@ -250,15 +335,316 @@ body::after {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.95);
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.95) 0%, rgba(15, 23, 30, 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     margin: var(--space-2xl);
     margin-right: var(--space-md);
     margin-bottom: 0; /* Remove bottom margin to prevent overlap */
     border-radius: var(--radius-xl);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Terminal-Style Tab Navigation */
+.terminal-tabs {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 100%);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.02),
+        0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.terminal-tabs::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(16, 185, 129, 0.5) 20%, 
+        rgba(16, 185, 129, 0.5) 80%, 
+        transparent 100%);
+    animation: subtle-pulse 4s ease-in-out infinite;
+}
+
+@keyframes subtle-pulse {
+    0%, 100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.terminal-tabs-header {
+    display: flex;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+}
+
+.tab-prefix,
+.tab-suffix {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    opacity: 0.4;
+    user-select: none;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+.tab-prefix {
+    margin-right: var(--space-sm);
+}
+
+.tab-suffix {
+    margin-left: var(--space-sm);
+    flex: 1;
+    position: relative;
+}
+
+.tab-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--text-muted) 0px,
+        var(--text-muted) 4px,
+        transparent 4px,
+        transparent 8px
+    );
+    opacity: 0.2;
+}
+
+.tab-separator {
+    color: var(--text-muted);
+    opacity: 0.3;
+    margin: 0 var(--space-xs);
+    font-size: var(--text-lg);
+    user-select: none;
+}
+
+.terminal-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    position: relative;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.terminal-tab::before {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--primary);
+    transform: scaleX(0);
+    transition: transform var(--transition-fast);
+}
+
+.tab-icon {
+    color: var(--text-muted);
+    font-size: 16px;
+    transition: all var(--transition-fast);
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+    position: relative;
+    top: 1px;
+}
+
+.tab-text {
+    position: relative;
+}
+
+.terminal-tab:hover {
+    color: var(--text-primary);
+}
+
+.terminal-tab:hover .tab-icon {
+    color: var(--text-secondary);
+    transform: translateX(2px);
+}
+
+.terminal-tab.tab-active {
+    color: var(--primary);
+}
+
+.terminal-tab.tab-active::before {
+    transform: scaleX(1);
+}
+
+.terminal-tab.tab-active .tab-icon {
+    color: var(--primary);
+    animation: pulse-glow 2s ease-in-out infinite;
+    transform: translateX(0);
+}
+
+/* Special animation for terminal tab icon when active */
+.terminal-tab.tab-active .tab-icon {
+    /* Default pulsing for all active tabs */
+}
+
+/* Specific animations based on tab content */
+.terminal-tab.tab-active .tab-text:contains("TERMINAL") ~ .tab-icon,
+.terminal-tab:first-child.tab-active .tab-icon {
+    animation: terminal-cursor 1s step-end infinite;
+}
+
+@keyframes terminal-cursor {
+    0%, 49% {
+        opacity: 1;
+    }
+    50%, 100% {
+        opacity: 0.3;
+    }
+}
+
+/* History tab gets a subtle rotation */
+.terminal-tab:nth-child(3).tab-active .tab-icon {
+    animation: rotate-spin 8s linear infinite;
+}
+
+@keyframes rotate-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Settings tab gets a gear rotation */
+.terminal-tab:nth-child(5).tab-active .tab-icon {
+    animation: gear-rotate 4s linear infinite;
+}
+
+@keyframes gear-rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        opacity: 1;
+        text-shadow: 0 0 5px currentColor;
+    }
+    50% {
+        opacity: 0.8;
+        text-shadow: 0 0 10px currentColor;
+    }
+}
+
+.terminal-tabs-indicator {
+    padding: 6px var(--space-lg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    background: linear-gradient(90deg, 
+        rgba(16, 185, 129, 0.02) 0%, 
+        rgba(16, 185, 129, 0.08) 50%, 
+        rgba(16, 185, 129, 0.02) 100%);
+    border-top: 1px solid rgba(16, 185, 129, 0.1);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    position: relative;
+    overflow: hidden;
+}
+
+.terminal-tabs-indicator::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(16, 185, 129, 0.1), 
+        transparent);
+    animation: indicator-scan 3s linear infinite;
+}
+
+@keyframes indicator-scan {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+.indicator-text {
+    opacity: 0.7;
+    transition: opacity var(--transition-fast);
+}
+
+.indicator-blink {
+    animation: terminal-blink 1s step-end infinite;
+    color: var(--primary);
+    opacity: 0.8;
+}
+
+@keyframes terminal-blink {
+    0%, 50% {
+        opacity: 1;
+    }
+    51%, 100% {
+        opacity: 0;
+    }
+}
+
+/* Active tab animations */
+.terminal-tab.tab-active .tab-text::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        var(--primary) 50%, 
+        transparent 100%);
+    animation: scan-line 3s linear infinite;
+}
+
+@keyframes scan-line {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 /* TERMINAL COMPONENTS */
@@ -499,12 +885,13 @@ body::after {
 /* Sidebar */
 .sidebar {
     width: 360px;
-    background: rgba(255, 255, 255, 0.95);
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.95) 0%, rgba(15, 23, 30, 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     margin: var(--space-2xl) var(--space-2xl) 0 var(--space-md); /* Remove bottom margin */
     border-radius: var(--radius-xl);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     flex-direction: column;
     transition: all var(--transition-base);
@@ -520,19 +907,19 @@ body::after {
 
 .sidebar-header {
     padding: var(--space-2xl);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sidebar-title {
     font-size: var(--text-lg);
     font-weight: 600;
-    color: #1f2937; /* Keep light mode text for white bg */
+    color: var(--text-primary);
     margin-bottom: var(--space-sm);
 }
 
 .sidebar-subtitle {
     font-size: var(--text-sm);
-    color: #6b7280; /* Keep light mode text for white bg */
+    color: var(--text-secondary);
 }
 
 .sidebar-stats {
@@ -557,7 +944,7 @@ body::after {
 
 .stat-label {
     font-size: 11px;
-    color: #6b7280; /* Keep light mode text for white bg */
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-top: var(--space-xs);
@@ -572,7 +959,7 @@ body::after {
 .empty-state {
     text-align: center;
     padding: 48px var(--space-2xl);
-    color: #6b7280; /* Keep light mode text for white bg */
+    color: var(--text-secondary);
 }
 
 .empty-icon {
@@ -595,8 +982,8 @@ body::after {
 }
 
 .todo-item {
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
     transition: all var(--transition-base);
@@ -605,13 +992,14 @@ body::after {
 
 .todo-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .todo-item.completed {
     opacity: 0.6;
-    background: rgba(0, 0, 0, 0.02);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .todo-item.completed .todo-text {

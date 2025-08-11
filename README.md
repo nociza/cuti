@@ -149,7 +149,7 @@ Start the modern web interface:
 python run.py web
 
 # Or directly
-claude-queue web --host 0.0.0.0 --port 8000
+cuti web --host 0.0.0.0 --port 8000
 ```
 
 Features:
@@ -167,24 +167,24 @@ The enhanced CLI provides a rich terminal experience:
 
 ```bash
 # Quick status check
-claude-queue status --detailed
+cuti status --detailed
 
 # Add a prompt using an alias
-claude-queue add "explore-codebase" --priority 1
+cuti add "explore-codebase" --priority 1
 
 # Start the queue processor
-claude-queue start --verbose
+cuti start --verbose
 
 # Manage aliases
-claude-queue alias create my-task "Implement user authentication with JWT tokens"
-claude-queue alias list
+cuti alias create my-task "Implement user authentication with JWT tokens"
+cuti alias list
 
 # Search history
-claude-queue history search "authentication" 
-claude-queue history list --limit 10
+cuti history search "authentication" 
+cuti history list --limit 10
 
 # Task expansion
-claude-queue expand "Build a REST API for user management"
+cuti expand "Build a REST API for user management"
 ```
 
 ### Prompt Aliases in Action
@@ -193,27 +193,27 @@ claude-queue expand "Build a REST API for user management"
 
 ```bash
 # Comprehensive codebase analysis
-claude-queue add "explore-codebase" --working-dir /path/to/project
+cuti add "explore-codebase" --working-dir /path/to/project
 
 # Security audit with automatic context
-claude-queue add "security-audit" --priority 1
+cuti add "security-audit" --priority 1
 
 # Performance optimization analysis  
-claude-queue add "optimize-performance"
+cuti add "optimize-performance"
 ```
 
 #### Creating Custom Aliases
 
 ```bash
 # Create a reusable deployment alias
-claude-queue alias create deploy-app \
+cuti alias create deploy-app \
   "Deploy the ${PROJECT_NAME} application to production. Include: 1) Pre-deployment checks 2) Database migrations 3) Blue-green deployment 4) Health checks 5) Rollback plan" \
   --description "Production deployment checklist" \
   --working-dir "." \
   --context-files "deploy/config.yml" "scripts/deploy.sh"
 
 # Use the custom alias
-claude-queue add "deploy-app"
+cuti add "deploy-app"
 ```
 
 #### Variable Substitution
@@ -231,7 +231,7 @@ Transform high-level tasks into detailed execution plans:
 
 ```bash
 # Expand a complex task
-claude-queue expand "Build a production-ready web application with user authentication"
+cuti expand "Build a production-ready web application with user authentication"
 ```
 
 This automatically generates:
@@ -249,7 +249,7 @@ This automatically generates:
 Create rich prompt templates:
 
 ```bash
-claude-queue template feature-implementation --priority 1
+cuti template feature-implementation --priority 1
 ```
 
 Edit the generated `.md` file:
@@ -324,7 +324,7 @@ export CLAUDE_QUEUE_CLEANUP_INTERVAL_HOURS="24"
 
 ### Configuration File
 
-Create `~/.claude-queue/config.json`:
+Create `~/.cuti/config.json`:
 
 ```json
 {
@@ -375,7 +375,7 @@ claude-code-queue/
 ## 🗄️ Storage Structure
 
 ```
-~/.claude-queue/
+~/.cuti/
 ├── queue/                   # Pending prompts
 │   ├── 001-feature.md
 │   └── 002-bugfix.executing.md
@@ -482,13 +482,13 @@ uv run pytest --cov=cuti
 
 ```bash
 # Check Claude Code connection
-claude-queue test
+cuti test
 
 # Check queue status  
-claude-queue status --detailed
+cuti status --detailed
 
 # Restart queue processor
-claude-queue start --verbose
+cuti start --verbose
 ```
 
 **Web interface not starting:**
@@ -498,29 +498,29 @@ claude-queue start --verbose
 lsof -i :8000
 
 # Try different port
-claude-queue web --port 8080
+cuti web --port 8080
 
 # Check logs for errors
-claude-queue web --log-level debug
+cuti web --log-level debug
 ```
 
 **Rate limit issues:**
 
 - The system automatically handles rate limits
-- Check rate limit status: `claude-queue status`
+- Check rate limit status: `cuti status`
 - Prompts will automatically retry after cooldown period
 
 **Alias not resolving:**
 
 ```bash
 # List available aliases
-claude-queue alias list
+cuti alias list
 
 # Check specific alias
-claude-queue alias show alias-name
+cuti alias show alias-name
 
 # Test alias resolution
-claude-queue add "alias-name" --dry-run
+cuti add "alias-name" --dry-run
 ```
 
 ## 📊 Performance & Scaling

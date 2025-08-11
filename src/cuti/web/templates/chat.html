@@ -12,8 +12,41 @@
 {% block content %}
 <!-- Main Content Area -->
 <div class="main-content">
+    <!-- Terminal-Style Tab Navigation -->
+    <div class="terminal-tabs">
+        <div class="terminal-tabs-header">
+            <span class="tab-prefix">┌─[</span>
+            <button @click="activeTab = 'chat'" 
+                    :class="{'tab-active': activeTab === 'chat'}" 
+                    class="terminal-tab">
+                <span class="tab-icon">▸</span>
+                <span class="tab-text">TERMINAL</span>
+            </button>
+            <span class="tab-separator">│</span>
+            <button @click="activeTab = 'history'" 
+                    :class="{'tab-active': activeTab === 'history'}" 
+                    class="terminal-tab">
+                <span class="tab-icon">◑</span>
+                <span class="tab-text">HISTORY</span>
+            </button>
+            <span class="tab-separator">│</span>
+            <button @click="activeTab = 'settings'" 
+                    :class="{'tab-active': activeTab === 'settings'}" 
+                    class="terminal-tab">
+                <span class="tab-icon">⚙</span>
+                <span class="tab-text">SETTINGS</span>
+            </button>
+            <span class="tab-suffix">]─</span>
+            <span class="tab-line"></span>
+        </div>
+        <div class="terminal-tabs-indicator">
+            <span class="indicator-text" x-text="activeTab === 'chat' ? '> Terminal Mode' : activeTab === 'history' ? '> Command History' : '> System Settings'"></span>
+            <span class="indicator-blink">_</span>
+        </div>
+    </div>
+    
     <!-- Terminal Container -->
-    <div class="terminal-container" x-show="activeTab === 'chat'">
+    <div class="terminal-container" x-show="activeTab === 'chat'" x-transition:enter="fade-in">
         <!-- Terminal Header -->
         <div class="terminal-header">
             <div class="terminal-controls">
@@ -84,6 +117,8 @@
                         @keydown.ctrl.c="clearTerminal()"
                         @keydown.tab.prevent="acceptSuggestion()"
                         @keydown.escape="closeSuggestions()"
+                        @keydown.arrow-up.prevent="navigateSuggestions(-1)"
+                        @keydown.arrow-down.prevent="navigateSuggestions(1)"
                         placeholder="Type your message or @agent-name..."
                         class="prompt-input"
                         :disabled="isStreaming"

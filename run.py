@@ -50,7 +50,7 @@ def setup_environment():
         return False
     
     # Create default configuration directory
-    config_dir = Path.home() / '.claude-queue'
+    config_dir = Path.home() / '.cuti'
     config_dir.mkdir(exist_ok=True)
     
     print(f"✓ Configuration directory created: {config_dir}")
@@ -90,7 +90,7 @@ Examples:
     web_parser = subparsers.add_parser('web', help='Start web interface')
     web_parser.add_argument('--host', default='127.0.0.1', help='Host to bind to')
     web_parser.add_argument('--port', type=int, default=8000, help='Port to bind to')
-    web_parser.add_argument('--storage-dir', default='~/.claude-queue', help='Storage directory')
+    web_parser.add_argument('--storage-dir', default='~/.cuti', help='Storage directory')
     
     # CLI command
     cli_parser = subparsers.add_parser('cli', help='Start CLI interface')
@@ -99,17 +99,17 @@ Examples:
     # Direct queue commands
     start_parser = subparsers.add_parser('start', help='Start queue processor')
     start_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
-    start_parser.add_argument('--storage-dir', default='~/.claude-queue', help='Storage directory')
+    start_parser.add_argument('--storage-dir', default='~/.cuti', help='Storage directory')
     
     status_parser = subparsers.add_parser('status', help='Show queue status')
-    status_parser.add_argument('--storage-dir', default='~/.claude-queue', help='Storage directory')
+    status_parser.add_argument('--storage-dir', default='~/.cuti', help='Storage directory')
     status_parser.add_argument('--json', action='store_true', help='Output as JSON')
     
     # Add prompt command
     add_parser = subparsers.add_parser('add', help='Add prompt to queue')
     add_parser.add_argument('prompt', help='Prompt text or alias')
     add_parser.add_argument('--priority', '-p', type=int, default=0, help='Priority')
-    add_parser.add_argument('--storage-dir', default='~/.claude-queue', help='Storage directory')
+    add_parser.add_argument('--storage-dir', default='~/.cuti', help='Storage directory')
     
     args = parser.parse_args()
     

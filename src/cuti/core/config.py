@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 class CutiConfig:
     """Configuration class for cuti system."""
     
-    storage_dir: str = "~/.claude-queue"
+    storage_dir: str = "~/.cuti"
     claude_command: str = "claude"
     check_interval: int = 30
     timeout: int = 3600

@@ -20,17 +20,19 @@ from ..core.claude_interface import ClaudeCodeInterface
 from ..services.claude_usage_monitor import ClaudeUsageMonitor
 from ..services.claude_agent_manager import ClaudeCodeAgentManager
 from ..services.claude_settings_manager import ClaudeSettingsManager
+from ..services.claude_logs_reader import ClaudeLogsReader
 from .api.queue import queue_router
 from .api.agents import agents_router
 from .api.monitoring import monitoring_router
 from .api.websocket import websocket_router
 from .api.claude_code_agents import claude_code_agents_router
 from .api.claude_settings import claude_settings_router
+from .api.claude_logs import claude_logs_router
 from .utils import WebSocketManager
 
 
 def create_app(
-    storage_dir: str = "~/.claude-queue",
+    storage_dir: str = "~/.cuti",
     working_directory: Optional[str] = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application."""
@@ -80,6 +82,11 @@ def create_app(
         working_directory=working_directory
     )
     
+    # Initialize Claude logs reader for ground truth data
+    claude_logs_reader = ClaudeLogsReader(
+        working_directory=working_directory
+    )
+    
     # Initialize project settings if needed
     if not (Path(working_directory or Path.cwd()) / ".claude").exists():
         claude_settings_manager.initialize_project_settings()
@@ -95,6 +102,7 @@ def create_app(
     app.state.usage_monitor = usage_monitor
     app.state.claude_code_agent_manager = claude_code_agent_manager
     app.state.claude_settings_manager = claude_settings_manager
+    app.state.claude_logs_reader = claude_logs_reader
     app.state.storage_dir = storage_dir
     app.state.working_directory = Path(working_directory or Path.cwd()).resolve()
     
@@ -114,6 +122,7 @@ def create_app(
     app.include_router(monitoring_router, prefix="/api")
     app.include_router(claude_code_agents_router, prefix="/api")
     app.include_router(claude_settings_router, prefix="/api")
+    app.include_router(claude_logs_router, prefix="/api")
     app.include_router(websocket_router)
     
     # Include main routes
@@ -183,7 +192,7 @@ def main():
     )
     parser.add_argument(
         "--storage-dir",
-        default="~/.claude-queue",
+        default="~/.cuti",
         help="Storage directory"
     )
     parser.add_argument(

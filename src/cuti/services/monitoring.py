@@ -47,7 +47,7 @@ class ClaudeCodeMetrics:
 class SystemMonitor:
     """Monitor system performance and Claude Code usage."""
     
-    def __init__(self, base_dir: str = "~/.claude-queue"):
+    def __init__(self, base_dir: str = "~/.cuti"):
         self.base_dir = Path(base_dir).expanduser()
         self.metrics_db = self.base_dir / "metrics.db"
         self.base_dir.mkdir(parents=True, exist_ok=True)

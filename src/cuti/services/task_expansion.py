@@ -69,7 +69,7 @@ class TaskBreakdown:
 class TaskExpansionEngine:
     """Engine for automatically expanding tasks into subtasks."""
     
-    def __init__(self, base_dir: str = "~/.claude-queue"):
+    def __init__(self, base_dir: str = "~/.cuti"):
         self.base_dir = Path(base_dir).expanduser()
         self.templates_file = self.base_dir / "task_templates.json"
         self.base_dir.mkdir(parents=True, exist_ok=True)

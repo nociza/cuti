@@ -24,6 +24,7 @@ class AgentResponse(BaseModel):
     capabilities: List[str]
     tools: List[str]
     is_local: bool
+    is_builtin: bool = False
     file_path: Optional[str]
 
 

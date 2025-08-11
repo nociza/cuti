@@ -13,7 +13,7 @@ import hashlib
 class PromptHistoryManager:
     """Manages prompt history with SQLite storage."""
 
-    def __init__(self, base_dir: str = "~/.claude-queue"):
+    def __init__(self, base_dir: str = "~/.cuti"):
         self.base_dir = Path(base_dir).expanduser()
         self.db_path = self.base_dir / "history.db"
         self.base_dir.mkdir(parents=True, exist_ok=True)

@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Any
 class PromptAliasManager:
     """Manages prompt aliases for common tasks."""
 
-    def __init__(self, base_dir: str = "~/.claude-queue"):
+    def __init__(self, base_dir: str = "~/.cuti"):
         self.base_dir = Path(base_dir).expanduser()
         self.aliases_file = self.base_dir / "aliases.json"
         self.base_dir.mkdir(parents=True, exist_ok=True)

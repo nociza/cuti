@@ -117,7 +117,7 @@ class MarkdownPromptParser:
 class PromptStorage:
     """Manages queue storage using markdown files and JSON state."""
 
-    def __init__(self, base_dir: str = "~/.claude-queue"):
+    def __init__(self, base_dir: str = "~/.cuti"):
         self.base_dir = Path(base_dir).expanduser()
         self.queue_dir = self.base_dir / "queue"
         self.completed_dir = self.base_dir / "completed"
