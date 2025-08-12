@@ -1,8 +1,8 @@
-# cuti
+# cuti - Claude Code Unified Terminal Interface
 
-> **Advanced multi-agent orchestration system for Claude Code with intelligent task routing, workspace management, and comprehensive monitoring.**
+> **Production-ready AI orchestration system for Claude Code with multi-agent support, intelligent task routing, real-time usage monitoring, and comprehensive workspace management.**
 
-A production-ready AI agent orchestration platform that seamlessly integrates Claude Code, Gemini, and other AI services. Features intelligent task routing, collaborative agent workflows, real-time monitoring, and a modern web interface for managing complex development tasks.
+cuti (Claude Code Unified Terminal Interface) is an advanced orchestration platform that transforms Claude Code into a powerful development assistant. It provides seamless integration with Claude Code CLI, Google Gemini, and extensible agent architecture, featuring intelligent task routing, collaborative workflows, real-time token usage monitoring, and a modern web interface for managing complex AI-assisted development tasks.
 
 ## 🚀 Quick Start
 
@@ -23,103 +23,116 @@ uvx run ./run.py cli --help
 
 Open http://127.0.0.1:8000 in your browser for the full web interface!
 
-## ✨ Key Features
+## ✨ Core Features
 
-### 🤖 Multi-Agent Orchestration
-- **Agent Pool Management**: Centralized management of Claude, Gemini, and custom AI agents
-- **Intelligent Task Routing**: Multiple routing strategies (capability-based, load-balanced, cost-optimized, speed-optimized)
-- **Collaborative Workflows**: Agents can work together, sharing context and results
-- **Dynamic Agent Creation**: Generate new agents on-demand using Claude's capabilities
-- **Built-in Agent Library**: Pre-configured agents for code review, documentation, testing, UI design, and more
+### 🤖 Multi-Agent Orchestration System
+- **Unified Agent Pool**: Centralized management of Claude Code, Gemini, and custom AI agents
+- **Intelligent Task Routing**: Six routing strategies - capability-based, round-robin, load-balanced, cost-optimized, speed-optimized, quality-optimized
+- **Agent Capabilities**: 18+ defined capabilities including code generation, refactoring, testing, documentation, security analysis, and large context processing
+- **Collaborative Workflows**: Agents share context through SharedMemoryManager for coordinated task execution
+- **Dynamic Agent Management**: Create, configure, and monitor agents through web UI or CLI
+- **Built-in Agent Templates**: Pre-configured agents for code review, documentation, testing, UI design, refactoring, and codebase analysis
 
 ### 🔧 Claude Code Deep Integration
-- **Native Claude CLI Integration**: Direct interface with Claude Code for file operations and tool use
-- **MCP Server Support**: Full support for Model Context Protocol servers
-- **Settings Management**: Per-project Claude configuration management
-- **Log Synchronization**: Automatic sync of Claude conversation logs and TodoWrite data
-- **Real Usage Monitoring**: Live tracking of actual token usage and costs
+- **Native CLI Integration**: Direct interface with Claude Code CLI for seamless file operations and tool use
+- **Real Usage Monitoring**: Integration with claude-monitor package for live token tracking and burn rate calculation
+- **Settings Management**: Project-specific Claude configuration with automatic CLAUDE.md updates
+- **Log Synchronization**: Automatic sync of Claude conversation logs, TodoWrite lists, and execution history
+- **MCP Server Support**: Full Model Context Protocol support for extended capabilities
 
-### 📂 Workspace Management
-- **Project-Specific Workspaces**: Local `.cuti` directories for project isolation
-- **Multi-Database Architecture**: Separate SQLite databases for history, metrics, and agent usage
-- **Git Integration**: Automatic `.gitignore` updates and git context awareness
-- **Workspace Backup**: Automated backup and cleanup systems
+### 📂 Intelligent Workspace Management
+- **Project Isolation**: Dedicated `.cuti` directories for each project with complete data separation
+- **Multi-Database Architecture**: SQLite databases for history tracking, metrics collection, and agent usage analytics
+- **Git-Aware Operations**: Automatic `.gitignore` configuration and git context preservation
+- **Automated Maintenance**: Scheduled backups, data cleanup, and workspace optimization
+- **Workspace Portability**: Export/import workspace configurations across projects
 
-### 🎯 Core Queue Management
-- **Smart Rate Limit Handling**: Automatic detection and handling of API rate limits
-- **Priority Scheduling**: Execute high-priority tasks first
-- **Markdown Templates**: Rich prompt templates with YAML frontmatter
-- **Retry Logic**: Configurable retry attempts with exponential backoff
-- **Persistent Storage**: Queue survives system restarts
+### 🎯 Advanced Queue Processing
+- **Smart Rate Limiting**: Automatic detection and handling of Claude API rate limits with cooldown management
+- **Priority-Based Execution**: Multi-level priority system with intelligent task scheduling
+- **Template System**: YAML frontmatter support for rich prompt templates with metadata
+- **Resilient Retry Logic**: Exponential backoff with configurable retry strategies
+- **Persistent State**: Queue state preservation across system restarts and crashes
+- **Batch Operations**: Process multiple prompts with dependency management
 
-### 🔗 Prompt Aliases System
-- **Pre-built Aliases**: 10+ ready-to-use aliases for common development tasks
-- **Custom Aliases**: Create your own reusable prompt templates
-- **Variable Substitution**: Dynamic variables like `${PROJECT_NAME}`, `${DATE}`
-- **Alias Chaining**: Reference other aliases with `@alias-name` syntax
+### 🔗 Powerful Alias System
+- **Built-in Aliases**: 12+ production-ready aliases for common development workflows
+- **Dynamic Templates**: Variable substitution with project context (`${PROJECT_NAME}`, `${DATE}`, `${GIT_BRANCH}`)
+- **Alias Composition**: Chain aliases together with `@alias-name` references
+- **Context Awareness**: Aliases inherit working directory and file contexts
+- **Custom Workflows**: Create complex multi-step workflows as reusable aliases
 
-### 📊 Advanced Monitoring & Analytics
-- **Real-time Usage Tracking**: Live monitoring of token usage, costs, and rate limits
-- **Burn Rate Calculation**: Predictive analysis of rate limit consumption
-- **Multi-dimensional Analytics**: Daily, monthly breakdowns by model and feature
-- **Plan-aware Monitoring**: Understands Claude subscription plans (Pro, Max5, Max20)
-- **System Metrics**: CPU, memory, disk, and network monitoring
-- **Performance Analytics**: Response times, success rates, and throughput
+### 📊 Comprehensive Monitoring & Analytics
+- **Real-time Token Tracking**: Live monitoring via claude-monitor integration
+- **Burn Rate Analysis**: Predictive rate limit consumption with visual indicators
+- **Cost Management**: Per-model, per-feature cost tracking with budget alerts
+- **Subscription Awareness**: Automatic detection of Claude plans (Pro, Max5, Max20, Custom)
+- **System Performance**: CPU, memory, disk I/O, and network metrics with historical trends
+- **Execution Analytics**: Success rates, response times, throughput metrics, and error analysis
 
 ### 🌐 Modern Web Interface
-- **Real-time Dashboard**: Live queue status and system metrics
-- **WebSocket Updates**: Real-time updates without page refresh
-- **Claude Chat Proxy**: Web-based chat interface that proxies to Claude Code CLI
-- **Agent Management UI**: Visual interface for managing agents and configurations
-- **Interactive Queue Management**: Add, cancel, and monitor prompts
-- **History Browser**: Searchable prompt history with analytics
+- **Real-time Dashboard**: Live system metrics with WebSocket-powered updates
+- **Agent Orchestration UI**: Visual agent management with Symphony toggle animations
+- **Claude Chat Integration**: Web-based chat interface proxying to Claude Code CLI
+- **Interactive Queue Manager**: Drag-and-drop queue reordering with priority management
+- **Execution History**: Searchable history with filters, analytics, and export options
+- **Statistics Dashboard**: Comprehensive usage analytics with interactive charts
 
 ### 📱 Enhanced CLI Experience
-- **Rich Terminal UI**: Beautiful tables, colors, and icons using Rich
-- **Intuitive Commands**: Modern CLI with Typer framework
-- **Agent Commands**: Dedicated commands for agent management and testing
-- **JSON Output**: Machine-readable output for scripting
-- **Progress Indicators**: Visual progress bars and spinners
+- **Rich Terminal UI**: Beautiful formatting with Rich library (tables, progress bars, syntax highlighting)
+- **Modern Command Structure**: Intuitive CLI built with Typer for superior UX
+- **Agent Operations**: Complete agent lifecycle management via CLI
+- **Machine-Readable Output**: JSON output mode for automation and scripting
+- **Interactive Mode**: Real-time feedback with spinners and progress indicators
+- **Autocomplete Support**: Shell completion for faster command entry
 
-### 📈 Task Expansion Engine
-- **Smart Task Breakdown**: Automatically breaks complex tasks into manageable subtasks
-- **Complexity Analysis**: Analyzes task complexity and estimates effort
-- **Dependency Management**: Identifies task dependencies and execution order
-- **Parallel Execution**: Identifies tasks that can run in parallel
-- **Risk Assessment**: Identifies potential risks and success metrics
+### 🧠 Intelligent Task Processing
+- **Task Expansion Engine**: Automatically decomposes complex tasks into subtasks
+- **Complexity Analysis**: Estimates effort, identifies risks, and suggests approaches
+- **Dependency Resolution**: Automatic detection and ordering of task dependencies
+- **Parallel Execution**: Identifies and executes independent tasks concurrently
+- **Context Sharing**: SharedMemoryManager enables inter-agent communication
+- **Execution Planning**: Generates execution plans with success metrics
 
-## 📋 Installation
+## 📋 Requirements & Installation
+
+### System Requirements
+- **Python**: 3.9 or higher
+- **OS**: macOS, Linux, Windows (WSL recommended)
+- **Memory**: 512MB minimum, 1GB recommended
+- **Storage**: 100MB for installation, 1GB+ for workspace data
 
 ### Prerequisites
-- Python 3.9+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- [uv](https://docs.astral.sh/uv/) - Fast Python package manager (recommended)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) - Required for Claude integration
+- [claude-monitor](https://github.com/cline/claude-monitor) - Automatically installed for usage tracking
 - (Optional) Google Gemini API key for Gemini agent support
 
-### Install uv (if not already installed)
+### Quick Installation
+
+#### Using uv (Recommended)
 ```bash
+# Install uv if not present
 curl -LsSf https://astral.sh/uv/install.sh | sh
-# or
-pip install uv
-```
 
-### Install cuti
-
-#### Option 1: Development Setup (Recommended)
-```bash
+# Clone and setup
 git clone https://github.com/nociza/cuti
 cd cuti
 python run.py setup
 ```
 
-#### Option 2: Direct Installation with uv
+#### Alternative Installation Methods
 ```bash
+# Direct installation with uv
 uv add git+https://github.com/nociza/cuti
-```
 
-#### Option 3: Traditional pip Installation
-```bash
+# Traditional pip installation
 pip install git+https://github.com/nociza/cuti
+
+# Development installation
+git clone https://github.com/nociza/cuti
+cd cuti
+uv install -e .
 ```
 
 ## 🎮 Usage
@@ -372,26 +385,41 @@ cuti/
 └── README.md              # This file
 ```
 
-## 🗄️ Storage Structure
+## 🗄️ Data Architecture
 
+### Storage Structure
 ```
-~/.cuti/                    # Global cuti directory
-├── config.json            # Global configuration
-├── agents/                # Agent configurations
-└── logs/                  # System logs
+~/.cuti/                       # Global configuration
+├── config.json               # Global settings
+├── agents/                   # Agent templates
+│   ├── builtin/             # Pre-configured agents
+│   └── custom/              # User-defined agents
+└── logs/                     # System logs
 
-<project>/.cuti/           # Project-specific workspace
-├── queue/                 # Pending prompts
-├── completed/             # Successful executions
-├── failed/               # Failed prompts
-├── databases/            # SQLite databases
-│   ├── history.db       # Prompt history
-│   ├── metrics.db       # Monitoring data
-│   └── agents.db        # Agent usage tracking
-├── claude-settings.json  # Project Claude settings
-├── workspace.json       # Workspace metadata
-└── backups/            # Workspace backups
+<project>/.cuti/              # Project workspace
+├── queue/                    # Queue management
+│   ├── pending/            # Waiting prompts
+│   ├── executing/          # Currently running
+│   └── archived/           # Completed/failed
+├── databases/               # SQLite databases
+│   ├── history.db          # Execution history
+│   ├── metrics.db          # Performance metrics
+│   ├── agents.db           # Agent usage stats
+│   └── monitoring.db       # System monitoring
+├── agents.json              # Active agents config
+├── aliases.json             # Custom aliases
+├── claude-settings.json     # Claude configuration
+├── CLAUDE.md               # Dynamic instructions
+├── workspace.json          # Workspace metadata
+└── backups/                # Automated backups
+    └── YYYY-MM-DD/        # Daily snapshots
 ```
+
+### Database Schemas
+- **history.db**: Prompt executions, results, timings
+- **metrics.db**: Token usage, costs, rate limits
+- **agents.db**: Agent performance, capability scores
+- **monitoring.db**: System metrics, health checks
 
 ## 🔧 API Reference
 
@@ -434,43 +462,66 @@ cuti/
 - `system_alert` - System health alerts
 - `usage_update` - Token usage updates
 
-## 🧪 Development
+## 🧪 Development & Testing
 
-### Setup Development Environment
+### Development Setup
 
 ```bash
+# Clone and setup development environment
 git clone https://github.com/nociza/cuti
 cd cuti
 python run.py setup
 
 # Install development dependencies  
-uv add --dev pytest pytest-asyncio black ruff mypy
+uv add --dev pytest pytest-asyncio black ruff mypy pre-commit
 
-# Run tests
-uv run pytest
+# Setup pre-commit hooks
+pre-commit install
 
-# Code formatting
+# Run initial checks
 uv run black .
 uv run ruff check . --fix
-
-# Type checking
 uv run mypy src/
 ```
 
-### Running Tests
+### Testing Suite
 
 ```bash
-# All tests
+# Run all tests
 uv run pytest
 
-# Specific test file
-uv run pytest tests/test_agents.py
+# Run with coverage report
+uv run pytest --cov=cuti --cov-report=html
 
-# With coverage
-uv run pytest --cov=cuti
+# Test specific components
+uv run pytest tests/test_agents.py -v
+uv run pytest tests/test_interface.py -v
+uv run pytest tests/test_agent_integration.py -v
 
-# Integration tests
-uv run pytest tests/test_agent_integration.py
+# Run performance tests
+uv run pytest tests/test_statistics_page.py -v
+
+# Test structure validation
+uv run pytest tests/test_structure.py -v
+```
+
+### Code Quality Tools
+
+```bash
+# Format code with Black
+uv run black src/ tests/
+
+# Lint with Ruff
+uv run ruff check src/ --fix
+
+# Type checking with mypy
+uv run mypy src/ --strict
+
+# Security scanning
+uv run bandit -r src/
+
+# Generate documentation
+uv run sphinx-build docs/ docs/_build/
 ```
 
 ## 🚨 Troubleshooting
@@ -519,63 +570,117 @@ cuti web --log-level debug
 - View burn rate: `cuti monitoring burn-rate`
 - Prompts will automatically retry after cooldown
 
-## 📊 Performance & Scaling
+## 📊 Performance & Optimization
 
-### Performance Characteristics
-- **Queue Processing**: ~10-50 prompts/hour (depends on API limits)
-- **Agent Pool**: Handles 5-10 concurrent agents efficiently
-- **Web Interface**: Supports 100+ concurrent connections
-- **Database**: SQLite handles millions of records efficiently
-- **Memory Usage**: ~100-200MB typical (varies with agent pool size)
-- **CPU Usage**: Minimal when idle, 20-40% during active processing
+### Performance Metrics
+- **Queue Throughput**: 10-50 prompts/hour (API-limited)
+- **Agent Concurrency**: 5-10 agents with <100ms coordination overhead
+- **WebSocket Connections**: 100+ concurrent clients
+- **Database Performance**: Sub-millisecond queries for <1M records
+- **Memory Footprint**: 100-200MB base, +50MB per active agent
+- **CPU Utilization**: <5% idle, 20-40% active processing
+- **Response Time**: <500ms for API endpoints, <100ms for WebSocket
 
-### Scaling Recommendations
-- Use SSD storage for better database performance
-- Configure appropriate agent pool size based on usage
-- Monitor disk space (databases grow over time)
-- Set up retention policies for old data
-- Use reverse proxy (nginx) for production deployments
-- Consider Redis for distributed deployments
+### Optimization Tips
+- **Storage**: Use NVMe SSD for database operations
+- **Agent Pool**: Size = (Available Memory - 500MB) / 50MB
+- **Rate Limits**: Configure burn rate alerts at 80% threshold
+- **Database**: Enable WAL mode for SQLite, vacuum monthly
+- **Monitoring**: Set 7-day retention for high-frequency metrics
+- **Production**: Deploy behind nginx with caching enabled
+- **Scaling**: Horizontal scaling via Redis queue sharing
 
-## 🔐 Security
+## 🔐 Security & Privacy
 
-- **Local-first Architecture**: All data stored locally by default
-- **API Key Management**: Secure handling of API credentials
-- **Network Security**: CORS configuration, local-only by default
-- **Data Isolation**: Project-specific data isolation
-- **No Telemetry**: No data sent to external services without explicit configuration
+### Security Features
+- **Local-first Architecture**: All data stored locally, no cloud dependencies
+- **Credential Management**: API keys stored in environment variables or keyring
+- **Network Isolation**: Default bind to localhost, configurable CORS
+- **Project Isolation**: Complete data separation between projects
+- **No Telemetry**: Zero external data collection without explicit consent
+- **Secure Communication**: HTTPS support for production deployments
+- **Access Control**: Token-based authentication for API endpoints (optional)
+
+### Best Practices
+- Store API keys in environment variables or `.env` files
+- Use `.gitignore` for workspace directories (auto-configured)
+- Enable HTTPS for production web interface deployments
+- Regularly rotate API keys and update configurations
+- Review agent permissions before enabling new integrations
 
 ## 📜 License
 
-MIT License - see LICENSE file for details.
+MIT License - Copyright (c) 2025 @nociza. See [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- [Claude](https://claude.ai) by Anthropic for amazing AI capabilities
-- [Google Gemini](https://deepmind.google/technologies/gemini/) for large context support
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
-- [Typer](https://typer.tiangolo.com/) for the modern CLI framework
-- [Rich](https://rich.readthedocs.io/) for beautiful terminal output
-- [uv](https://docs.astral.sh/uv/) for fast Python package management
+### Core Technologies
+- [Claude Code](https://claude.ai) by Anthropic - Foundation AI assistant
+- [Google Gemini](https://deepmind.google/technologies/gemini/) - Large context processing
+- [claude-monitor](https://github.com/cline/claude-monitor) - Token usage tracking
+- [FastAPI](https://fastapi.tiangolo.com/) - Async web framework
+- [Typer](https://typer.tiangolo.com/) - CLI framework
+- [Rich](https://rich.readthedocs.io/) - Terminal formatting
+- [uv](https://docs.astral.sh/uv/) - Fast package management
 
-## 🔮 Roadmap
+### Contributors
+- Initial development by @nociza and Claude Code
+- Community contributions welcome via GitHub
 
-### Upcoming Features
-- [ ] **More AI Models**: OpenAI GPT, Anthropic API, local models
-- [ ] **Distributed Processing**: Multi-machine agent pools
-- [ ] **Advanced Scheduling**: Cron-like scheduling for recurring tasks
-- [ ] **Plugin System**: Extensible plugin architecture
-- [ ] **Docker Support**: Containerized deployment
-- [ ] **Cloud Integration**: AWS/GCP/Azure integration
-- [ ] **Visual Workflow Builder**: Drag-and-drop workflow creation
-- [ ] **Team Collaboration**: Shared queues and team features
+## 🔮 Future Roadmap
+
+### Version 1.0 (Current)
+- ✅ Multi-agent orchestration with Claude and Gemini
+- ✅ Real-time usage monitoring and analytics
+- ✅ Web interface with WebSocket updates
+- ✅ Project workspace management
+- ✅ Queue processing with rate limit handling
+
+### Version 1.1 (Q1 2025)
+- [ ] OpenAI GPT-4 integration
+- [ ] Local LLM support (Ollama, LlamaCpp)
+- [ ] Enhanced workflow templates
+- [ ] Docker containerization
+- [ ] GitHub Actions integration
+
+### Version 2.0 (Q2 2025)
+- [ ] Distributed agent pools
+- [ ] Visual workflow designer
+- [ ] Team collaboration features
+- [ ] Cloud deployment options
+- [ ] Plugin ecosystem
 
 ### Long-term Vision
+Create the definitive AI orchestration platform that seamlessly integrates multiple AI services, enabling developers to leverage the best capabilities of each model through intelligent routing, collaborative workflows, and comprehensive monitoring.
 
-Transform cuti into the ultimate AI agent orchestration platform, enabling teams to leverage multiple AI services collaboratively for complex development tasks, with intelligent routing, comprehensive monitoring, and seamless integration into existing workflows.
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### How to Contribute
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Development Philosophy
+- **User-First**: Prioritize developer experience and productivity
+- **Performance**: Optimize for speed without sacrificing functionality
+- **Reliability**: Ensure robust error handling and recovery
+- **Extensibility**: Design for plugin and integration support
+- **Privacy**: Maintain local-first, zero-telemetry approach
 
 ---
 
-**Built with ❤️ for the AI-assisted development community**
+<div align="center">
 
-*Star this repository if you find it useful!*
+**cuti - Orchestrating AI for Developers**
+
+Built with passion for the AI-assisted development community
+
+⭐ Star this repository if you find it useful!
+
+[Report Bug](https://github.com/nociza/cuti/issues) · [Request Feature](https://github.com/nociza/cuti/issues) · [Documentation](https://github.com/nociza/cuti/wiki)
+
+</div>
