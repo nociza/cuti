@@ -305,11 +305,51 @@ body::after {
     gap: 8px;
     font-size: var(--text-xs);
     color: var(--text-muted);
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    position: relative;
+    min-width: 120px;
+}
+
+.working-dir:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
 }
 
 .working-dir i {
     font-size: 12px;
     color: var(--text-muted);
+    transition: color var(--transition-base);
+}
+
+.working-dir:hover i {
+    color: var(--primary);
+}
+
+.working-dir-display,
+.working-dir-full {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+
+.working-dir-full {
+    position: absolute;
+    left: 40px;
+    right: 12px;
+    background: linear-gradient(135deg, rgba(20, 30, 38, 0.98) 0%, rgba(15, 23, 30, 0.98) 100%);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    top: -2px;
 }
 
 /* LAYOUT COMPONENTS */
@@ -443,7 +483,7 @@ body::after {
     font-weight: 500;
     padding: var(--space-sm) var(--space-md);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: none; /* Removed animation for instant transitions */
     display: inline-flex;
     align-items: center;
     gap: var(--space-sm);
@@ -461,13 +501,13 @@ body::after {
     height: 2px;
     background: var(--primary);
     transform: scaleX(0);
-    transition: transform var(--transition-fast);
+    transition: none; /* Removed animation for instant transitions */
 }
 
 .tab-icon {
     color: var(--text-muted);
     font-size: 16px;
-    transition: all var(--transition-fast);
+    transition: none; /* Removed animation for instant transitions */
     display: inline-block;
     width: 20px;
     text-align: center;
@@ -485,7 +525,7 @@ body::after {
 
 .terminal-tab:hover .tab-icon {
     color: var(--text-secondary);
-    transform: translateX(2px);
+    /* Removed transform animation */
 }
 
 .terminal-tab.tab-active {
@@ -498,8 +538,7 @@ body::after {
 
 .terminal-tab.tab-active .tab-icon {
     color: var(--primary);
-    animation: pulse-glow 2s ease-in-out infinite;
-    transform: translateX(0);
+    /* Removed animations for instant transitions */
 }
 
 /* Special animation for terminal tab icon when active */
@@ -507,10 +546,10 @@ body::after {
     /* Default pulsing for all active tabs */
 }
 
-/* Specific animations based on tab content */
+/* Removed animations for instant transitions */
 .terminal-tab.tab-active .tab-text:contains("TERMINAL") ~ .tab-icon,
 .terminal-tab:first-child.tab-active .tab-icon {
-    animation: terminal-cursor 1s step-end infinite;
+    /* animation removed */
 }
 
 @keyframes terminal-cursor {
@@ -522,9 +561,9 @@ body::after {
     }
 }
 
-/* History tab gets a subtle rotation */
+/* Removed animations for instant transitions */
 .terminal-tab:nth-child(3).tab-active .tab-icon {
-    animation: rotate-spin 8s linear infinite;
+    /* animation removed */
 }
 
 @keyframes rotate-spin {
@@ -536,9 +575,9 @@ body::after {
     }
 }
 
-/* Settings tab gets a gear rotation */
+/* Removed animations for instant transitions */
 .terminal-tab:nth-child(5).tab-active .tab-icon {
-    animation: gear-rotate 4s linear infinite;
+    /* animation removed */
 }
 
 @keyframes gear-rotate {
@@ -623,19 +662,9 @@ body::after {
     }
 }
 
-/* Active tab animations */
+/* Removed active tab animations */
 .terminal-tab.tab-active .tab-text::after {
-    content: '';
-    position: absolute;
-    bottom: -4px;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, 
-        transparent 0%, 
-        var(--primary) 50%, 
-        transparent 100%);
-    animation: scan-line 3s linear infinite;
+    /* Removed scanning line animation */
 }
 
 @keyframes scan-line {
@@ -1158,8 +1187,7 @@ body::after {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 40px rgba(16, 185, 129, 0.1);
     cursor: pointer;
     transition: all 0.3s ease;
-    z-index: 50;
-    position: relative;
+    z-index: 110; /* Increased z-index to be above the header (z-index: 100) */
     overflow: hidden;
 }
 

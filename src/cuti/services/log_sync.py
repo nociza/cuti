@@ -126,7 +126,17 @@ class LogSyncService:
                 
                 session_id = todo_file.stem
                 
-                for todo in todos_data.get('todos', []):
+                # Handle both array and object formats
+                if isinstance(todos_data, list):
+                    todos = todos_data
+                elif isinstance(todos_data, dict):
+                    todos = todos_data.get('todos', [])
+                else:
+                    todos = []
+                
+                for todo in todos:
+                    if not isinstance(todo, dict):
+                        continue
                     todo_id = todo.get('id', self._generate_todo_id(todo))
                     
                     # Check if exists

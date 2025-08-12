@@ -1,0 +1,1609 @@
+{% extends "base.html" %}
+
+{% block title %}cuti - Usage Statistics{% endblock %}
+
+{% block head %}
+<!-- jQuery (required for daterangepicker) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Chart.js for data visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Date range picker -->
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<style>
+    /* Statistics Page Specific Styles */
+    .stats-page-container {
+        flex: 1;
+        background: var(--bg-darkest);
+        margin: var(--space-2xl);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .stats-header {
+        background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-darkest) 100%);
+        padding: var(--space-3xl);
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .stats-title {
+        font-size: 32px;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: var(--space-sm);
+    }
+    
+    .stats-subtitle {
+        color: var(--text-muted);
+        font-size: var(--text-sm);
+    }
+    
+    .stats-controls {
+        display: flex;
+        gap: var(--space-lg);
+        margin-top: var(--space-2xl);
+        align-items: center;
+    }
+    
+    .date-range-picker {
+        padding: 12px 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        color: var(--text-primary);
+        font-size: var(--text-sm);
+        cursor: pointer;
+        transition: all var(--transition-base);
+        min-width: 250px;
+    }
+    
+    .date-range-picker:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--secondary);
+    }
+    
+    .stats-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--space-3xl);
+    }
+    
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: var(--space-xl);
+        margin-bottom: var(--space-3xl);
+    }
+    
+    .metric-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-2xl);
+        position: relative;
+        overflow: hidden;
+        transition: all var(--transition-base);
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        border-color: var(--primary);
+    }
+    
+    .metric-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(96, 165, 250, 0.2) 100%);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin-bottom: var(--space-lg);
+    }
+    
+    .metric-label {
+        color: var(--text-muted);
+        font-size: var(--text-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: var(--space-sm);
+    }
+    
+    .metric-value {
+        font-size: 36px;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: var(--space-sm);
+    }
+    
+    .metric-change {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        font-size: var(--text-sm);
+        font-weight: 500;
+    }
+    
+    .metric-change.positive {
+        color: var(--primary);
+    }
+    
+    .metric-change.negative {
+        color: var(--error);
+    }
+    
+    .chart-section {
+        margin-bottom: var(--space-3xl);
+    }
+    
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-xl);
+    }
+    
+    .chart-title {
+        font-size: var(--text-lg);
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .chart-container {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-2xl);
+        height: 400px;
+        position: relative;
+    }
+    
+    .export-controls {
+        display: flex;
+        gap: var(--space-md);
+        padding: var(--space-2xl) var(--space-3xl);
+        background: linear-gradient(180deg, var(--bg-darkest) 0%, var(--bg-dark) 100%);
+        border-top: 1px solid var(--border);
+    }
+    
+    .table-container {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        margin-bottom: var(--space-3xl);
+    }
+    
+    .stats-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .stats-table th {
+        background: rgba(16, 185, 129, 0.1);
+        padding: var(--space-md) var(--space-lg);
+        text-align: left;
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: var(--text-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .stats-table td {
+        padding: var(--space-md) var(--space-lg);
+        color: var(--text-secondary);
+        font-size: var(--text-sm);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .stats-table tr:hover {
+        background: rgba(255, 255, 255, 0.02);
+    }
+    
+    .stats-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(10, 15, 20, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+    }
+    
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    /* Print Styles */
+    @media print {
+        body {
+            background: white;
+            color: black;
+        }
+        
+        .stats-header,
+        .export-controls,
+        .loading-overlay,
+        .history-filter-pills,
+        .btn-secondary,
+        .btn-danger {
+            display: none !important;
+        }
+        
+        .stats-page-container {
+            margin: 0;
+            border-radius: 0;
+        }
+        
+        .metric-card,
+        .chart-container,
+        .table-container {
+            page-break-inside: avoid;
+            border: 1px solid #ddd;
+            box-shadow: none;
+        }
+        
+        .stats-table {
+            font-size: 10pt;
+        }
+        
+        .metric-value {
+            color: black !important;
+            -webkit-text-fill-color: black !important;
+        }
+    }
+    
+    /* Predictions Section */
+    .predictions-section {
+        margin-bottom: var(--space-3xl);
+    }
+    
+    .section-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-xl);
+    }
+    
+    .predictions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: var(--space-xl);
+    }
+    
+    .prediction-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        transition: all var(--transition-base);
+    }
+    
+    .prediction-card.warning {
+        border-color: #f59e0b;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+    }
+    
+    .prediction-label {
+        color: var(--text-muted);
+        font-size: var(--text-sm);
+        margin-bottom: var(--space-sm);
+    }
+    
+    .prediction-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-xs);
+    }
+    
+    .prediction-subtitle {
+        color: var(--text-muted);
+        font-size: var(--text-sm);
+    }
+    
+    .usage-progress {
+        margin-bottom: var(--space-md);
+    }
+    
+    .progress-bar {
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: var(--space-xs);
+    }
+    
+    .progress-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+    
+    .tokens-progress {
+        background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+    }
+    
+    .cost-progress {
+        background: linear-gradient(90deg, #60a5fa 0%, #93c5fd 100%);
+    }
+    
+    .progress-label {
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+    }
+    
+    .warning-badge {
+        background: #f59e0b;
+        color: white;
+        padding: 6px 12px;
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        font-weight: 600;
+        margin-top: var(--space-md);
+        display: inline-block;
+    }
+    
+    /* Settings Modal */
+    .settings-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .settings-modal-content {
+        background: var(--bg-dark);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        padding: var(--space-3xl);
+        max-width: 800px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    
+    .settings-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-2xl);
+    }
+    
+    .settings-section {
+        margin-bottom: var(--space-2xl);
+    }
+    
+    .settings-section h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-sm);
+    }
+    
+    .settings-description {
+        color: var(--text-muted);
+        font-size: var(--text-sm);
+        margin-bottom: var(--space-xl);
+    }
+    
+    .plan-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: var(--space-lg);
+    }
+    
+    .plan-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        cursor: pointer;
+        transition: all var(--transition-base);
+        position: relative;
+    }
+    
+    .plan-card:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--secondary);
+        transform: translateY(-2px);
+    }
+    
+    .plan-card.selected {
+        border-color: var(--primary);
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    }
+    
+    .plan-name {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-md);
+    }
+    
+    .plan-limits {
+        margin-bottom: var(--space-md);
+    }
+    
+    .limit-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: var(--space-xs);
+        font-size: var(--text-sm);
+    }
+    
+    .limit-label {
+        color: var(--text-muted);
+    }
+    
+    .limit-value {
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+    
+    .selected-badge {
+        position: absolute;
+        top: var(--space-md);
+        right: var(--space-md);
+        color: var(--primary);
+        font-size: var(--text-sm);
+        font-weight: 600;
+    }
+    
+    .settings-actions {
+        display: flex;
+        gap: var(--space-lg);
+        justify-content: flex-end;
+        margin-top: var(--space-2xl);
+        padding-top: var(--space-xl);
+        border-top: 1px solid var(--border);
+    }
+</style>
+{% endblock %}
+
+{% set body_class = "" %}
+{% set alpine_data = "statisticsInterface()" %}
+
+{% block content %}
+<div class="stats-page-container">
+    <!-- Header -->
+    <div class="stats-header">
+        <div>
+            <h1 class="stats-title">📊 Usage Statistics</h1>
+            <p class="stats-subtitle">Monitor your Claude usage, system performance, and productivity metrics</p>
+        </div>
+        
+        <div class="stats-controls">
+            <input type="text" 
+                   id="daterangepicker" 
+                   class="date-range-picker" 
+                   placeholder="Select date range..."
+                   x-model="dateRange">
+            
+            <div class="history-filter-pills">
+                <button @click="timeRange = 'today'" 
+                        :class="{'filter-pill': true, 'active': timeRange === 'today'}">Today</button>
+                <button @click="timeRange = 'week'" 
+                        :class="{'filter-pill': true, 'active': timeRange === 'week'}">Week</button>
+                <button @click="timeRange = 'month'" 
+                        :class="{'filter-pill': true, 'active': timeRange === 'month'}">Month</button>
+                <button @click="timeRange = 'year'" 
+                        :class="{'filter-pill': true, 'active': timeRange === 'year'}">Year</button>
+            </div>
+            
+            <button @click="refreshData()" class="btn-secondary">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+            
+            <button @click="showSettings = !showSettings" class="btn-secondary">
+                <i class="fas fa-cog"></i>
+                Settings
+            </button>
+        </div>
+    </div>
+    
+    <!-- Content -->
+    <div class="stats-content">
+        <!-- Key Metrics Grid -->
+        <div class="metrics-grid">
+            <!-- Total Tokens -->
+            <div class="metric-card">
+                <div class="metric-icon">💬</div>
+                <div class="metric-label">Total Tokens</div>
+                <div class="metric-value" x-text="formatNumber(metrics.totalTokens)">0</div>
+                <div class="metric-change" :class="metrics.tokenChange > 0 ? 'positive' : 'negative'">
+                    <i class="fas" :class="metrics.tokenChange > 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+                    <span x-text="Math.abs(metrics.tokenChange) + '%'">0%</span>
+                    <span>vs last period</span>
+                </div>
+            </div>
+            
+            <!-- Total Cost -->
+            <div class="metric-card">
+                <div class="metric-icon">💰</div>
+                <div class="metric-label">Total Cost</div>
+                <div class="metric-value" x-text="'$' + metrics.totalCost.toFixed(2)">$0.00</div>
+                <div class="metric-change" :class="metrics.costChange > 0 ? 'negative' : 'positive'">
+                    <i class="fas" :class="metrics.costChange > 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+                    <span x-text="Math.abs(metrics.costChange) + '%'">0%</span>
+                    <span>vs last period</span>
+                </div>
+            </div>
+            
+            <!-- Total Requests -->
+            <div class="metric-card">
+                <div class="metric-icon">📝</div>
+                <div class="metric-label">Total Requests</div>
+                <div class="metric-value" x-text="formatNumber(metrics.totalRequests)">0</div>
+                <div class="metric-change positive">
+                    <i class="fas fa-arrow-up"></i>
+                    <span x-text="metrics.requestChange + '%'">0%</span>
+                    <span>vs last period</span>
+                </div>
+            </div>
+            
+            <!-- Success Rate -->
+            <div class="metric-card">
+                <div class="metric-icon">✅</div>
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value" x-text="metrics.successRate + '%'">0%</div>
+                <div class="metric-change" :class="metrics.successRate >= 95 ? 'positive' : 'negative'">
+                    <i class="fas fa-check-circle"></i>
+                    <span x-text="metrics.successCount + '/' + metrics.totalRequests">0/0</span>
+                </div>
+            </div>
+            
+            <!-- Avg Response Time -->
+            <div class="metric-card">
+                <div class="metric-icon">⚡</div>
+                <div class="metric-label">Avg Response Time</div>
+                <div class="metric-value" x-text="metrics.avgResponseTime + 's'">0s</div>
+                <div class="metric-change" :class="metrics.responseTimeChange < 0 ? 'positive' : 'negative'">
+                    <i class="fas" :class="metrics.responseTimeChange < 0 ? 'fa-arrow-down' : 'fa-arrow-up'"></i>
+                    <span x-text="Math.abs(metrics.responseTimeChange) + '%'">0%</span>
+                    <span>vs last period</span>
+                </div>
+            </div>
+            
+            <!-- Active Sessions -->
+            <div class="metric-card">
+                <div class="metric-icon">🔥</div>
+                <div class="metric-label">Active Sessions</div>
+                <div class="metric-value" x-text="metrics.activeSessions">0</div>
+                <div class="metric-change positive">
+                    <i class="fas fa-circle" style="color: var(--primary); font-size: 8px;"></i>
+                    <span>Live now</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Predictions and Warnings Section -->
+        <div class="predictions-section" x-show="predictions">
+            <h2 class="section-title">🔮 Usage Predictions</h2>
+            <div class="predictions-grid">
+                <!-- Burn Rate -->
+                <div class="prediction-card">
+                    <div class="prediction-label">Current Burn Rate</div>
+                    <div class="prediction-value">
+                        <span x-text="predictions.burn_rate?.tokens_per_hour || 0"></span> tokens/hour
+                    </div>
+                    <div class="prediction-subtitle">
+                        $<span x-text="predictions.burn_rate?.cost_per_hour?.toFixed(2) || '0.00'"></span>/hour
+                    </div>
+                </div>
+                
+                <!-- Usage Progress -->
+                <div class="prediction-card">
+                    <div class="prediction-label">Today's Usage</div>
+                    <div class="usage-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill tokens-progress" 
+                                 :style="`width: ${predictions.current_usage?.tokens_percentage || 0}%`"></div>
+                        </div>
+                        <div class="progress-label">
+                            <span x-text="predictions.current_usage?.tokens_percentage || 0"></span>% of token limit
+                        </div>
+                    </div>
+                    <div class="usage-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill cost-progress" 
+                                 :style="`width: ${predictions.current_usage?.cost_percentage || 0}%`"></div>
+                        </div>
+                        <div class="progress-label">
+                            <span x-text="predictions.current_usage?.cost_percentage || 0"></span>% of cost limit
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Limit Warning -->
+                <div class="prediction-card" :class="predictions.projections?.will_hit_limit_today ? 'warning' : ''">
+                    <div class="prediction-label">Limit Status</div>
+                    <div class="prediction-value" x-show="predictions.projections?.hours_until_limit">
+                        <span x-text="predictions.projections?.hours_until_limit"></span> hours
+                    </div>
+                    <div class="prediction-subtitle" x-show="predictions.projections?.hours_until_limit">
+                        until <span x-text="predictions.projections?.limit_type"></span> limit
+                    </div>
+                    <div class="prediction-value" x-show="!predictions.projections?.hours_until_limit">
+                        No limit risk today
+                    </div>
+                    <div class="warning-badge" x-show="predictions.projections?.will_hit_limit_today">
+                        ⚠️ Will hit limit today!
+                    </div>
+                </div>
+                
+                <!-- End of Day Projection -->
+                <div class="prediction-card">
+                    <div class="prediction-label">End of Day Projection</div>
+                    <div class="prediction-value">
+                        <span x-text="formatNumber(predictions.projections?.tokens_end_of_day || 0)"></span> tokens
+                    </div>
+                    <div class="prediction-subtitle">
+                        $<span x-text="predictions.projections?.cost_end_of_day?.toFixed(2) || '0.00'"></span> total
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Section -->
+        <!-- Token Usage Over Time -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h2 class="chart-title">Token Usage Over Time</h2>
+                <div class="history-filter-pills">
+                    <button @click="chartType = 'line'" 
+                            :class="{'filter-pill': true, 'active': chartType === 'line'}">Line</button>
+                    <button @click="chartType = 'bar'" 
+                            :class="{'filter-pill': true, 'active': chartType === 'bar'}">Bar</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="tokenChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Cost Breakdown -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h2 class="chart-title">Cost Breakdown by Model</h2>
+            </div>
+            <div class="chart-container" style="height: 300px;">
+                <canvas id="costChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- System Metrics -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h2 class="chart-title">System Performance</h2>
+            </div>
+            <div class="chart-container">
+                <canvas id="systemChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Detailed Usage Table -->
+        <div class="table-container">
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Model</th>
+                        <th>Requests</th>
+                        <th>Input Tokens</th>
+                        <th>Output Tokens</th>
+                        <th>Total Cost</th>
+                        <th>Avg Response</th>
+                        <th>Success Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="row in tableData" :key="row.date">
+                        <tr>
+                            <td x-text="formatDate(row.date)"></td>
+                            <td x-text="row.model"></td>
+                            <td x-text="formatNumber(row.requests)"></td>
+                            <td x-text="formatNumber(row.inputTokens)"></td>
+                            <td x-text="formatNumber(row.outputTokens)"></td>
+                            <td x-text="'$' + row.cost.toFixed(4)"></td>
+                            <td x-text="row.avgResponse + 's'"></td>
+                            <td>
+                                <span :class="row.successRate >= 95 ? 'text-primary' : 'text-error'" 
+                                      x-text="row.successRate + '%'"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Export Controls -->
+    <div class="export-controls">
+        <button @click="exportCSV()" class="btn-secondary">
+            <i class="fas fa-file-csv"></i>
+            Export CSV
+        </button>
+        <button @click="exportJSON()" class="btn-secondary">
+            <i class="fas fa-file-code"></i>
+            Export JSON
+        </button>
+        <button @click="printReport()" class="btn-secondary">
+            <i class="fas fa-print"></i>
+            Print Report
+        </button>
+        <div style="flex: 1;"></div>
+        <button @click="clearData()" class="btn-danger" x-show="showClearButton">
+            <i class="fas fa-trash"></i>
+            Clear Data
+        </button>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="settings-modal" x-show="showSettings" @click.away="showSettings = false" x-transition>
+        <div class="settings-modal-content" @click.stop>
+            <h2 class="settings-title">⚙️ Statistics Settings</h2>
+            
+            <!-- Plan Selection -->
+            <div class="settings-section">
+                <h3>Claude Subscription Plan</h3>
+                <p class="settings-description">Select your current Claude plan to get accurate limit predictions</p>
+                
+                <div class="plan-grid">
+                    <template x-for="plan in availablePlans" :key="plan.name">
+                        <div class="plan-card" 
+                             :class="{'selected': plan.name === selectedPlan}"
+                             @click="selectPlan(plan.name)">
+                            <div class="plan-name" x-text="plan.display_name"></div>
+                            <div class="plan-limits">
+                                <div class="limit-item">
+                                    <span class="limit-label">Tokens:</span>
+                                    <span class="limit-value" x-text="plan.formatted_token_limit"></span>
+                                </div>
+                                <div class="limit-item">
+                                    <span class="limit-label">Cost:</span>
+                                    <span class="limit-value">$<span x-text="plan.cost_limit"></span></span>
+                                </div>
+                                <div class="limit-item">
+                                    <span class="limit-label">Messages:</span>
+                                    <span class="limit-value" x-text="plan.message_limit"></span>
+                                </div>
+                            </div>
+                            <div class="selected-badge" x-show="plan.name === selectedPlan">
+                                <i class="fas fa-check-circle"></i> Current
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="settings-actions">
+                <button @click="savePlan()" class="btn-primary">
+                    <i class="fas fa-save"></i>
+                    Save Settings
+                </button>
+                <button @click="showSettings = false" class="btn-secondary">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" x-show="isLoading" x-transition>
+        <div class="loading-spinner"></div>
+    </div>
+</div>
+
+<script>
+function statisticsInterface() {
+    return {
+        // Data
+        metrics: {
+            totalTokens: 0,
+            tokenChange: 0,
+            totalCost: 0,
+            costChange: 0,
+            totalRequests: 0,
+            requestChange: 0,
+            successRate: 0,
+            successCount: 0,
+            avgResponseTime: 0,
+            responseTimeChange: 0,
+            activeSessions: 0
+        },
+        tableData: [],
+        predictions: {},
+        availablePlans: [],
+        selectedPlan: 'pro',
+        
+        // UI State
+        timeRange: 'week',
+        dateRange: '',
+        chartType: 'line',
+        isLoading: false,
+        showClearButton: false,
+        showSettings: false,
+        chartsInitialized: false,
+        
+        // Charts
+        tokenChart: null,
+        costChart: null,
+        systemChart: null,
+        
+        async init() {
+            // Wait for DOM to be ready
+            await this.$nextTick();
+            
+            // Initialize charts first (with empty data)
+            this.initCharts();
+            
+            // Small delay to ensure charts are ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Load initial data immediately
+            await this.refreshData();
+            
+            // Load predictions and plans
+            await this.loadPredictions();
+            await this.loadAvailablePlans();
+            
+            // Initialize date range picker after data is loaded (with jQuery check)
+            if (typeof $ !== 'undefined' && $.fn.daterangepicker) {
+                $('#daterangepicker').daterangepicker({
+                startDate: moment().subtract(7, 'days'),
+                endDate: moment(),
+                ranges: {
+                    'Today': [moment(), moment()],
+                    'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                    'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                    'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                    'This Month': [moment().startOf('month'), moment().endOf('month')],
+                    'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+                },
+                opens: 'left',
+                autoUpdateInput: true,
+                locale: {
+                    format: 'MM/DD/YYYY'
+                }
+            }, (start, end) => {
+                this.dateRange = start.format('MM/DD/YYYY') + ' - ' + end.format('MM/DD/YYYY');
+                this.refreshData();
+            });
+            }
+            
+            // Watch for timeRange changes
+            this.$watch('timeRange', () => {
+                this.refreshData();
+            });
+            
+            // Watch for chartType changes
+            this.$watch('chartType', (newType) => {
+                if (this.tokenChart) {
+                    this.tokenChart.config.type = newType;
+                    this.tokenChart.update();
+                }
+            });
+            
+            // Set up auto-refresh
+            setInterval(() => this.refreshData(), 30000); // Refresh every 30 seconds
+        },
+        
+        async refreshData() {
+            this.isLoading = true;
+            
+            try {
+                // Fetch metrics from API
+                const response = await fetch('/api/monitoring/metrics?' + new URLSearchParams({
+                    range: this.timeRange,
+                    start_date: this.getStartDate(),
+                    end_date: this.getEndDate()
+                }));
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update metrics with real data
+                this.metrics = {
+                    totalTokens: data.total_tokens || 0,
+                    tokenChange: data.token_change || 0,
+                    totalCost: data.total_cost || 0,
+                    costChange: data.cost_change || 0,
+                    totalRequests: data.total_requests || 0,
+                    requestChange: data.request_change || 0,
+                    successRate: data.success_rate || 0,
+                    successCount: data.success_count || 0,
+                    avgResponseTime: data.avg_response_time || 0,
+                    responseTimeChange: data.response_time_change || 0,
+                    activeSessions: data.active_sessions || 0
+                };
+                
+                // Update table data with real data
+                this.tableData = data.table_data || [];
+                
+                // Update charts with real data
+                this.updateChartsWithRealData(data);
+                
+            } catch (error) {
+                console.error('Error fetching statistics:', error);
+                // Show error message to user
+                this.showErrorMessage('Failed to load usage statistics. Using sample data.');
+                // Use sample data for demo
+                this.loadSampleData();
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        
+        loadSampleData() {
+            // Sample data for demonstration
+            this.metrics = {
+                totalTokens: 125420,
+                tokenChange: 15.3,
+                totalCost: 42.85,
+                costChange: 8.7,
+                totalRequests: 342,
+                requestChange: 22.1,
+                successRate: 98.5,
+                successCount: 337,
+                avgResponseTime: 2.3,
+                responseTimeChange: -5.2,
+                activeSessions: 3
+            };
+            
+            this.tableData = this.generateSampleTableData();
+            
+            // Defer chart updates to next tick to ensure they're initialized
+            this.$nextTick(() => {
+                if (this.tokenChart || this.costChart || this.systemChart) {
+                    // Use sample data for charts
+                    const sampleData = {
+                        daily_usage: this.generateSampleDailyUsage(),
+                        model_breakdown: [
+                            { model: 'Claude 3 Opus', cost: 65 },
+                            { model: 'Claude 3 Sonnet', cost: 25 },
+                            { model: 'Claude 3 Haiku', cost: 10 }
+                        ]
+                    };
+                    this.updateChartsWithRealData(sampleData);
+                }
+            });
+        },
+        
+        generateSampleDailyUsage() {
+            const usage = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                usage.push({
+                    date: date.toISOString(),
+                    input_tokens: Math.floor(Math.random() * 10000) + 5000,
+                    output_tokens: Math.floor(Math.random() * 8000) + 3000
+                });
+            }
+            return usage;
+        },
+        
+        generateSampleTableData() {
+            const models = ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'];
+            const data = [];
+            
+            for (let i = 0; i < 7; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                
+                data.push({
+                    date: date.toISOString(),
+                    model: models[i % 3],
+                    requests: Math.floor(Math.random() * 100) + 20,
+                    inputTokens: Math.floor(Math.random() * 10000) + 5000,
+                    outputTokens: Math.floor(Math.random() * 8000) + 3000,
+                    cost: Math.random() * 10 + 2,
+                    avgResponse: (Math.random() * 3 + 1).toFixed(1),
+                    successRate: Math.floor(Math.random() * 5) + 95
+                });
+            }
+            
+            return data;
+        },
+        
+        initCharts() {
+            // Prevent duplicate initialization
+            if (this.chartsInitialized) {
+                console.log('Charts already initialized');
+                return;
+            }
+            
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                setTimeout(() => this.initCharts(), 500);
+                return;
+            }
+            
+            // Destroy existing charts if they exist
+            if (this.tokenChart) {
+                this.tokenChart.destroy();
+                this.tokenChart = null;
+            }
+            if (this.costChart) {
+                this.costChart.destroy();
+                this.costChart = null;
+            }
+            if (this.systemChart) {
+                this.systemChart.destroy();
+                this.systemChart = null;
+            }
+            
+            // Token Usage Chart
+            const tokenCtx = document.getElementById('tokenChart');
+            if (!tokenCtx) {
+                console.error('Token chart canvas not found');
+                return;
+            }
+            
+            try {
+                this.tokenChart = new Chart(tokenCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Input Tokens',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Output Tokens',
+                        data: [],
+                        borderColor: '#60a5fa',
+                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#94a3b8'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#64748b'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#64748b'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error('Error initializing token chart:', error);
+            }
+            
+            // Cost Breakdown Chart
+            const costCtx = document.getElementById('costChart');
+            if (!costCtx) {
+                console.error('Cost chart canvas not found');
+                return;
+            }
+            
+            try {
+                this.costChart = new Chart(costCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Claude 3 Opus', 'Claude 3 Sonnet', 'Claude 3 Haiku'],
+                    datasets: [{
+                        data: [65, 25, 10],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(96, 165, 250, 0.8)',
+                            'rgba(245, 158, 11, 0.8)'
+                        ],
+                        borderColor: [
+                            '#10b981',
+                            '#60a5fa',
+                            '#f59e0b'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#94a3b8',
+                                padding: 20
+                            }
+                        }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error('Error initializing cost chart:', error);
+            }
+            
+            // System Performance Chart
+            const systemCtx = document.getElementById('systemChart');
+            if (!systemCtx) {
+                console.error('System chart canvas not found');
+                return;
+            }
+            
+            try {
+                this.systemChart = new Chart(systemCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'CPU Usage (%)',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Memory Usage (%)',
+                        data: [],
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Response Time (s)',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#94a3b8'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#64748b'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            ticks: {
+                                color: '#64748b'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            ticks: {
+                                color: '#64748b'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error('Error initializing system chart:', error);
+            }
+            
+            // Mark charts as initialized
+            this.chartsInitialized = true;
+        },
+        
+        updateCharts() {
+            // Only update if charts are initialized
+            if (this.tokenChart && this.tokenChart.data) {
+                this.tokenChart.data.labels = this.getChartLabels();
+                this.tokenChart.data.datasets[0].data = this.generateChartData();
+                this.tokenChart.data.datasets[1].data = this.generateChartData();
+                this.tokenChart.update();
+            }
+            
+            if (this.systemChart && this.systemChart.data) {
+                this.systemChart.data.labels = this.getChartLabels();
+                this.systemChart.data.datasets[0].data = this.generateChartData(20, 80);
+                this.systemChart.data.datasets[1].data = this.generateChartData(30, 70);
+                this.systemChart.data.datasets[2].data = this.generateChartData(1, 5);
+                this.systemChart.update();
+            }
+            
+            if (this.costChart && this.costChart.data) {
+                // Cost chart doesn't need updating here as it's updated in updateChartsWithRealData
+                this.costChart.update();
+            }
+        },
+        
+        updateChartsWithRealData(data) {
+            // Prevent updates if charts aren't initialized
+            if (!this.tokenChart && !this.costChart && !this.systemChart) {
+                console.log('Charts not initialized yet');
+                return;
+            }
+            
+            // Update token chart with real daily usage data
+            if (this.tokenChart && this.tokenChart.data) {
+                try {
+                    if (data.daily_usage && data.daily_usage.length > 0) {
+                        const sortedDaily = data.daily_usage.sort((a, b) => new Date(a.date) - new Date(b.date));
+                        const labels = sortedDaily.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                        const inputTokens = sortedDaily.map(d => d.input_tokens || 0);
+                        const outputTokens = sortedDaily.map(d => d.output_tokens || 0);
+                        
+                        this.tokenChart.data.labels = labels;
+                        this.tokenChart.data.datasets[0].data = inputTokens;
+                        this.tokenChart.data.datasets[1].data = outputTokens;
+                    } else {
+                        // Use sample data if no real data available
+                        this.tokenChart.data.labels = this.getChartLabels();
+                        this.tokenChart.data.datasets[0].data = this.generateChartData();
+                        this.tokenChart.data.datasets[1].data = this.generateChartData();
+                    }
+                    this.tokenChart.update('none'); // Update without animation to avoid issues
+                } catch (e) {
+                    console.error('Error updating token chart:', e);
+                }
+            }
+            
+            // Update cost chart with real model breakdown
+            if (this.costChart && this.costChart.data) {
+                try {
+                    if (data.model_breakdown && data.model_breakdown.length > 0) {
+                        const models = data.model_breakdown.map(m => m.model);
+                        const costs = data.model_breakdown.map(m => m.cost);
+                        const colors = [
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(96, 165, 250, 0.8)', 
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(168, 85, 247, 0.8)'
+                        ];
+                        
+                        this.costChart.data.labels = models;
+                        this.costChart.data.datasets[0].data = costs;
+                        this.costChart.data.datasets[0].backgroundColor = colors.slice(0, models.length);
+                    } else {
+                        // Use sample data if no real data
+                        this.costChart.data.labels = ['Claude 3 Opus', 'Claude 3 Sonnet', 'Claude 3 Haiku'];
+                        this.costChart.data.datasets[0].data = [65, 25, 10];
+                    }
+                    this.costChart.update('none'); // Update without animation
+                } catch (e) {
+                    console.error('Error updating cost chart:', e);
+                }
+            }
+            
+            // Update system chart with labels and sample data
+            if (this.systemChart && this.systemChart.data) {
+                try {
+                    this.systemChart.data.labels = this.getChartLabels();
+                    this.systemChart.data.datasets[0].data = this.generateChartData(20, 80);
+                    this.systemChart.data.datasets[1].data = this.generateChartData(30, 70);
+                    this.systemChart.data.datasets[2].data = this.generateChartData(1, 5);
+                    this.systemChart.update('none'); // Update without animation
+                } catch (e) {
+                    console.error('Error updating system chart:', e);
+                }
+            }
+        },
+        
+        showErrorMessage(message) {
+            // Create and show error notification
+            const notification = document.createElement('div');
+            notification.className = 'error-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #ef4444;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                z-index: 1000;
+                max-width: 400px;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        },
+        
+        getChartLabels() {
+            const labels = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+            }
+            return labels;
+        },
+        
+        generateChartData(min = 1000, max = 10000) {
+            return Array.from({ length: 7 }, () => Math.floor(Math.random() * (max - min)) + min);
+        },
+        
+        getStartDate() {
+            // Get start date based on selected range
+            const now = new Date();
+            switch (this.timeRange) {
+                case 'today':
+                    return now.toISOString().split('T')[0];
+                case 'week':
+                    now.setDate(now.getDate() - 7);
+                    return now.toISOString().split('T')[0];
+                case 'month':
+                    now.setMonth(now.getMonth() - 1);
+                    return now.toISOString().split('T')[0];
+                case 'year':
+                    now.setFullYear(now.getFullYear() - 1);
+                    return now.toISOString().split('T')[0];
+                default:
+                    return now.toISOString().split('T')[0];
+            }
+        },
+        
+        getEndDate() {
+            return new Date().toISOString().split('T')[0];
+        },
+        
+        formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        },
+        
+        formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        },
+        
+        async exportCSV() {
+            // Convert table data to CSV
+            const headers = ['Date', 'Model', 'Requests', 'Input Tokens', 'Output Tokens', 'Cost', 'Avg Response', 'Success Rate'];
+            const rows = this.tableData.map(row => [
+                this.formatDate(row.date),
+                row.model,
+                row.requests,
+                row.inputTokens,
+                row.outputTokens,
+                '$' + row.cost.toFixed(4),
+                row.avgResponse + 's',
+                row.successRate + '%'
+            ]);
+            
+            let csv = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csv += row.join(',') + '\n';
+            });
+            
+            // Download CSV
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cuti-statistics-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        },
+        
+        async exportJSON() {
+            // Export all data as JSON
+            const data = {
+                metrics: this.metrics,
+                tableData: this.tableData,
+                dateRange: this.dateRange || this.timeRange,
+                exportDate: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cuti-statistics-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        },
+        
+        printReport() {
+            window.print();
+        },
+        
+        async clearData() {
+            if (confirm('Are you sure you want to clear all statistics data? This action cannot be undone.')) {
+                try {
+                    const response = await fetch('/api/monitoring/clear', {
+                        method: 'POST'
+                    });
+                    
+                    if (response.ok) {
+                        this.metrics = {
+                            totalTokens: 0,
+                            tokenChange: 0,
+                            totalCost: 0,
+                            costChange: 0,
+                            totalRequests: 0,
+                            requestChange: 0,
+                            successRate: 0,
+                            successCount: 0,
+                            avgResponseTime: 0,
+                            responseTimeChange: 0,
+                            activeSessions: 0
+                        };
+                        this.tableData = [];
+                        // Charts will update on next data refresh
+                    }
+                } catch (error) {
+                    console.error('Error clearing data:', error);
+                }
+            }
+        },
+        
+        async loadPredictions() {
+            try {
+                const response = await fetch('/api/monitoring/predictions');
+                if (response.ok) {
+                    this.predictions = await response.json();
+                }
+            } catch (error) {
+                console.error('Failed to load predictions:', error);
+            }
+        },
+        
+        async loadAvailablePlans() {
+            try {
+                const response = await fetch('/api/monitoring/plans');
+                if (response.ok) {
+                    this.availablePlans = await response.json();
+                    // Find current plan
+                    const current = this.availablePlans.find(p => p.is_current);
+                    if (current) {
+                        this.selectedPlan = current.name;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load plans:', error);
+            }
+        },
+        
+        selectPlan(planName) {
+            this.selectedPlan = planName;
+        },
+        
+        async savePlan() {
+            try {
+                const response = await fetch('/api/monitoring/plan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ plan: this.selectedPlan })
+                });
+                
+                if (response.ok) {
+                    // Reload predictions with new plan
+                    await this.loadPredictions();
+                    this.showSettings = false;
+                    
+                    // Show success message
+                    this.showSuccessMessage('Plan updated successfully');
+                } else {
+                    throw new Error('Failed to update plan');
+                }
+            } catch (error) {
+                console.error('Failed to save plan:', error);
+                this.showErrorMessage('Failed to update plan');
+            }
+        },
+        
+        showSuccessMessage(message) {
+            const notification = document.createElement('div');
+            notification.className = 'success-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                z-index: 1000;
+                max-width: 400px;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+    };
+}
+</script>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}

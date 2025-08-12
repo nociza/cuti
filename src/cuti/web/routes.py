@@ -12,7 +12,8 @@ def get_nav_items(current_page: str = "chat"):
     """Get navigation items with proper active state."""
     nav_items = [
         {"url": "/", "label": "Chat", "active": current_page == "chat"},
-        {"url": "/agents", "label": "Agent Manager", "active": current_page == "agents"}
+        {"url": "/agents", "label": "Agent Manager", "active": current_page == "agents"},
+        {"url": "/statistics", "label": "Statistics", "active": current_page == "statistics"}
     ]
     return nav_items
 
@@ -48,6 +49,20 @@ async def agents_dashboard(request: Request):
     nav_items = get_nav_items("agents")
     
     return templates.TemplateResponse("agents.html", {
+        "request": request,
+        "working_directory": str(request.app.state.working_directory),
+        "nav_items": nav_items
+    })
+
+
+@main_router.get("/statistics", response_class=HTMLResponse)
+async def statistics_dashboard(request: Request):
+    """Usage statistics dashboard page."""
+    templates = request.app.state.templates
+    
+    nav_items = get_nav_items("statistics")
+    
+    return templates.TemplateResponse("statistics.html", {
         "request": request,
         "working_directory": str(request.app.state.working_directory),
         "nav_items": nav_items

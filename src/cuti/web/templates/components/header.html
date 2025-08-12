@@ -21,6 +21,8 @@
                 <i class="fas fa-comments"></i>
                 {% elif nav_item.label == "Agent Manager" %}
                 <i class="fas fa-robot"></i>
+                {% elif nav_item.label == "Statistics" %}
+                <i class="fas fa-chart-line"></i>
                 {% endif %}
                 <span>{{ nav_item.label }}</span>
             </a>
@@ -32,9 +34,10 @@
                 <span class="status-dot active"></span>
                 <span class="status-text">Connected</span>
             </div>
-            <div class="working-dir">
+            <div class="working-dir" x-data="{ showFullPath: false }" @mouseenter="showFullPath = true" @mouseleave="showFullPath = false">
                 <i class="fas fa-folder"></i>
-                <span>{{ working_directory | truncate(30) }}</span>
+                <span class="working-dir-display" x-show="!showFullPath">{{ working_directory.split('/')[-1] if '/' in working_directory else working_directory }}</span>
+                <span class="working-dir-full" x-show="showFullPath" x-transition:enter="fade-in" style="display: none;">{{ working_directory }}</span>
             </div>
         </div>
     </div>

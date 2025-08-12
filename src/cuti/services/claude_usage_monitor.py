@@ -1,6 +1,11 @@
 """
-Claude Code usage monitoring integration.
-Reads usage data from Claude Code's data files and provides monitoring capabilities.
+DEPRECATED: Claude Code usage monitoring integration.
+
+This module has been replaced by claude_monitor_integration.py which uses 
+the claude_monitor package directly as a library for better performance 
+and more accurate data.
+
+Use ClaudeMonitorIntegration from claude_monitor_integration.py instead.
 """
 
 import json
