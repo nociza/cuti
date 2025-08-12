@@ -81,3 +81,26 @@ async def orchestration_dashboard(request: Request):
         "working_directory": str(request.app.state.working_directory),
         "nav_items": nav_items
     })
+
+
+@main_router.get("/enhanced-chat", response_class=HTMLResponse)
+async def enhanced_chat_page(request: Request):
+    """Enhanced chat interface with execution control and detailed streaming."""
+    templates = request.app.state.templates
+    
+    nav_items = get_nav_items("chat")
+    
+    status_info = {
+        "left": ["Enhanced Mode"],
+        "right": [
+            {"text": "Ready", "indicator": "ready"},
+            {"text": "Stop Enabled", "indicator": "success"}
+        ]
+    }
+    
+    return templates.TemplateResponse("enhanced_chat.html", {
+        "request": request,
+        "working_directory": str(request.app.state.working_directory),
+        "nav_items": nav_items,
+        "status_info": status_info
+    })

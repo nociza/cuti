@@ -41,6 +41,15 @@ window.cutiUtils = {
     },
 
     formatTerminalMessage(content) {
+        // Use the enhanced markdown renderer if available
+        if (!content) return '';
+        
+        if (window.MarkdownRenderer) {
+            const renderer = new MarkdownRenderer();
+            return renderer.render(content);
+        }
+        
+        // Fallback to basic styling
         return content
             .replace(/`([^`]+)`/g, '<span style="background: rgba(96, 165, 250, 0.2); padding: 2px 6px; border-radius: 4px; color: #60a5fa;">$1</span>')
             .replace(/```([\\s\\S]*?)```/g, '<div style="background: rgba(16, 185, 129, 0.1); padding: 12px; margin: 8px 0; border-left: 3px solid #10b981; border-radius: 4px; font-family: JetBrains Mono, monospace;">$1</div>')

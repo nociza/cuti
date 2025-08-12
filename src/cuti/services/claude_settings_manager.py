@@ -76,7 +76,7 @@ class ClaudeSettingsManager:
         
         try:
             with open(self.settings_file, 'w') as f:
-                json.dump(settings, json_encoder=None, indent=2, fp=f)
+                json.dump(settings, f, indent=2)
             
             return {
                 "success": True,

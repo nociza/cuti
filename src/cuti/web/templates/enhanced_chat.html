@@ -1,0 +1,663 @@
+{% extends "base.html" %}
+
+{% block title %}cuti - Enhanced Chat{% endblock %}
+
+{% block head %}
+<style>
+.execution-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.stop-button {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.stop-button:hover {
+    background: #c82333;
+    transform: translateY(-1px);
+}
+
+.stop-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.agent-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.agent-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin: 0 2px;
+}
+
+.execution-progress {
+    height: 4px;
+    background: var(--bg-secondary);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.execution-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transition: width 0.3s ease;
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; }
+    100% { opacity: 0.8; }
+}
+
+.task-history-panel {
+    position: fixed;
+    right: 0;
+    top: 60px;
+    bottom: 0;
+    width: 350px;
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border-color);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 100;
+    overflow-y: auto;
+}
+
+.task-history-panel.open {
+    transform: translateX(0);
+}
+
+.task-history-header {
+    padding: 15px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.task-history-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.task-history-item:hover {
+    background: var(--bg-hover);
+}
+
+.task-status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.task-status-badge.completed {
+    background: #28a745;
+    color: white;
+}
+
+.task-status-badge.executing {
+    background: #ffc107;
+    color: #000;
+}
+
+.task-status-badge.failed {
+    background: #dc3545;
+    color: white;
+}
+
+.task-status-badge.cancelled {
+    background: #6c757d;
+    color: white;
+}
+
+.stream-details {
+    background: rgba(102, 126, 234, 0.05);
+    border-left: 3px solid #667eea;
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+    color: #667eea;
+}
+
+.task-toggle-button {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: all 0.3s;
+    z-index: 99;
+}
+
+.task-toggle-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.session-id {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+}
+</style>
+{% endblock %}
+
+{% set body_class = "" %}
+{% set alpine_data = "enhancedChat()" %}
+
+{% block content %}
+<div class="main-content">
+    <!-- Execution Controls Bar -->
+    <div class="execution-controls" x-show="isStreaming || currentSession">
+        <button class="stop-button" 
+                @click="stopExecution()" 
+                :disabled="!isStreaming">
+            <i class="fas fa-stop-circle"></i>
+            <span x-text="isStreaming ? 'Stop Execution' : 'Ready'"></span>
+        </button>
+        
+        <div class="agent-indicator" x-show="currentAgent">
+            <i class="fas fa-robot"></i>
+            <span>Active: <strong x-text="currentAgent"></strong></span>
+        </div>
+        
+        <div class="session-info" x-show="currentSession">
+            <span>Session:</span>
+            <span class="session-id" x-text="currentSession"></span>
+        </div>
+        
+        <div style="flex: 1;"></div>
+        
+        <button class="btn-secondary" @click="toggleTaskHistory()">
+            <i class="fas fa-history"></i>
+            Task History
+        </button>
+    </div>
+    
+    <!-- Execution Progress Bar -->
+    <div class="execution-progress" x-show="isStreaming">
+        <div class="execution-progress-bar" :style="`width: ${executionProgress}%`"></div>
+    </div>
+    
+    <!-- Terminal Container -->
+    <div class="terminal-container">
+        <!-- Terminal Header -->
+        <div class="terminal-header">
+            <div class="terminal-controls">
+                <div class="terminal-dot red"></div>
+                <div class="terminal-dot yellow"></div>
+                <div class="terminal-dot green"></div>
+            </div>
+            <div class="terminal-title">
+                cuti-enhanced@{{ working_directory }}
+                <span x-show="currentAgent" class="agent-badge" x-text="`via ${currentAgent}`"></span>
+            </div>
+        </div>
+        
+        <!-- Terminal Output -->
+        <div id="terminalOutput" class="terminal-output">
+            <!-- Chat Messages -->
+            <template x-for="message in chatMessages" :key="message.id">
+                <div class="terminal-message">
+                    <!-- User Input -->
+                    <div x-show="message.role === 'user'" class="user-input">
+                        <span class="timestamp" x-text="formatTime(message.timestamp)"></span>
+                        <span class="terminal-prompt">$</span>
+                        <span x-text="message.content"></span>
+                    </div>
+                    
+                    <!-- Assistant Output -->
+                    <div x-show="message.role === 'assistant'" class="assistant-output">
+                        <div x-show="message.agent" class="stream-details">
+                            <i class="fas fa-info-circle"></i>
+                            Agent: <span x-text="message.agent"></span>
+                        </div>
+                        <div x-html="formatTerminalMessage(message.content)"></div>
+                    </div>
+                    
+                    <!-- System Messages -->
+                    <div x-show="message.role === 'system'" class="system-message">
+                        <span class="timestamp" x-text="formatTime(message.timestamp)"></span>
+                        <span>[SYSTEM]</span> <span x-text="message.content"></span>
+                    </div>
+                    
+                    <!-- Execution Details -->
+                    <div x-show="message.role === 'execution'" class="stream-details">
+                        <i class="fas fa-cog fa-spin"></i>
+                        <span x-text="message.content"></span>
+                    </div>
+                    
+                    <!-- Error Messages -->
+                    <div x-show="message.role === 'error'" class="error-message">
+                        <span class="timestamp" x-text="formatTime(message.timestamp)"></span>
+                        <span>[ERROR]</span> <span x-text="message.content"></span>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- Current Streaming Message -->
+            <div x-show="isStreaming && currentStreamingMessage" class="terminal-message">
+                <div class="assistant-output">
+                    <div x-show="currentAgent" class="stream-details">
+                        <i class="fas fa-robot fa-pulse"></i>
+                        Processing with <strong x-text="currentAgent"></strong>
+                        <span x-show="chunksReceived > 0">
+                            (Chunks: <span x-text="chunksReceived"></span>)
+                        </span>
+                    </div>
+                    <span x-html="formatTerminalMessage(currentStreamingMessage.content)"></span>
+                    <span class="streaming-cursor"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <span class="prompt-symbol">$</span>
+                <input
+                    x-model="chatInput"
+                    @keydown.enter="sendMessage()"
+                    @keydown.ctrl.c="stopExecution()"
+                    placeholder="Type your message or @agent-name... (Ctrl+C to stop)"
+                    class="prompt-input"
+                    :disabled="isStreaming"
+                    x-ref="promptInput">
+                <div x-show="isStreaming" class="processing-indicator">
+                    <div class="processing-dot"></div>
+                    <div class="processing-dot"></div>
+                    <div class="processing-dot"></div>
+                    <span>Processing</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task History Panel -->
+<div class="task-history-panel" :class="{'open': showTaskHistory}">
+    <div class="task-history-header">
+        <h3>Task History</h3>
+        <button @click="toggleTaskHistory()" class="btn-icon">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <div class="task-history-content">
+        <template x-for="task in taskHistory" :key="task.id">
+            <div class="task-history-item" @click="viewTask(task)">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span class="task-status-badge" 
+                          :class="task.status" 
+                          x-text="task.status"></span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);" 
+                          x-text="formatTime(task.timestamp)"></span>
+                </div>
+                <div style="font-size: 0.9rem; margin-bottom: 4px;" 
+                     x-text="task.content.substring(0, 100) + (task.content.length > 100 ? '...' : '')"></div>
+                <div x-show="task.agents_used && task.agents_used.length > 0" 
+                     style="display: flex; gap: 4px; flex-wrap: wrap;">
+                    <template x-for="agent in task.agents_used" :key="agent">
+                        <span class="agent-badge" x-text="agent"></span>
+                    </template>
+                </div>
+                <div x-show="task.duration" 
+                     style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                    Duration: <span x-text="task.duration.toFixed(1)"></span>s
+                </div>
+            </div>
+        </template>
+        
+        <div x-show="taskHistory.length === 0" 
+             style="padding: 20px; text-align: center; color: var(--text-muted);">
+            No task history yet
+        </div>
+    </div>
+</div>
+
+<!-- Task History Toggle Button -->
+<button class="task-toggle-button" @click="toggleTaskHistory()" title="Task History">
+    <i class="fas fa-tasks"></i>
+</button>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function enhancedChat() {
+    return {
+        // WebSocket and session
+        ws: null,
+        currentSession: null,
+        
+        // Chat state
+        chatMessages: [],
+        chatInput: '',
+        isStreaming: false,
+        currentStreamingMessage: null,
+        
+        // Agent and execution tracking
+        currentAgent: null,
+        detectedAgents: [],
+        chunksReceived: 0,
+        executionProgress: 0,
+        
+        // Task history
+        taskHistory: [],
+        showTaskHistory: false,
+        
+        // Settings
+        working_directory: '.',
+        
+        init() {
+            this.connectWebSocket();
+            this.loadTaskHistory();
+            
+            // Set focus to input
+            this.$nextTick(() => {
+                if (this.$refs.promptInput) {
+                    this.$refs.promptInput.focus();
+                }
+            });
+        },
+        
+        connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/enhanced-chat-ws`;
+            
+            this.ws = new WebSocket(wsUrl);
+            
+            this.ws.onopen = () => {
+                console.log('Enhanced chat WebSocket connected');
+            };
+            
+            this.ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                this.handleWebSocketMessage(data);
+            };
+            
+            this.ws.onclose = () => {
+                console.log('WebSocket disconnected, reconnecting...');
+                setTimeout(() => this.connectWebSocket(), 3000);
+            };
+            
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        },
+        
+        handleWebSocketMessage(data) {
+            switch(data.type) {
+                case 'session_created':
+                    this.currentSession = data.session_id;
+                    this.addSystemMessage(`Session created: ${data.session_id}`);
+                    break;
+                    
+                case 'execution_start':
+                    this.isStreaming = true;
+                    this.chunksReceived = 0;
+                    this.executionProgress = 0;
+                    this.currentStreamingMessage = {
+                        id: Date.now(),
+                        role: 'assistant',
+                        content: '',
+                        agent: null,
+                        timestamp: new Date()
+                    };
+                    break;
+                    
+                case 'agents_detected':
+                    this.detectedAgents = data.agents;
+                    this.addExecutionMessage(`Detected agents: ${data.agents.join(', ')}`);
+                    break;
+                    
+                case 'agent_activated':
+                    this.currentAgent = data.agent;
+                    this.addExecutionMessage(`${data.agent} agent: ${data.message}`);
+                    break;
+                    
+                case 'agent_status':
+                    this.addExecutionMessage(`${data.agent}: ${data.status}`);
+                    break;
+                    
+                case 'stream':
+                    if (this.currentStreamingMessage) {
+                        this.currentStreamingMessage.content += data.content;
+                        this.currentStreamingMessage.agent = data.agent || this.currentAgent;
+                        this.chunksReceived++;
+                        this.scrollToBottom();
+                    }
+                    break;
+                    
+                case 'progress':
+                    if (data.percent !== undefined) {
+                        this.executionProgress = data.percent;
+                    }
+                    if (data.chunks_received !== undefined) {
+                        this.chunksReceived = data.chunks_received;
+                    }
+                    break;
+                    
+                case 'agent_deactivated':
+                    this.addExecutionMessage(`${data.agent}: ${data.message}`);
+                    if (this.currentAgent === data.agent) {
+                        this.currentAgent = null;
+                    }
+                    break;
+                    
+                case 'task_recorded':
+                    this.loadTaskHistory();
+                    break;
+                    
+                case 'execution_complete':
+                case 'execution_cancelled':
+                    if (this.currentStreamingMessage) {
+                        this.chatMessages.push(this.currentStreamingMessage);
+                        this.currentStreamingMessage = null;
+                    }
+                    this.isStreaming = false;
+                    this.currentAgent = null;
+                    this.executionProgress = 100;
+                    
+                    if (data.type === 'execution_cancelled') {
+                        this.addSystemMessage('Execution cancelled');
+                    } else {
+                        this.addSystemMessage(`Execution complete (${data.duration?.toFixed(1)}s)`);
+                    }
+                    
+                    this.$nextTick(() => {
+                        if (this.$refs.promptInput) {
+                            this.$refs.promptInput.focus();
+                        }
+                    });
+                    break;
+                    
+                case 'stop_acknowledged':
+                    this.addSystemMessage(data.message);
+                    break;
+                    
+                case 'error':
+                    this.addErrorMessage(data.content);
+                    this.isStreaming = false;
+                    this.currentAgent = null;
+                    break;
+                    
+                case 'task_history':
+                    this.taskHistory = data.tasks;
+                    break;
+            }
+        },
+        
+        sendMessage() {
+            if (!this.chatInput.trim() || this.isStreaming || !this.ws) return;
+            
+            const content = this.chatInput.trim();
+            
+            // Add user message
+            this.chatMessages.push({
+                id: Date.now(),
+                role: 'user',
+                content: content,
+                timestamp: new Date()
+            });
+            
+            // Send to WebSocket
+            this.ws.send(JSON.stringify({
+                type: 'message',
+                content: content
+            }));
+            
+            // Clear input
+            this.chatInput = '';
+            this.scrollToBottom();
+        },
+        
+        stopExecution() {
+            if (this.ws && this.isStreaming) {
+                this.ws.send(JSON.stringify({
+                    type: 'stop'
+                }));
+            }
+        },
+        
+        loadTaskHistory() {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({
+                    type: 'get_task_history',
+                    limit: 20
+                }));
+            }
+        },
+        
+        toggleTaskHistory() {
+            this.showTaskHistory = !this.showTaskHistory;
+            if (this.showTaskHistory) {
+                this.loadTaskHistory();
+            }
+        },
+        
+        viewTask(task) {
+            // Could expand to show full task details
+            console.log('View task:', task);
+        },
+        
+        addSystemMessage(content) {
+            this.chatMessages.push({
+                id: Date.now(),
+                role: 'system',
+                content: content,
+                timestamp: new Date()
+            });
+        },
+        
+        addExecutionMessage(content) {
+            this.chatMessages.push({
+                id: Date.now(),
+                role: 'execution',
+                content: content,
+                timestamp: new Date()
+            });
+        },
+        
+        addErrorMessage(content) {
+            this.chatMessages.push({
+                id: Date.now(),
+                role: 'error',
+                content: content,
+                timestamp: new Date()
+            });
+        },
+        
+        formatTime(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        },
+        
+        formatTerminalMessage(content) {
+            // Convert markdown to HTML for terminal display
+            if (!content) return '';
+            
+            // Basic markdown processing
+            return content
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br>');
+        },
+        
+        scrollToBottom() {
+            this.$nextTick(() => {
+                const output = document.getElementById('terminalOutput');
+                if (output) {
+                    output.scrollTop = output.scrollHeight;
+                }
+            });
+        }
+    };
+}
+</script>
+{% endblock %}

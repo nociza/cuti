@@ -148,6 +148,43 @@ class WorkspaceManager:
             )
         """)
         
+        # Add task execution history table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_execution_history (
+                id TEXT PRIMARY KEY,
+                session_id TEXT,
+                content TEXT,
+                response TEXT,
+                agents_used TEXT,
+                sub_tasks TEXT,
+                status TEXT,
+                created_at TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                duration_seconds REAL,
+                tokens_used INTEGER,
+                cost REAL,
+                error_message TEXT,
+                metadata TEXT
+            )
+        """)
+        
+        # Add sub_tasks table for detailed tracking
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_sub_tasks (
+                id TEXT PRIMARY KEY,
+                parent_task_id TEXT,
+                agent_name TEXT,
+                content TEXT,
+                status TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                duration_seconds REAL,
+                metadata TEXT,
+                FOREIGN KEY (parent_task_id) REFERENCES task_execution_history(id)
+            )
+        """)
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sync_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,6 +201,10 @@ class WorkspaceManager:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_source ON command_history(source)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_session ON task_execution_history(session_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_execution_history(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_created ON task_execution_history(created_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subtask_parent ON task_sub_tasks(parent_task_id)")
         
         conn.commit()
         conn.close()

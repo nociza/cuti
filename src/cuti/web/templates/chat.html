@@ -5,6 +5,8 @@
 {% block head %}
 <!-- Symphony Mode Toggle Styles -->
 <link rel="stylesheet" href="/static/css/symphony-toggle.css">
+<!-- Markdown Rendering Styles -->
+<link rel="stylesheet" href="/static/css/markdown.css">
 {% endblock %}
 
 {% set body_class = "" %}
@@ -600,5 +602,6 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Any additional scripts for chat page -->
+<!-- Markdown Renderer -->
+<script src="/static/js/markdown-renderer.js"></script>
 {% endblock %}

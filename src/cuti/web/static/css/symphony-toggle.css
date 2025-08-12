@@ -180,14 +180,9 @@
     }
 }
 
-/* Music icon */
+/* Music icon - Hidden/Removed */
 .symphony-icon {
-    position: absolute;
-    right: -45px;
-    font-size: 24px;
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0.3;
-    transform: scale(0.8);
+    display: none;
 }
 
 /* === ACTIVE STATE (Symphony Mode) === */
@@ -228,22 +223,12 @@
 }
 
 .symphony-toggle-container input:checked + .symphony-toggle-track .symphony-toggle-knob::after {
-    content: '♫';
-    font-size: 16px;
+    content: 'SYMPH';
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
     color: white;
-    animation: musicBounce 2s ease-in-out infinite;
-}
-
-@keyframes musicBounce {
-    0%, 100% {
-        transform: translateY(0) rotate(0deg);
-    }
-    25% {
-        transform: translateY(-2px) rotate(-5deg);
-    }
-    75% {
-        transform: translateY(-2px) rotate(5deg);
-    }
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .symphony-toggle-container input:checked + .symphony-toggle-track .symphony-label-solo {
@@ -277,29 +262,7 @@
     opacity: 1;
 }
 
-.symphony-toggle-container input:checked ~ .symphony-icon {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-    animation: iconSpin 8s linear infinite;
-}
-
-@keyframes iconSpin {
-    0% {
-        transform: scale(1) rotate(0deg);
-    }
-    25% {
-        transform: scale(1.1) rotate(90deg);
-    }
-    50% {
-        transform: scale(1) rotate(180deg);
-    }
-    75% {
-        transform: scale(1.1) rotate(270deg);
-    }
-    100% {
-        transform: scale(1) rotate(360deg);
-    }
-}
+/* Removed spinning icon animation */
 
 /* Ripple effect on click */
 .symphony-toggle-track::after {
