@@ -47,6 +47,49 @@ window.cutiUtils = {
             .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong style="color: #10b981;">$1</strong>')
             .replace(/\\*([^*]+)\\*/g, '<em style="color: #f59e0b;">$1</em>')
             .replace(/\\n/g, '<br>');
+    },
+    
+    // Symphony Mode management
+    symphonyMode: false,
+    
+    toggleSymphonyMode(event) {
+        this.symphonyMode = event.target.checked;
+        localStorage.setItem('symphonyMode', this.symphonyMode);
+        
+        // Update UI state
+        if (this.symphonyMode) {
+            document.body.classList.add('symphony-mode-active');
+            this.showNotification('Symphony Mode activated - Agent orchestration enabled', 'success');
+        } else {
+            document.body.classList.remove('symphony-mode-active');
+            this.showNotification('Solo Mode activated - Single agent mode', 'info');
+        }
+        
+        // Notify backend about mode change
+        if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+            window.ws.send(JSON.stringify({
+                type: 'symphony_mode_changed',
+                enabled: this.symphonyMode
+            }));
+        }
+    },
+    
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => notification.classList.add('show'), 10);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 };
 
@@ -55,6 +98,7 @@ function terminalInterface() {
     return {
         activeTab: 'chat',
         showTodos: true,
+        symphonyMode: localStorage.getItem('symphonyMode') === 'true',
         
         // Chat functionality
         chatMessages: [],
@@ -121,6 +165,15 @@ function terminalInterface() {
             this.loadClaudeSettings();
             this.loadGroundTruthData();
             
+            // Initialize Symphony Mode state
+            const symphonyToggle = document.getElementById('symphonyModeToggle');
+            if (symphonyToggle) {
+                symphonyToggle.checked = this.symphonyMode;
+                if (this.symphonyMode) {
+                    document.body.classList.add('symphony-mode-active');
+                }
+            }
+            
             // Check if an agent was selected from the agent manager
             const selectedAgent = sessionStorage.getItem('selectedAgent');
             if (selectedAgent) {
@@ -136,6 +189,11 @@ function terminalInterface() {
             });
             // Refresh ground truth data periodically
             setInterval(() => this.loadGroundTruthData(), 5000);
+        },
+        
+        toggleSymphonyMode(event) {
+            this.symphonyMode = event.target.checked;
+            window.cutiUtils.toggleSymphonyMode(event);
         },
         
         connectChatWebSocket() {

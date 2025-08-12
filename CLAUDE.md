@@ -1,17 +1,29 @@
 # Claude Code Configuration
 
 This file contains configuration and context for Claude Code usage within this project.
+It is dynamically managed by the cuti orchestration system.
+
+Last updated: 2025-08-12T14:28:30.974083
 
 ## Project Overview
 
-This is a production-ready cuti system that provides:
+This is a production-ready cuti system with advanced agent orchestration capabilities.
 
-- **Queue Management**: Automatic handling of rate limits and retry logic
-- **Prompt Aliases**: Pre-built aliases for common development tasks
-- **Task Expansion**: Automatic breakdown of complex tasks into subtasks
-- **Web Interface**: Modern FastAPI-based web UI with real-time updates
-- **Monitoring**: Comprehensive system and usage monitoring
-- **History Tracking**: SQLite-based prompt history with search capabilities
+## Active Agents
+
+The following agents are currently active and available for use:
+
+### @gemini-codebase-analysis: Deep codebase analysis using Gemini's large context window
+  Capabilities: large file analysis, cross-file dependencies, architecture review
+  Usage: Use for analyzing large codebases or complex systems
+
+
+## Agent Usage Instructions
+
+To use an agent, mention it with @ followed by the agent name.
+For example: @code-reviewer please review this function
+
+Agents can be enabled/disabled through the cuti web interface at http://localhost:8000/agents
 
 ## Development Commands
 
@@ -22,25 +34,6 @@ python run.py setup
 
 # Development installation with uv
 uv install -e .
-
-# Install dev dependencies
-uv add --dev pytest pytest-asyncio black ruff mypy
-```
-
-### Testing and Quality
-```bash
-# Run tests
-uv run pytest
-
-# Type checking
-uv run mypy src/
-
-# Code formatting
-uv run black src/ tests/
-uv run ruff check src/ tests/ --fix
-
-# Linting
-uv run ruff check src/ tests/
 ```
 
 ### Running the Application
@@ -51,107 +44,16 @@ python run.py web
 # Start CLI
 python run.py cli
 
-# Start queue processor  
-python run.py start --verbose
-
-# Check status
-python run.py status
+# Check agent status
+cuti agent list
 ```
 
-## Architecture
+## Orchestration Configuration
 
-### Core Components
-- **cli.py**: Modern Typer-based CLI interface
-- **queue_manager.py**: Core queue processing logic
-- **models.py**: Data models and enums
-- **storage.py**: Persistent storage with markdown support
-- **claude_interface.py**: Claude Code CLI integration
-- **aliases.py**: Prompt alias management system
-- **history.py**: SQLite-based history tracking
-- **task_expansion.py**: Task breakdown engine
-- **web/main.py**: FastAPI web application
-- **web/monitoring.py**: System monitoring and metrics
+This file is automatically managed by the cuti orchestration system.
+Manual changes will be overwritten when agents are toggled or updated.
 
-### Storage Structure
-```
-~/.cuti/
-├── queue/              # Active prompts
-├── completed/          # Completed prompts  
-├── failed/            # Failed prompts
-├── aliases.json       # Prompt aliases
-├── history.db         # SQLite history
-├── metrics.db         # Monitoring data
-└── queue-state.json   # Queue metadata
-```
-
-## Usage Patterns
-
-### Common Aliases
-- `explore-codebase`: Comprehensive code analysis
-- `security-audit`: Security vulnerability assessment  
-- `optimize-performance`: Performance optimization
-- `write-tests`: Complete test suite creation
-- `refactor-code`: Code quality improvements
-
-### Custom Alias Creation
-```bash
-cuti alias create my-task "Custom task description with ${PROJECT_NAME}" \
-  --description "My custom task" \
-  --working-dir "." \
-  --context-files "src/main.py"
-```
-
-### Task Expansion
-Complex tasks are automatically broken down into:
-- Subtasks with time estimates
-- Dependency relationships
-- Parallel execution opportunities  
-- Risk assessments
-- Success metrics
-
-## Monitoring and Analytics
-
-The system tracks:
-- System performance (CPU, memory, disk, network)
-- Token usage and costs
-- Request success/failure rates
-- Performance metrics
-- Health status
-
-Access via web interface at `/monitoring` or REST API at `/api/monitoring/*`
-
-## Configuration
-
-### Environment Variables
-- `CLAUDE_QUEUE_STORAGE_DIR`: Custom storage location
-- `CLAUDE_QUEUE_CLAUDE_COMMAND`: Claude CLI command
-- `CLAUDE_QUEUE_WEB_HOST`: Web interface host
-- `CLAUDE_QUEUE_WEB_PORT`: Web interface port
-
-### Config File
-Optional `~/.cuti/config.json` for detailed configuration.
-
-## Performance Considerations
-
-- Queue processes 10-50 prompts/hour (Claude rate limit dependent)
-- Web interface handles 100+ concurrent users
-- SQLite databases scale to millions of records
-- Memory usage: 50-100MB typical
-- Automatic cleanup of old metrics (90-day default)
-
-## Security
-
-- No sensitive data logged
-- Local storage only (no external services)
-- Rate limit respect prevents abuse
-- Web interface CORS configurable
-- No authentication required (designed for local use)
-
-## Extension Points
-
-The system is designed for extensibility:
-- Custom aliases via JSON configuration
-- Plugin-ready monitoring system
-- REST API for integration
-- WebSocket events for real-time updates
-- Configurable task expansion templates
+To modify agent configuration:
+1. Use the web interface at http://localhost:8000/agents
+2. Use the CLI: `cuti agent toggle <agent-name>`
+3. Modify `.cuti/agents.json` and reload

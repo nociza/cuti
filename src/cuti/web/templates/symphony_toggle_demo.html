@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symphony Mode Toggle - Enhanced Demo</title>
+    
+    <!-- Include the enhanced CSS -->
+    <link rel="stylesheet" href="/static/css/symphony-toggle-enhanced.css">
+    
+    <!-- Demo page styles -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #0a0f14 0%, #111827 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .demo-container {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: #9ca3af;
+            font-size: 1.25rem;
+            margin-bottom: 3rem;
+        }
+        
+        .toggle-section {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 3rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .toggle-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 2rem 0;
+        }
+        
+        .status-display {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .status-display.active {
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(102, 126, 234, 0.5);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-description {
+            color: #9ca3af;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .code-example {
+            background: #0a0f14;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            text-align: left;
+            overflow-x: auto;
+        }
+        
+        .code-example pre {
+            color: #e5e7eb;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        
+        .integration-note {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .integration-note h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>Symphony Mode</h1>
+        <p class="subtitle">AI Agent Orchestration System</p>
+        
+        <div class="toggle-section">
+            <h2 style="margin-bottom: 1.5rem; color: #e5e7eb;">Enhanced Toggle Design</h2>
+            
+            <!-- Enhanced Symphony Mode Toggle -->
+            <div class="toggle-wrapper">
+                <label class="symphony-toggle-enhanced" tabindex="0" role="switch" aria-checked="false">
+                    <input type="checkbox" id="symphonyModeToggle">
+                    <div class="symphony-toggle-track">
+                        <div class="symphony-toggle-knob">
+                            <span class="symphony-toggle-icon"></span>
+                        </div>
+                        <div class="symphony-mode-labels">
+                            <span class="symphony-label symphony-label-solo">SOLO</span>
+                            <span class="symphony-label symphony-label-symphony">SYMPHONY</span>
+                        </div>
+                    </div>
+                    <div class="symphony-status-indicator"></div>
+                </label>
+            </div>
+            
+            <div class="status-display" id="statusDisplay">
+                <strong>Current Mode:</strong> <span id="modeText">SOLO</span><br>
+                <strong>Status:</strong> <span id="statusText">Single agent operation</span><br>
+                <strong>Active Agents:</strong> <span id="agentCount">1</span>
+            </div>
+        </div>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">✨</div>
+                <div class="feature-title">Smooth Animations</div>
+                <div class="feature-description">
+                    Fluid transitions with custom easing curves and particle effects
+                </div>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <div class="feature-title">Visual Feedback</div>
+                <div class="feature-description">
+                    Glowing effects, status indicators, and interactive hover states
+                </div>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">♿</div>
+                <div class="feature-title">Accessible</div>
+                <div class="feature-description">
+                    Full keyboard support, ARIA labels, and high contrast compatibility
+                </div>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <div class="feature-title">Responsive</div>
+                <div class="feature-description">
+                    Adapts seamlessly to different screen sizes and devices
+                </div>
+            </div>
+        </div>
+        
+        <div class="integration-note">
+            <h3>Integration Instructions</h3>
+            <p style="margin-bottom: 1rem;">To integrate this enhanced toggle into your existing chat interface:</p>
+            <ol style="text-align: left; line-height: 1.8; color: #e5e7eb;">
+                <li>Include the CSS file: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">symphony-toggle-enhanced.css</code></li>
+                <li>Include the JavaScript file: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">symphony-toggle.js</code></li>
+                <li>Replace the existing toggle HTML with the enhanced structure</li>
+                <li>Listen for the <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">symphonyModeChanged</code> event</li>
+            </ol>
+        </div>
+        
+        <div class="code-example">
+            <pre>// Listen for toggle changes
+document.addEventListener('symphonyModeChanged', (event) => {
+    console.log('Mode changed:', event.detail);
+    // Update your application state
+    updateAgentOrchestration(event.detail.enabled);
+});
+
+// Programmatically control the toggle
+const toggle = new SymphonyToggle(element);
+toggle.setEnabled(true);  // Enable Symphony Mode
+toggle.setLoading(true);  // Show loading state</pre>
+        </div>
+    </div>
+    
+    <!-- Include the JavaScript -->
+    <script src="/static/js/symphony-toggle.js"></script>
+    
+    <!-- Demo functionality -->
+    <script>
+        // Update status display when toggle changes
+        document.addEventListener('symphonyModeChanged', (event) => {
+            const statusDisplay = document.getElementById('statusDisplay');
+            const modeText = document.getElementById('modeText');
+            const statusText = document.getElementById('statusText');
+            const agentCount = document.getElementById('agentCount');
+            
+            if (event.detail.enabled) {
+                statusDisplay.classList.add('active');
+                modeText.textContent = 'SYMPHONY';
+                statusText.textContent = 'Multiple agents orchestrated';
+                agentCount.textContent = '5+';
+                
+                // Simulate agent activation
+                setTimeout(() => {
+                    agentCount.textContent = '8 (synchronized)';
+                }, 1000);
+            } else {
+                statusDisplay.classList.remove('active');
+                modeText.textContent = 'SOLO';
+                statusText.textContent = 'Single agent operation';
+                agentCount.textContent = '1';
+            }
+        });
+        
+        // Demo: Simulate loading state
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleElement = document.querySelector('.symphony-toggle-enhanced');
+            if (toggleElement && window.SymphonyToggle) {
+                const toggle = new window.SymphonyToggle(toggleElement);
+                
+                // Example: Show loading state when processing
+                window.simulateLoading = () => {
+                    toggle.setLoading(true);
+                    setTimeout(() => {
+                        toggle.setLoading(false);
+                    }, 2000);
+                };
+            }
+        });
+    </script>
+</body>
+</html>

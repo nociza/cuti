@@ -49,6 +49,12 @@ class WebSocketManager:
 websocket_manager = WebSocketManager()
 
 
+async def broadcast_message(message: Dict[str, Any], connection_type: str = "general"):
+    """Broadcast a message to all connected WebSocket clients."""
+    message_str = json.dumps(message)
+    await websocket_manager.broadcast(message_str, connection_type)
+
+
 @websocket_router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Main WebSocket endpoint for real-time updates."""

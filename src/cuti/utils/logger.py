@@ -8,6 +8,18 @@ from pathlib import Path
 from typing import Optional
 
 
+def get_logger(name: str = "cuti") -> logging.Logger:
+    """Get a logger instance with default configuration.
+    
+    Args:
+        name: Logger name
+        
+    Returns:
+        Logger instance
+    """
+    return setup_logger(name)
+
+
 def setup_logger(
     name: str = "cuti",
     level: int = logging.INFO,

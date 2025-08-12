@@ -39,6 +39,10 @@
     --glass-bg: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.1);
     
+    /* Symphony Mode colors */
+    --symphony-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --symphony-glow: rgba(102, 126, 234, 0.4);
+    
     /* Spacing scale */
     --space-xs: 4px;
     --space-sm: 8px;
@@ -2041,6 +2045,154 @@ body::after {
 .btn-danger:hover {
     background: rgba(239, 68, 68, 0.2);
     border-color: var(--error);
+}
+
+/* Symphony Mode Toggle Styles */
+.symphony-mode-toggle {
+    margin-left: auto;
+    margin-right: 2rem;
+    display: flex;
+    align-items: center;
+}
+
+.symphony-toggle-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.symphony-toggle-container input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.symphony-toggle-slider {
+    position: relative;
+    width: 140px;
+    height: 32px;
+    background: linear-gradient(135deg, rgba(100, 100, 100, 0.3) 0%, rgba(60, 60, 60, 0.3) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    overflow: hidden;
+}
+
+.symphony-toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 26px;
+    left: 3px;
+    top: 2px;
+    background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    border-radius: 16px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.symphony-label-off,
+.symphony-label-on {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    z-index: 3;
+    transition: all 0.3s ease;
+}
+
+.symphony-label-off {
+    color: rgba(255, 255, 255, 0.7);
+    margin-left: 4px;
+}
+
+.symphony-label-on {
+    color: rgba(255, 255, 255, 0.3);
+    margin-right: 4px;
+}
+
+.symphony-icon {
+    position: absolute;
+    right: -30px;
+    font-size: 20px;
+    transition: all 0.3s ease;
+    opacity: 0.5;
+}
+
+/* Active state */
+.symphony-toggle-container input:checked + .symphony-toggle-slider {
+    background: var(--symphony-gradient);
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 0 0 20px var(--symphony-glow);
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-slider::before {
+    transform: translateX(74px);
+    background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-slider + .symphony-icon {
+    opacity: 1;
+    animation: musicPulse 2s ease-in-out infinite;
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-slider .symphony-label-off {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-slider .symphony-label-on {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+@keyframes musicPulse {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+    }
+    25% {
+        transform: scale(1.1) rotate(-5deg);
+    }
+    75% {
+        transform: scale(1.1) rotate(5deg);
+    }
+}
+
+/* Symphony config link */
+.symphony-config-link {
+    margin-left: 1rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 12px;
+    color: #667eea;
+    text-decoration: none;
+    font-size: 12px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.symphony-config-link:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* Hover effects */
+.symphony-toggle-container:hover .symphony-toggle-slider {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.symphony-toggle-container:hover input:checked + .symphony-toggle-slider {
+    box-shadow: 0 0 30px var(--symphony-glow);
 }
 
 /* AGENT STATUS PAGE COMPONENTS - Unified Design */

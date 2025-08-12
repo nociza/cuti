@@ -1,0 +1,773 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Orchestration{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/agents_orchestration.css">
+{% endblock %}
+
+{% block content %}
+<div class="orchestration-container">
+    <!-- Header with CLAUDE.md status -->
+    <div class="orchestration-header">
+        <div class="header-left">
+            <h1 class="page-title">
+                <i class="fas fa-robot"></i>
+                Agent Orchestration Center
+            </h1>
+            <div class="claude-md-status">
+                <div class="status-indicator active"></div>
+                <span class="status-text">CLAUDE.md synchronized</span>
+                <code class="file-path">./CLAUDE.md</code>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="refreshAgents()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+            <button class="btn btn-primary" onclick="showCreateAgentModal()">
+                <i class="fas fa-plus"></i>
+                Create Agent
+            </button>
+            <button class="btn btn-danger" onclick="performHotSwap()">
+                <i class="fas fa-exchange-alt"></i>
+                Hot Swap
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Agents Summary -->
+    <div class="active-agents-summary">
+        <h3>Active Agent Pool</h3>
+        <div class="active-count">
+            <span id="activeCount">0</span> / <span id="totalCount">0</span> agents active
+        </div>
+        <div class="active-agents-list" id="activeAgentsList">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Agent Cards Grid -->
+    <div class="agents-grid" id="agentsGrid">
+        <!-- Agent cards will be populated here -->
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+</div>
+
+<!-- Create Agent Modal -->
+<div class="modal" id="createAgentModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create Custom Agent</h2>
+            <button class="modal-close" onclick="closeCreateAgentModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="agentName">Agent Name</label>
+                <input type="text" id="agentName" class="form-input" placeholder="e.g., my-custom-agent">
+            </div>
+            <div class="form-group">
+                <label for="agentDescription">Description</label>
+                <textarea id="agentDescription" class="form-textarea" placeholder="What does this agent do?"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="agentCapabilities">Capabilities (comma-separated)</label>
+                <input type="text" id="agentCapabilities" class="form-input" placeholder="e.g., code review, testing, documentation">
+            </div>
+            <div class="form-group">
+                <label for="agentInstructions">Usage Instructions</label>
+                <textarea id="agentInstructions" class="form-textarea" placeholder="How should this agent be used?"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="agentPriority">Priority (0-10)</label>
+                <input type="number" id="agentPriority" class="form-input" value="5" min="0" max="10">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeCreateAgentModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="createAgent()">Create Agent</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let agents = [];
+let activeAgents = new Set();
+let ws = null;
+
+// Initialize WebSocket connection
+function initWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'agent_toggled' || data.type === 'agents_hot_swapped') {
+            loadAgents();
+        }
+    };
+    
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+        // Reconnect after 3 seconds
+        setTimeout(initWebSocket, 3000);
+    };
+}
+
+// Load agents from API
+async function loadAgents() {
+    try {
+        const response = await fetch('/api/agents');
+        agents = await response.json();
+        
+        // Update active agents set
+        activeAgents.clear();
+        agents.forEach(agent => {
+            if (agent.enabled) {
+                activeAgents.add(agent.id);
+            }
+        });
+        
+        updateUI();
+    } catch (error) {
+        console.error('Failed to load agents:', error);
+        showNotification('Failed to load agents', 'error');
+    }
+}
+
+// Update the UI
+function updateUI() {
+    updateActiveAgentsList();
+    updateAgentsGrid();
+    updateCounts();
+}
+
+// Update active agents list
+function updateActiveAgentsList() {
+    const container = document.getElementById('activeAgentsList');
+    container.innerHTML = '';
+    
+    if (activeAgents.size === 0) {
+        container.innerHTML = '<div class="empty-message">No active agents. Enable agents below to add them to the pool.</div>';
+        return;
+    }
+    
+    activeAgents.forEach(agentId => {
+        const agent = agents.find(a => a.id === agentId);
+        if (agent) {
+            const chip = document.createElement('div');
+            chip.className = 'active-agent-chip';
+            chip.innerHTML = `
+                <i class="fas fa-robot"></i>
+                <span>@${agent.name}</span>
+                <span class="remove-agent" onclick="toggleAgent('${agent.id}', false)">×</span>
+            `;
+            container.appendChild(chip);
+        }
+    });
+}
+
+// Update agents grid
+function updateAgentsGrid() {
+    const grid = document.getElementById('agentsGrid');
+    grid.innerHTML = '';
+    
+    // Sort agents by priority and name
+    const sortedAgents = [...agents].sort((a, b) => {
+        if (a.enabled !== b.enabled) return b.enabled ? 1 : -1;
+        if (a.priority !== b.priority) return b.priority - a.priority;
+        return a.name.localeCompare(b.name);
+    });
+    
+    sortedAgents.forEach(agent => {
+        const card = createAgentCard(agent);
+        grid.appendChild(card);
+    });
+}
+
+// Create agent card element
+function createAgentCard(agent) {
+    const card = document.createElement('div');
+    card.className = `agent-card ${agent.enabled ? 'active' : 'inactive'}`;
+    card.dataset.agentId = agent.id;
+    
+    const typeIcon = agent.type === 'gemini' ? 'fa-gem' : 'fa-robot';
+    const typeColor = agent.type === 'gemini' ? 'gemini' : 'claude';
+    
+    card.innerHTML = `
+        <div class="agent-header">
+            <div class="agent-info">
+                <h3 class="agent-name">
+                    <i class="fas ${typeIcon}"></i>
+                    ${agent.name}
+                </h3>
+                <span class="agent-type ${typeColor}">${agent.type}</span>
+            </div>
+            <div class="agent-toggle">
+                <input type="checkbox" 
+                       id="toggle-${agent.id}" 
+                       class="toggle-switch" 
+                       ${agent.enabled ? 'checked' : ''}
+                       onchange="toggleAgent('${agent.id}', this.checked)">
+                <label for="toggle-${agent.id}" class="toggle-label"></label>
+            </div>
+        </div>
+        
+        <p class="agent-description">${agent.description}</p>
+        
+        <div class="agent-capabilities">
+            ${agent.capabilities.map(cap => `
+                <span class="capability-tag">${cap}</span>
+            `).join('')}
+        </div>
+        
+        <div class="agent-footer">
+            <div class="agent-priority">
+                <i class="fas fa-sort-amount-up"></i>
+                <span class="priority-badge">${agent.priority}</span>
+            </div>
+            <div class="agent-actions">
+                <button class="action-btn" onclick="testAgent('${agent.id}')" title="Test">
+                    <i class="fas fa-flask"></i>
+                </button>
+                ${!isBuiltinAgent(agent.id) ? `
+                    <button class="action-btn" onclick="deleteAgent('${agent.id}')" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    return card;
+}
+
+// Check if agent is built-in
+function isBuiltinAgent(agentId) {
+    const builtinAgents = [
+        'code-reviewer', 'docs-generator', 'test-writer',
+        'refactor-assistant', 'ui-design-expert', 'gemini-codebase-analysis'
+    ];
+    return builtinAgents.includes(agentId);
+}
+
+// Toggle agent enabled status
+async function toggleAgent(agentId, enabled) {
+    showLoading(true);
+    
+    try {
+        const response = await fetch(`/api/agents/${agentId}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+        
+        if (!response.ok) throw new Error('Failed to toggle agent');
+        
+        const result = await response.json();
+        showNotification(result.message, 'success');
+        
+        // Reload agents to get updated state
+        await loadAgents();
+    } catch (error) {
+        console.error('Failed to toggle agent:', error);
+        showNotification('Failed to toggle agent', 'error');
+        // Revert the toggle
+        document.getElementById(`toggle-${agentId}`).checked = !enabled;
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Test agent
+async function testAgent(agentId) {
+    const prompt = prompt('Enter a test prompt for the agent:');
+    if (!prompt) return;
+    
+    showLoading(true);
+    
+    try {
+        const response = await fetch(`/api/agents/${agentId}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+        
+        if (!response.ok) throw new Error('Failed to test agent');
+        
+        const result = await response.json();
+        showNotification('Agent test completed successfully', 'success');
+        console.log('Test result:', result);
+    } catch (error) {
+        console.error('Failed to test agent:', error);
+        showNotification('Failed to test agent', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Delete custom agent
+async function deleteAgent(agentId) {
+    if (!confirm(`Are you sure you want to delete agent "${agentId}"?`)) return;
+    
+    showLoading(true);
+    
+    try {
+        const response = await fetch(`/api/agents/${agentId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error('Failed to delete agent');
+        
+        showNotification('Agent deleted successfully', 'success');
+        await loadAgents();
+    } catch (error) {
+        console.error('Failed to delete agent:', error);
+        showNotification('Failed to delete agent', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Perform hot swap
+async function performHotSwap() {
+    const selectedAgents = prompt(
+        'Enter agent IDs to activate (comma-separated):\n' +
+        'Available: ' + agents.map(a => a.id).join(', ')
+    );
+    
+    if (!selectedAgents) return;
+    
+    const agentNames = selectedAgents.split(',').map(s => s.trim()).filter(s => s);
+    
+    showLoading(true);
+    
+    try {
+        const response = await fetch('/api/agents/hot-swap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent_names: agentNames })
+        });
+        
+        if (!response.ok) throw new Error('Failed to perform hot swap');
+        
+        const result = await response.json();
+        showNotification(result.message, 'success');
+        await loadAgents();
+    } catch (error) {
+        console.error('Failed to perform hot swap:', error);
+        showNotification('Failed to perform hot swap', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Show/hide create agent modal
+function showCreateAgentModal() {
+    document.getElementById('createAgentModal').style.display = 'block';
+}
+
+function closeCreateAgentModal() {
+    document.getElementById('createAgentModal').style.display = 'none';
+    // Clear form
+    document.getElementById('agentName').value = '';
+    document.getElementById('agentDescription').value = '';
+    document.getElementById('agentCapabilities').value = '';
+    document.getElementById('agentInstructions').value = '';
+    document.getElementById('agentPriority').value = '5';
+}
+
+// Create new agent
+async function createAgent() {
+    const name = document.getElementById('agentName').value.trim();
+    const description = document.getElementById('agentDescription').value.trim();
+    const capabilities = document.getElementById('agentCapabilities').value
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s);
+    const usage_instructions = document.getElementById('agentInstructions').value.trim();
+    const priority = parseInt(document.getElementById('agentPriority').value);
+    
+    if (!name || !description) {
+        showNotification('Name and description are required', 'error');
+        return;
+    }
+    
+    showLoading(true);
+    
+    try {
+        const response = await fetch('/api/agents/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                description,
+                capabilities,
+                usage_instructions,
+                priority
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to create agent');
+        
+        const result = await response.json();
+        showNotification(result.message, 'success');
+        closeCreateAgentModal();
+        await loadAgents();
+    } catch (error) {
+        console.error('Failed to create agent:', error);
+        showNotification('Failed to create agent', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Update counts
+function updateCounts() {
+    document.getElementById('activeCount').textContent = activeAgents.size;
+    document.getElementById('totalCount').textContent = agents.length;
+}
+
+// Refresh agents
+function refreshAgents() {
+    loadAgents();
+}
+
+// Show/hide loading overlay
+function showLoading(show) {
+    document.getElementById('loadingOverlay').classList.toggle('active', show);
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    // Add to body
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    initWebSocket();
+    loadAgents();
+    
+    // Refresh every 30 seconds
+    setInterval(loadAgents, 30000);
+});
+</script>
+
+<style>
+/* Additional styles for orchestration page */
+.orchestration-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.orchestration-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.header-left {
+    flex: 1;
+}
+
+.page-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.claude-md-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 12px;
+    width: fit-content;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse 2s infinite;
+}
+
+.file-path {
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: #667eea;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.active-agents-summary {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.active-agents-summary h3 {
+    margin-bottom: 1rem;
+    color: #667eea;
+}
+
+.active-count {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.active-agents-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.active-agent-chip {
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+    border: 1px solid #667eea;
+    border-radius: 20px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.active-agent-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.remove-agent {
+    cursor: pointer;
+    color: #f87171;
+    font-weight: bold;
+    margin-left: 0.5rem;
+}
+
+.empty-message {
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+}
+
+/* Modal styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background: #1f2937;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #9ca3af;
+}
+
+.form-input,
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
+}
+
+.form-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Notification styles */
+.notification {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    padding: 1rem 1.5rem;
+    background: #1f2937;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    z-index: 3000;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification-success {
+    border: 1px solid #4ade80;
+    background: rgba(74, 222, 128, 0.1);
+}
+
+.notification-error {
+    border: 1px solid #f87171;
+    background: rgba(248, 113, 113, 0.1);
+}
+
+.notification-info {
+    border: 1px solid #60a5fa;
+    background: rgba(96, 165, 250, 0.1);
+}
+
+/* Button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
+    color: white;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(248, 113, 113, 0.3);
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(74, 222, 128, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+    }
+}
+</style>
+{% endblock %}

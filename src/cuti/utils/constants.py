@@ -2,6 +2,8 @@
 Shared constants for cuti.
 """
 
+from pathlib import Path
+
 # Default configuration values
 DEFAULT_STORAGE_DIR = "~/.cuti"
 DEFAULT_CLAUDE_COMMAND = "claude"
@@ -34,3 +36,6 @@ RATE_LIMIT_COOLDOWN_MINUTES = 5
 # Web interface
 WEB_STATIC_DIR = "static"
 WEB_TEMPLATES_DIR = "templates"
+
+# Agent directories
+BUILTIN_AGENTS_DIR = Path(__file__).parent.parent / "builtin_agents"

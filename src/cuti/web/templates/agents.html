@@ -4,6 +4,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', path='css/agents.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', path='css/agent-cards.css') }}?v=1">
 {% endblock %}
 
 {% set body_class = "" %}
@@ -19,6 +20,12 @@
                 <span x-show="filteredAgents.length > 0" x-text="`${filteredAgents.length} of ${agents.length} agents`"></span>
                 <span x-show="agents.length === 0">Create and manage custom Claude Code agents</span>
             </p>
+            <!-- Orchestration Status -->
+            <div class="orchestration-status" x-show="orchestrationEnabled">
+                <div class="status-indicator active"></div>
+                <span>Symphony Mode Active</span>
+                <span class="active-count" x-text="`${activeAgents.size} agents orchestrated`"></span>
+            </div>
         </div>
         <div class="page-actions">
             <!-- Search bar for filtering agents -->
@@ -30,6 +37,10 @@
                        placeholder="Search agents..."
                        class="search-input">
             </div>
+            <a href="/orchestration" class="btn-secondary" title="Configure Orchestra">
+                <i class="fas fa-sliders-h"></i>
+                <span>Orchestra</span>
+            </a>
             <button @click="toggleCompactMode()" 
                     x-show="agents.length > 10" 
                     class="btn-secondary"
@@ -48,7 +59,17 @@
         <!-- Multi-Column Grid -->
         <div class="agents-grid">
             <template x-for="agent in filteredAgents" :key="agent.name">
-            <div class="agent-card" :class="{'agent-disabled': agent.agent_type === 'gemini' && !geminiAvailable}">
+            <div class="agent-card" 
+                 :class="{
+                     'agent-disabled': agent.agent_type === 'gemini' && !geminiAvailable,
+                     'agent-active': activeAgents.has(agent.name),
+                     'agent-orchestrated': orchestrationEnabled && activeAgents.has(agent.name)
+                 }"
+                 @click="toggleAgentCard(agent, $event)"
+                 :title="activeAgents.has(agent.name) ? 'Click to deactivate' : 'Click to activate'">
+                <!-- State Indicator - minimal dot -->
+                <div class="agent-state-indicator"></div>
+                
                 <div class="agent-card-header">
                     <div class="agent-name">
                         <span x-text="agent.name"></span>
@@ -57,14 +78,13 @@
                             <span>Gemini</span>
                         </span>
                         <span x-show="agent.is_builtin" class="agent-badge-builtin">
-                            <i class="fas fa-sparkles"></i>
-                            <span>Created by cuti</span>
+                            <span>Built-in</span>
                         </span>
                         <span x-show="!agent.is_builtin && isDefaultAgent(agent.name)" class="agent-badge">Default</span>
+                        <span x-show="activeAgents.has(agent.name)" class="agent-badge-active">
+                            <span>Active</span>
+                        </span>
                     </div>
-                    <button class="agent-menu-button" @click="toggleMenu(agent.name)">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
                 </div>
                 
                 <div class="agent-description" x-text="agent.description || 'No description available'"></div>
@@ -90,19 +110,24 @@
                         <span x-text="formatDate(agent.updated_at || agent.created_at)"></span>
                     </div>
                     <div class="agent-actions-row">
-                        <button @click="editAgent(agent)" class="btn-agent">
+                        <button @click.stop="editAgent(agent)" class="btn-agent">
                             <i class="fas fa-edit"></i>
                             <span>Edit</span>
                         </button>
-                        <button @click="useAgent(agent)" 
+                        <button @click.stop="useAgent(agent)" 
                                 :disabled="agent.agent_type === 'gemini' && !geminiAvailable"
-                                :class="{'btn-agent': true, 'btn-use': true, 'btn-disabled': agent.agent_type === 'gemini' && !geminiAvailable}"
-                                :title="agent.agent_type === 'gemini' && !geminiAvailable ? 'Gemini CLI not installed' : ''">
-                            <i class="fas fa-play"></i>
-                            <span>Use</span>
+                                :class="{
+                                    'btn-agent': true, 
+                                    'btn-use': true, 
+                                    'btn-disabled': agent.agent_type === 'gemini' && !geminiAvailable,
+                                    'btn-active': activeAgents.has(agent.name)
+                                }"
+                                :title="agent.agent_type === 'gemini' && !geminiAvailable ? 'Gemini CLI not installed' : activeAgents.has(agent.name) ? 'Agent is active in orchestra' : 'Use this agent'">
+                            <i class="fas" :class="activeAgents.has(agent.name) ? 'fa-music' : 'fa-play'"></i>
+                            <span x-text="activeAgents.has(agent.name) ? 'Active' : 'Use'"></span>
                         </button>
                         <button x-show="!agent.is_builtin && !isDefaultAgent(agent.name)" 
-                                @click="deleteAgent(agent.name)" 
+                                @click.stop="deleteAgent(agent.name)" 
                                 class="btn-agent btn-delete">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -288,6 +313,8 @@ function agentManager() {
         compactMode: false,
         showScrollHint: true,
         geminiAvailable: false,
+        orchestrationEnabled: false,
+        activeAgents: new Set(),
         formData: {
             name: '',
             description: '',
@@ -304,6 +331,11 @@ function agentManager() {
         async init() {
             await this.loadAgents();
             await this.checkAgentStatus();
+            await this.loadOrchestrationStatus();
+            
+            // Check Symphony Mode from localStorage
+            this.orchestrationEnabled = localStorage.getItem('symphonyMode') === 'true';
+            
             // Auto-enable compact mode for many agents
             this.compactMode = this.agents.length > 15;
             // Show scroll hint briefly
@@ -312,6 +344,109 @@ function agentManager() {
                     this.showScrollHint = false;
                 }, 5000);
             }
+            
+            // Connect to WebSocket for real-time updates
+            this.connectWebSocket();
+        },
+        
+        connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'agent_toggled' || data.type === 'agents_hot_swapped') {
+                    this.loadOrchestrationStatus();
+                }
+                if (data.type === 'symphony_mode_changed') {
+                    this.orchestrationEnabled = data.enabled;
+                }
+            };
+        },
+        
+        async loadOrchestrationStatus() {
+            try {
+                const response = await fetch('/api/agents');
+                if (response.ok) {
+                    const agents = await response.json();
+                    this.activeAgents.clear();
+                    agents.forEach(agent => {
+                        if (agent.enabled) {
+                            this.activeAgents.add(agent.id);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load orchestration status:', error);
+            }
+        },
+        
+        async toggleAgentCard(agent, event) {
+            // Don't toggle if clicking on action buttons or if disabled
+            if (event.target.closest('.btn-agent') || 
+                (agent.agent_type === 'gemini' && !this.geminiAvailable)) {
+                return;
+            }
+            
+            const isActive = this.activeAgents.has(agent.name);
+            const enabled = !isActive;
+            
+            try {
+                const response = await fetch(`/api/agents/${agent.name}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+                
+                if (response.ok) {
+                    if (enabled) {
+                        this.activeAgents.add(agent.name);
+                        this.showNotification(`${agent.name} activated in orchestra`, 'success');
+                        // Add a subtle animation if card element exists
+                        if (event.currentTarget) {
+                            this.animateCardActivation(event.currentTarget);
+                        }
+                    } else {
+                        this.activeAgents.delete(agent.name);
+                        this.showNotification(`${agent.name} deactivated`, 'info');
+                    }
+                } else {
+                    throw new Error('Failed to toggle agent');
+                }
+            } catch (error) {
+                console.error('Failed to toggle agent:', error);
+                this.showNotification('Failed to toggle agent', 'error');
+            }
+        },
+        
+        // Removed ripple and mouse position functions for minimalistic design
+        
+        animateCardActivation(card) {
+            if (!card || !card.style) return;
+            card.style.animation = 'none';
+            setTimeout(() => {
+                if (card && card.style) {
+                    card.style.animation = '';
+                }
+            }, 10);
+        },
+        
+        showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 10);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
         },
         
         async checkAgentStatus() {
@@ -560,6 +695,15 @@ function agentManager() {
                            (agent.tools && agent.tools.some(tool => tool.toLowerCase().includes(query)));
                 });
             }
+            
+            // Sort active agents first
+            this.filteredAgents.sort((a, b) => {
+                const aActive = this.activeAgents.has(a.name);
+                const bActive = this.activeAgents.has(b.name);
+                if (aActive && !bActive) return -1;
+                if (!aActive && bActive) return 1;
+                return 0;
+            });
         }
     }
 }

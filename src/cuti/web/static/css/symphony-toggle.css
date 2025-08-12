@@ -1,0 +1,444 @@
+/* Symphony Mode Toggle - Premium Design */
+
+.symphony-mode-toggle {
+    margin-left: auto;
+    margin-right: 2rem;
+    display: flex;
+    align-items: center;
+    position: relative;
+    z-index: 100;
+}
+
+/* Main container with glass morphism */
+.symphony-toggle-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 8px;
+    background: rgba(20, 25, 40, 0.6);
+    backdrop-filter: blur(12px);
+    border-radius: 40px;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.symphony-toggle-container:hover {
+    background: rgba(25, 30, 45, 0.7);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Hidden checkbox */
+.symphony-toggle-container input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* The switch track */
+.symphony-toggle-track {
+    position: relative;
+    width: 180px;
+    height: 40px;
+    background: linear-gradient(135deg, 
+        rgba(75, 85, 99, 0.3) 0%, 
+        rgba(55, 65, 81, 0.3) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 25px;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+/* Background glow effect */
+.symphony-toggle-track::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, 
+        rgba(102, 126, 234, 0) 0%, 
+        rgba(102, 126, 234, 0) 40%,
+        rgba(102, 126, 234, 0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+    animation: none;
+}
+
+/* The sliding knob */
+.symphony-toggle-knob {
+    position: absolute;
+    width: 70px;
+    height: 32px;
+    left: 4px;
+    top: 4px;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(240, 240, 240, 0.95) 100%);
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Knob icon/text */
+.symphony-toggle-knob::after {
+    content: 'SOLO';
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #374151;
+    transition: all 0.3s ease;
+}
+
+/* Labels */
+.symphony-label-solo,
+.symphony-label-symphony {
+    position: absolute;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 5;
+    pointer-events: none;
+}
+
+.symphony-label-solo {
+    left: 16px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.symphony-label-symphony {
+    right: 16px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Status indicator */
+.symphony-status-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #ef4444;
+    border-radius: 50%;
+    top: 8px;
+    right: 8px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 15;
+}
+
+/* Particle effects container */
+.symphony-particles {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+.particle {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: rgba(167, 139, 250, 0.8);
+    border-radius: 50%;
+    animation: particleFloat 3s ease-in-out infinite;
+}
+
+.particle:nth-child(1) { left: 20%; animation-delay: 0s; }
+.particle:nth-child(2) { left: 40%; animation-delay: 0.5s; }
+.particle:nth-child(3) { left: 60%; animation-delay: 1s; }
+.particle:nth-child(4) { left: 80%; animation-delay: 1.5s; }
+
+@keyframes particleFloat {
+    0%, 100% {
+        transform: translateY(0) scale(0);
+        opacity: 0;
+    }
+    20% {
+        transform: translateY(-10px) scale(1);
+        opacity: 1;
+    }
+    80% {
+        transform: translateY(-30px) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Music icon */
+.symphony-icon {
+    position: absolute;
+    right: -45px;
+    font-size: 24px;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.3;
+    transform: scale(0.8);
+}
+
+/* === ACTIVE STATE (Symphony Mode) === */
+
+.symphony-toggle-container input:checked + .symphony-toggle-track {
+    background: linear-gradient(135deg, 
+        rgba(102, 126, 234, 0.3) 0%, 
+        rgba(118, 75, 162, 0.3) 100%);
+    border-color: rgba(102, 126, 234, 0.3);
+    box-shadow: 0 0 30px rgba(102, 126, 234, 0.2) inset,
+                0 0 60px rgba(102, 126, 234, 0.1);
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-track::before {
+    opacity: 1;
+    animation: pulseGlow 4s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-track .symphony-toggle-knob {
+    left: calc(100% - 74px);  /* Position from right side for accurate placement */
+    background: linear-gradient(135deg, 
+        #667eea 0%, 
+        #764ba2 100%);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4),
+                0 0 40px rgba(102, 126, 234, 0.2),
+                0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-track .symphony-toggle-knob::after {
+    content: '♫';
+    font-size: 16px;
+    color: white;
+    animation: musicBounce 2s ease-in-out infinite;
+}
+
+@keyframes musicBounce {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    25% {
+        transform: translateY(-2px) rotate(-5deg);
+    }
+    75% {
+        transform: translateY(-2px) rotate(5deg);
+    }
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-track .symphony-label-solo {
+    color: rgba(255, 255, 255, 0.3);
+    transform: translateX(-5px);
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-track .symphony-label-symphony {
+    color: rgba(255, 255, 255, 0.9);
+    transform: translateX(5px);
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-track .symphony-status-dot {
+    background: #10b981;
+    opacity: 1;
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.8;
+    }
+}
+
+.symphony-toggle-container input:checked + .symphony-toggle-track .symphony-particles {
+    opacity: 1;
+}
+
+.symphony-toggle-container input:checked ~ .symphony-icon {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    animation: iconSpin 8s linear infinite;
+}
+
+@keyframes iconSpin {
+    0% {
+        transform: scale(1) rotate(0deg);
+    }
+    25% {
+        transform: scale(1.1) rotate(90deg);
+    }
+    50% {
+        transform: scale(1) rotate(180deg);
+    }
+    75% {
+        transform: scale(1.1) rotate(270deg);
+    }
+    100% {
+        transform: scale(1) rotate(360deg);
+    }
+}
+
+/* Ripple effect on click */
+.symphony-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, 
+        rgba(102, 126, 234, 0.3) 0%, 
+        rgba(102, 126, 234, 0) 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.symphony-toggle-container:active .symphony-toggle-track::after {
+    animation: ripple 0.6s ease-out;
+}
+
+@keyframes ripple {
+    0% {
+        width: 0;
+        height: 0;
+        opacity: 1;
+    }
+    100% {
+        width: 200px;
+        height: 200px;
+        opacity: 0;
+    }
+}
+
+/* Loading state */
+.symphony-toggle-container.loading .symphony-toggle-knob {
+    animation: loadingPulse 1s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Accessibility */
+.symphony-toggle-container:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 4px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .symphony-toggle-track,
+    .symphony-toggle-knob,
+    .symphony-icon,
+    .particle {
+        animation: none !important;
+        transition: all 0.3s ease !important;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .symphony-toggle-track {
+        width: 140px;
+    }
+    
+    .symphony-toggle-knob {
+        width: 55px;
+    }
+    
+    .symphony-toggle-container input:checked + .symphony-toggle-track .symphony-toggle-knob {
+        left: calc(100% - 59px);  /* Adjusted for smaller size */
+    }
+    
+    .symphony-icon {
+        right: -35px;
+        font-size: 20px;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .symphony-toggle-track {
+        border-width: 2px;
+    }
+    
+    .symphony-toggle-knob {
+        border: 2px solid currentColor;
+    }
+}
+
+/* Configuration link with matching design */
+.symphony-config-link {
+    margin-left: 1rem;
+    padding: 0.5rem 1rem;
+    background: rgba(102, 126, 234, 0.1);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 16px;
+    color: #a78bfa;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0;
+    transform: translateX(-10px);
+    animation: slideIn 0.6s ease forwards;
+    animation-delay: 0.3s;
+}
+
+@keyframes slideIn {
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.symphony-config-link:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+    color: #c4b5fd;
+}
+
+.symphony-config-link i {
+    font-size: 14px;
+    transition: transform 0.3s ease;
+}
+
+.symphony-config-link:hover i {
+    transform: rotate(90deg);
+}

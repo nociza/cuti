@@ -14,18 +14,15 @@
     overflow: hidden;
 }
 
-/* Page Header - Sticky for easy access */
+/* Page Header - Clean and minimal */
 .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-2xl) var(--space-3xl);
-    background: linear-gradient(180deg, 
-        rgba(10, 15, 20, 0.98) 0%, 
-        rgba(10, 15, 20, 0.95) 90%,
-        rgba(10, 15, 20, 0) 100%);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: var(--space-xl) var(--space-2xl);
+    background: rgba(10, 15, 20, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -33,13 +30,10 @@
 }
 
 .page-title {
-    font-size: 28px;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.5px;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.03em;
 }
 
 .page-subtitle {
@@ -56,24 +50,23 @@
 }
 
 .btn-primary {
-    padding: 12px 24px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 10px 20px;
+    background: #6366f1;
     color: white;
     border: none;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    font-size: 14px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 13px;
     cursor: pointer;
-    transition: all var(--transition-base);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+    background: #5558e3;
+    transform: translateY(-1px);
 }
 
 .btn-primary:active {
@@ -81,29 +74,28 @@
 }
 
 .btn-secondary {
-    padding: 12px 20px;
-    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 16px;
+    background: transparent;
     color: var(--text-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    font-size: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 13px;
     cursor: pointer;
-    transition: all var(--transition-base);
+    transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
     color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .btn-secondary:active {
-    transform: translateY(0);
+    transform: scale(0.98);
 }
 
 /* Search Bar */
@@ -157,28 +149,22 @@
     position: relative;
 }
 
-/* Custom scrollbar for the container */
+/* Custom scrollbar - minimal style */
 .agents-container::-webkit-scrollbar {
-    width: 12px;
+    width: 8px;
 }
 
 .agents-container::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 6px;
+    background: transparent;
 }
 
 .agents-container::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, 
-        rgba(16, 185, 129, 0.3) 0%, 
-        rgba(59, 130, 246, 0.3) 100%);
-    border-radius: 6px;
-    border: 2px solid rgba(10, 15, 20, 0.8);
+    background: rgba(75, 85, 99, 0.3);
+    border-radius: 4px;
 }
 
 .agents-container::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, 
-        rgba(16, 185, 129, 0.5) 0%, 
-        rgba(59, 130, 246, 0.5) 100%);
+    background: rgba(75, 85, 99, 0.5);
 }
 
 /* Masonry Grid with Column Layout */
@@ -251,48 +237,7 @@
     }
 }
 
-/* Agent Card - Optimized for masonry layout */
-.agent-card {
-    background: linear-gradient(135deg, rgba(20, 30, 38, 0.95) 0%, rgba(15, 23, 30, 0.98) 100%);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-lg);
-    padding: var(--space-xl);
-    transition: all var(--transition-base);
-    position: relative;
-    overflow: hidden;
-    break-inside: avoid;
-    margin-bottom: var(--space-2xl);
-    display: inline-block;
-    width: 100%;
-    transform-origin: center top;
-}
-
-.agent-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform var(--transition-base);
-}
-
-.agent-card:hover {
-    transform: scale(1.02) translateY(-2px);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4),
-                0 0 80px rgba(16, 185, 129, 0.1);
-    border-color: rgba(16, 185, 129, 0.3);
-    z-index: 10;
-    position: relative;
-}
-
-.agent-card:hover::before {
-    transform: scaleX(1);
-}
+/* Agent Card styles are now in agent-cards.css for better organization */
 
 .agent-card-header {
     display: flex;
@@ -301,7 +246,10 @@
     margin-bottom: var(--space-md);
     flex-wrap: wrap;
     gap: var(--space-sm);
+    position: relative;
 }
+
+/* State indicator styles moved to agent-cards.css */
 
 .agent-name {
     font-size: 16px;
@@ -325,107 +273,115 @@
     font-weight: 600;
 }
 
-/* Stunning "Created by cuti" badge */
+/* Simplified "Created by cuti" badge */
 .agent-badge-builtin {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     font-size: 11px;
-    padding: 4px 10px;
-    background: linear-gradient(135deg, 
-        rgba(16, 185, 129, 0.15) 0%, 
-        rgba(59, 130, 246, 0.15) 50%,
-        rgba(147, 51, 234, 0.15) 100%);
-    border: 1px solid transparent;
-    background-clip: padding-box;
-    position: relative;
-    border-radius: 12px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    overflow: hidden;
-    animation: shimmerAppear 0.6s ease-out;
+    padding: 3px 8px;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 8px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    color: #a5b4fc;
 }
 
-/* Gradient border effect */
-.agent-badge-builtin::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 12px;
-    padding: 1px;
-    background: linear-gradient(135deg, 
-        rgba(16, 185, 129, 0.8) 0%, 
-        rgba(59, 130, 246, 0.8) 50%,
-        rgba(147, 51, 234, 0.8) 100%);
-    -webkit-mask: 
-        linear-gradient(#fff 0 0) content-box, 
-        linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    animation: gradientRotate 3s linear infinite;
-}
-
-/* Text gradient */
-.agent-badge-builtin span {
-    background: linear-gradient(135deg, 
-        #10b981 0%, 
-        #3b82f6 50%,
-        #9333ea 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    position: relative;
-    z-index: 1;
-}
-
-/* Icon styling */
 .agent-badge-builtin i {
-    color: #fbbf24;
+    color: #a5b4fc;
     font-size: 10px;
-    animation: sparkle 2s ease-in-out infinite;
-    filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.5));
 }
 
-/* Hover effect */
-.agent-card:hover .agent-badge-builtin {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-}
-
-.agent-card:hover .agent-badge-builtin::before {
-    animation-duration: 1.5s;
-}
-
-/* Gemini Badge */
+/* Simplified Gemini Badge */
 .agent-badge-gemini {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     font-size: 11px;
-    padding: 4px 10px;
-    background: linear-gradient(135deg, 
-        rgba(139, 92, 246, 0.15) 0%, 
-        rgba(99, 102, 241, 0.15) 100%);
-    border: 1px solid rgba(139, 92, 246, 0.3);
-    border-radius: 12px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    color: #a78bfa;
+    padding: 3px 8px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 8px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    color: #c4b5fd;
 }
 
 .agent-badge-gemini i {
-    color: #a78bfa;
+    color: #c4b5fd;
     font-size: 10px;
-    filter: drop-shadow(0 0 2px rgba(139, 92, 246, 0.5));
 }
 
-/* Disabled State */
+/* Orchestration Styles - simplified */
+.orchestration-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    border-radius: 8px;
+    margin-top: 0.5rem;
+    font-size: 12px;
+}
+
+.status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #8b5cf6;
+}
+
+.active-count {
+    color: #c4b5fd;
+    font-weight: 500;
+}
+
+/* Removed toggle switch - card is now the toggle */
+/* Removed ripple effects for cleaner interaction */
+
+/* Simplified Active Badge */
+.agent-badge-active {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 3px 8px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    font-weight: 500;
+    color: #a5b4fc;
+}
+
+/* Orchestrated state - subtle indication */
+.agent-card.agent-orchestrated {
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* Text styles for cards */
+.agent-card:not(.agent-active) .agent-name,
+.agent-card:not(.agent-active) .agent-description {
+    opacity: 0.9;
+}
+
+.agent-card.agent-active .agent-name {
+    color: #f3f4f6;
+}
+
+.btn-agent.btn-active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+    color: #a78bfa;
+    border-color: rgba(102, 126, 234, 0.4);
+}
+
+/* Disabled State - Extra dimmed */
 .agent-disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     position: relative;
+    cursor: not-allowed;
+    filter: grayscale(80%);
 }
 
 .agent-disabled::after {
@@ -436,10 +392,15 @@
     right: 0;
     bottom: 0;
     background: linear-gradient(135deg, 
-        rgba(0, 0, 0, 0.2) 0%, 
-        rgba(0, 0, 0, 0.1) 100%);
+        rgba(0, 0, 0, 0.4) 0%, 
+        rgba(0, 0, 0, 0.2) 100%);
     pointer-events: none;
     border-radius: var(--radius-lg);
+}
+
+.agent-disabled:hover {
+    transform: none;
+    opacity: 0.4;
 }
 
 .agent-warning {
@@ -470,38 +431,7 @@
     box-shadow: none !important;
 }
 
-/* Animations */
-@keyframes shimmerAppear {
-    from {
-        opacity: 0;
-        transform: translateX(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes gradientRotate {
-    0% {
-        background-position: 0% 50%;
-    }
-    50% {
-        background-position: 100% 50%;
-    }
-    100% {
-        background-position: 0% 50%;
-    }
-}
-
-@keyframes sparkle {
-    0%, 100% {
-        transform: scale(1) rotate(0deg);
-    }
-    50% {
-        transform: scale(1.2) rotate(180deg);
-    }
-}
+/* Removed excessive animations */
 
 .agent-menu-button {
     background: transparent;
@@ -1039,34 +969,21 @@
     margin: 0 auto;
 }
 
-/* Loading states and animations */
+/* Simple fade-in for cards */
 .agent-card {
-    animation: cardFadeIn 0.4s ease-out;
-    animation-fill-mode: both;
+    animation: cardFadeIn 0.3s ease-out;
 }
 
 @keyframes cardFadeIn {
     from {
         opacity: 0;
-        transform: translateY(20px) scale(0.95);
+        transform: translateY(10px);
     }
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: translateY(0);
     }
 }
-
-/* Stagger animation for cards */
-.agent-card:nth-child(1) { animation-delay: 0.05s; }
-.agent-card:nth-child(2) { animation-delay: 0.1s; }
-.agent-card:nth-child(3) { animation-delay: 0.15s; }
-.agent-card:nth-child(4) { animation-delay: 0.2s; }
-.agent-card:nth-child(5) { animation-delay: 0.25s; }
-.agent-card:nth-child(6) { animation-delay: 0.3s; }
-.agent-card:nth-child(7) { animation-delay: 0.35s; }
-.agent-card:nth-child(8) { animation-delay: 0.4s; }
-.agent-card:nth-child(9) { animation-delay: 0.45s; }
-.agent-card:nth-child(10) { animation-delay: 0.5s; }
 
 /* Gradient overlay for long lists */
 .agents-container::before {
@@ -1081,6 +998,55 @@
         rgba(10, 15, 20, 0) 100%);
     pointer-events: none;
     z-index: 50;
+}
+
+/* Notification Styles */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    transform: translateX(400px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification-success {
+    background: linear-gradient(135deg, 
+        rgba(102, 126, 234, 0.9) 0%, 
+        rgba(118, 75, 162, 0.9) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.notification-info {
+    background: rgba(30, 40, 50, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.notification-error {
+    background: linear-gradient(135deg, 
+        rgba(239, 68, 68, 0.9) 0%, 
+        rgba(185, 28, 28, 0.9) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.notification i {
+    font-size: 18px;
 }
 
 /* Performance optimizations */
@@ -1135,4 +1101,29 @@
 @keyframes bounce {
     0%, 100% { transform: translateX(-50%) translateY(0); }
     50% { transform: translateX(-50%) translateY(-10px); }
+}
+
+/* Removed card activation animation */
+
+/* Ensure proper cursor feedback */
+.agent-card {
+    cursor: pointer;
+}
+
+.agent-card.agent-disabled {
+    cursor: not-allowed;
+}
+
+.agent-card .btn-agent {
+    cursor: pointer;
+}
+
+/* Hover lift effect for cards */
+@media (hover: hover) {
+    .agent-card {
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    opacity 0.3s ease,
+                    filter 0.3s ease;
+    }
 }

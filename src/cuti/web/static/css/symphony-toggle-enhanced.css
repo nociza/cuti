@@ -1,0 +1,463 @@
+/* Symphony Mode Toggle - Enhanced Futuristic Design */
+
+:root {
+    --symphony-primary: #667eea;
+    --symphony-secondary: #764ba2;
+    --symphony-accent: #f093fb;
+    --symphony-glow-primary: rgba(102, 126, 234, 0.6);
+    --symphony-glow-secondary: rgba(118, 75, 162, 0.4);
+    --symphony-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --symphony-gradient-alt: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --solo-gradient: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Main Toggle Container */
+.symphony-mode-toggle-enhanced {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 24px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Toggle Label Container */
+.symphony-toggle-enhanced {
+    position: relative;
+    display: inline-block;
+    width: 200px;
+    height: 48px;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Hidden Checkbox */
+.symphony-toggle-enhanced input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+/* Main Track */
+.symphony-toggle-track {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--solo-gradient);
+    border-radius: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    transition: all 0.6s var(--transition-smooth);
+    box-shadow: 
+        inset 0 2px 8px rgba(0, 0, 0, 0.3),
+        0 0 0 0 transparent;
+}
+
+/* Animated Background Layer */
+.symphony-toggle-track::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(
+        circle at center,
+        transparent 30%,
+        rgba(102, 126, 234, 0.1) 50%,
+        transparent 70%
+    );
+    opacity: 0;
+    animation: none;
+    transition: opacity 0.6s ease;
+}
+
+/* Slider Knob */
+.symphony-toggle-knob {
+    position: absolute;
+    width: 80px;
+    height: 40px;
+    top: 4px;
+    left: 4px;
+    background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+    border-radius: 20px;
+    transition: all 0.6s var(--transition-smooth);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.2),
+        0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* Knob Inner Glow */
+.symphony-toggle-knob::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(
+        circle at center,
+        rgba(102, 126, 234, 0) 0%,
+        rgba(102, 126, 234, 0) 40%,
+        rgba(102, 126, 234, 0.2) 100%
+    );
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+/* Knob Icon Container */
+.symphony-toggle-icon {
+    position: relative;
+    z-index: 2;
+    font-size: 20px;
+    transition: all 0.6s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Solo Icon (default) */
+.symphony-toggle-icon::before {
+    content: '🎵';
+    position: absolute;
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    transition: all 0.6s var(--transition-smooth);
+}
+
+/* Symphony Icon (active) */
+.symphony-toggle-icon::after {
+    content: '🎼';
+    position: absolute;
+    opacity: 0;
+    transform: scale(0.5) rotate(-180deg);
+    transition: all 0.6s var(--transition-smooth);
+}
+
+/* Mode Labels */
+.symphony-mode-labels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    pointer-events: none;
+}
+
+.symphony-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    transition: all 0.6s var(--transition-smooth);
+    position: relative;
+}
+
+.symphony-label-solo {
+    color: rgba(255, 255, 255, 0.8);
+    margin-left: 70px;
+}
+
+.symphony-label-symphony {
+    color: rgba(255, 255, 255, 0.3);
+    margin-right: 10px;
+}
+
+/* Particle Effects Container */
+.symphony-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: 24px;
+}
+
+.particle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: white;
+    border-radius: 50%;
+    opacity: 0;
+}
+
+/* Status Indicator */
+.symphony-status-indicator {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 16px;
+    height: 16px;
+    background: #4b5563;
+    border: 2px solid #1f2937;
+    border-radius: 50%;
+    transition: all 0.6s var(--transition-smooth);
+    z-index: 3;
+}
+
+.symphony-status-indicator::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    background: #9ca3af;
+    border-radius: 50%;
+    transition: all 0.6s ease;
+}
+
+/* Hover States */
+.symphony-toggle-enhanced:hover .symphony-toggle-track {
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.02);
+}
+
+.symphony-toggle-enhanced:hover .symphony-toggle-knob {
+    box-shadow: 
+        0 6px 16px rgba(0, 0, 0, 0.3),
+        0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Active/Checked State */
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track {
+    background: var(--symphony-gradient);
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 
+        inset 0 2px 8px rgba(102, 126, 234, 0.3),
+        0 0 30px rgba(102, 126, 234, 0.4),
+        0 0 60px rgba(118, 75, 162, 0.2);
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track::before {
+    opacity: 1;
+    animation: symphonyPulse 4s ease-in-out infinite;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .symphony-toggle-knob {
+    transform: translateX(112px);
+    background: linear-gradient(145deg, #ffffff 0%, #f8f8ff 100%);
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .symphony-toggle-knob::before {
+    opacity: 1;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .symphony-toggle-icon::before {
+    opacity: 0;
+    transform: scale(0.5) rotate(180deg);
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .symphony-toggle-icon::after {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    animation: iconFloat 3s ease-in-out infinite;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .symphony-label-solo {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .symphony-label-symphony {
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
+}
+
+.symphony-toggle-enhanced input:checked ~ .symphony-status-indicator {
+    background: var(--symphony-gradient);
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+.symphony-toggle-enhanced input:checked ~ .symphony-status-indicator::before {
+    background: white;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+/* Particle Animation for Active State */
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .particle {
+    animation: particleFloat 3s linear infinite;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .particle:nth-child(1) {
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .particle:nth-child(2) {
+    left: 30%;
+    animation-delay: 0.5s;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .particle:nth-child(3) {
+    left: 50%;
+    animation-delay: 1s;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .particle:nth-child(4) {
+    left: 70%;
+    animation-delay: 1.5s;
+}
+
+.symphony-toggle-enhanced input:checked + .symphony-toggle-track .particle:nth-child(5) {
+    left: 90%;
+    animation-delay: 2s;
+}
+
+/* Animations */
+@keyframes symphonyPulse {
+    0%, 100% {
+        transform: rotate(0deg) scale(1);
+        opacity: 0.3;
+    }
+    50% {
+        transform: rotate(180deg) scale(1.5);
+        opacity: 0.6;
+    }
+}
+
+@keyframes iconFloat {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    25% {
+        transform: translateY(-2px) rotate(-5deg);
+    }
+    75% {
+        transform: translateY(2px) rotate(5deg);
+    }
+}
+
+@keyframes statusPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(102, 126, 234, 0);
+    }
+}
+
+@keyframes particleFloat {
+    0% {
+        transform: translateY(48px) translateX(0);
+        opacity: 0;
+    }
+    20% {
+        opacity: 1;
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-10px) translateX(20px);
+        opacity: 0;
+    }
+}
+
+/* Loading State Animation */
+.symphony-toggle-loading .symphony-toggle-knob {
+    animation: loadingSlide 1s ease-in-out infinite;
+}
+
+@keyframes loadingSlide {
+    0%, 100% {
+        transform: translateX(20px);
+    }
+    50% {
+        transform: translateX(92px);
+    }
+}
+
+/* Accessibility Focus States */
+.symphony-toggle-enhanced:focus-within .symphony-toggle-track {
+    outline: 2px solid rgba(102, 126, 234, 0.5);
+    outline-offset: 4px;
+}
+
+/* Disabled State */
+.symphony-toggle-enhanced input:disabled + .symphony-toggle-track {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.symphony-toggle-enhanced input:disabled + .symphony-toggle-track .symphony-toggle-knob {
+    animation: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .symphony-toggle-enhanced {
+        width: 160px;
+        height: 40px;
+    }
+    
+    .symphony-toggle-track {
+        height: 40px;
+    }
+    
+    .symphony-toggle-knob {
+        width: 64px;
+        height: 32px;
+        top: 4px;
+        left: 4px;
+    }
+    
+    .symphony-toggle-enhanced input:checked + .symphony-toggle-track .symphony-toggle-knob {
+        transform: translateX(88px);
+    }
+    
+    .symphony-label {
+        font-size: 10px;
+    }
+    
+    .symphony-label-solo {
+        margin-left: 56px;
+    }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .symphony-toggle-track {
+        border-width: 3px;
+    }
+    
+    .symphony-toggle-knob {
+        border: 2px solid currentColor;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .symphony-toggle-track,
+    .symphony-toggle-knob,
+    .symphony-toggle-icon::before,
+    .symphony-toggle-icon::after,
+    .symphony-label,
+    .symphony-status-indicator {
+        transition-duration: 0.01ms;
+    }
+    
+    .symphony-toggle-track::before,
+    .symphony-toggle-icon::after,
+    .particle,
+    .symphony-status-indicator,
+    .symphony-toggle-loading .symphony-toggle-knob {
+        animation: none;
+    }
+}

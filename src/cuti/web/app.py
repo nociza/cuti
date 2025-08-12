@@ -23,8 +23,9 @@ from ..services.claude_settings_manager import ClaudeSettingsManager
 from ..services.claude_logs_reader import ClaudeLogsReader
 from ..services.workspace_manager import WorkspaceManager
 from ..services.log_sync import LogSyncService
+from ..services.claude_orchestration import ClaudeOrchestrationManager
 from .api.queue import queue_router
-from .api.agents import agents_router
+from .api.agents import agents_router, get_orchestration_manager
 from .api.monitoring import monitoring_router
 from .api.websocket import websocket_router
 from .api.claude_code_agents import claude_code_agents_router
@@ -107,6 +108,9 @@ def create_app(
     if not (Path(working_directory or Path.cwd()) / ".claude").exists():
         claude_settings_manager.initialize_project_settings()
     
+    # Initialize orchestration manager
+    orchestration_manager = ClaudeOrchestrationManager(Path(working_directory or Path.cwd()))
+    
     # Store managers in app state
     app.state.queue_manager = queue_manager
     app.state.claude_interface = claude_interface
@@ -121,6 +125,7 @@ def create_app(
     app.state.claude_logs_reader = claude_logs_reader
     app.state.workspace_manager = workspace_manager
     app.state.log_sync_service = log_sync_service
+    app.state.orchestration_manager = orchestration_manager
     app.state.storage_dir = workspace_storage
     app.state.working_directory = Path(working_directory or Path.cwd()).resolve()
     
@@ -151,6 +156,13 @@ def create_app(
     # Start queue processor in the background on app startup
     @app.on_event("startup")
     async def _start_background_processor():
+        # Initialize orchestration manager
+        await orchestration_manager.initialize()
+        
+        # Set the global orchestration manager for the API
+        from .api import agents as agents_api
+        agents_api.orchestration_manager = orchestration_manager
+        
         if not queue_manager:
             return
             

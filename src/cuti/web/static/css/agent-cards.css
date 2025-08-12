@@ -1,0 +1,181 @@
+/* Minimalistic Agent Card Design - Clean and Professional */
+
+/* Base Card Styles */
+.agent-card {
+    position: relative;
+    background: rgba(18, 24, 30, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 1.25rem;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    overflow: hidden;
+    break-inside: avoid;
+    margin-bottom: 1rem;
+    display: inline-block;
+    width: 100%;
+    transform-origin: center;
+    
+    /* Inactive/default state - subtle dimming */
+    opacity: 0.85;
+}
+
+/* Remove the checkbox toggle completely */
+.agent-toggle-switch {
+    display: none !important;
+}
+
+/* State indicator - minimal dot */
+.agent-state-indicator {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+/* Inactive state indicator */
+.agent-card:not(.agent-active) .agent-state-indicator {
+    background: rgba(156, 163, 175, 0.4);
+    box-shadow: 0 0 0 4px rgba(156, 163, 175, 0.1);
+}
+
+/* Active Card State - Clean and Elevated */
+.agent-card.agent-active {
+    opacity: 1;
+    background: rgba(24, 32, 40, 0.8);
+    border-color: rgba(99, 102, 241, 0.3);
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(99, 102, 241, 0.15) inset;
+}
+
+/* Active state indicator - simple accent */
+.agent-card.agent-active .agent-state-indicator {
+    background: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+}
+
+/* Orchestrated cards - subtle distinction */
+.agent-card.agent-orchestrated {
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.agent-card.agent-orchestrated .agent-state-indicator {
+    background: #8b5cf6;
+}
+
+/* Hover effects - subtle elevation */
+.agent-card:not(.agent-active):hover {
+    opacity: 1;
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.agent-card.agent-active:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 
+        0 8px 20px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(99, 102, 241, 0.2) inset;
+}
+
+/* Click effect - subtle press */
+.agent-card:active {
+    transform: scale(0.99);
+    transition: transform 0.1s;
+}
+
+/* Text styles for active cards - subtle enhancement */
+.agent-card.agent-active .agent-name {
+    color: #f3f4f6;
+}
+
+.agent-card.agent-active .agent-description {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.agent-card.agent-active .capability-tag {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
+}
+
+/* Active badge - clean style */
+.agent-card.agent-active .agent-badge-active {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* Prevent action buttons from triggering card toggle */
+.agent-actions-row button {
+    position: relative;
+    z-index: 20;
+}
+
+/* Disabled state - clear indication */
+.agent-card.agent-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    background: rgba(15, 20, 25, 0.4);
+}
+
+/* Loading state - simple spinner */
+.agent-card.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.agent-card.loading .agent-state-indicator {
+    background: transparent;
+    border: 2px solid rgba(156, 163, 175, 0.2);
+    border-top-color: #6366f1;
+    width: 12px;
+    height: 12px;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .agent-card {
+        padding: 1rem;
+    }
+    
+    .agent-state-indicator {
+        width: 6px;
+        height: 6px;
+        top: 1rem;
+        right: 1rem;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .agent-card.agent-active {
+        border: 1px solid #6366f1;
+    }
+    
+    .agent-card:not(.agent-active) {
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .agent-card,
+    .agent-state-indicator {
+        animation: none !important;
+        transition: opacity 0.2s ease !important;
+    }
+}

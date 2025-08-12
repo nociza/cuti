@@ -67,3 +67,17 @@ async def statistics_dashboard(request: Request):
         "working_directory": str(request.app.state.working_directory),
         "nav_items": nav_items
     })
+
+
+@main_router.get("/orchestration", response_class=HTMLResponse)
+async def orchestration_dashboard(request: Request):
+    """Agent orchestration control page."""
+    templates = request.app.state.templates
+    
+    nav_items = get_nav_items("orchestration")
+    
+    return templates.TemplateResponse("agents_orchestration.html", {
+        "request": request,
+        "working_directory": str(request.app.state.working_directory),
+        "nav_items": nav_items
+    })

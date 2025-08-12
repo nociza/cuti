@@ -3,7 +3,8 @@
 {% block title %}cuti - Chat Interface{% endblock %}
 
 {% block head %}
-<!-- Any additional head elements for chat page -->
+<!-- Symphony Mode Toggle Styles -->
+<link rel="stylesheet" href="/static/css/symphony-toggle.css">
 {% endblock %}
 
 {% set body_class = "" %}
@@ -38,10 +39,33 @@
             </button>
             <span class="tab-suffix">]─</span>
             <span class="tab-line"></span>
+            
+            <!-- Symphony Mode Toggle -->
+            <div class="symphony-mode-toggle">
+                <label class="symphony-toggle-container" title="Enable Symphony Mode - Orchestrate multiple AI agents">
+                    <input type="checkbox" id="symphonyModeToggle" @change="toggleSymphonyMode($event)">
+                    <div class="symphony-toggle-track">
+                        <div class="symphony-toggle-knob"></div>
+                        <span class="symphony-label-solo">SOLO</span>
+                        <span class="symphony-label-symphony">SYMPHONY</span>
+                        <div class="symphony-status-dot"></div>
+                        <div class="symphony-particles">
+                            <span class="particle"></span>
+                            <span class="particle"></span>
+                            <span class="particle"></span>
+                            <span class="particle"></span>
+                        </div>
+                    </div>
+                    <span class="symphony-icon">🎼</span>
+                </label>
+            </div>
         </div>
         <div class="terminal-tabs-indicator">
-            <span class="indicator-text" x-text="activeTab === 'chat' ? '> Terminal Mode' : activeTab === 'history' ? '> Command History' : '> System Settings'"></span>
+            <span class="indicator-text" x-text="activeTab === 'chat' ? (symphonyMode ? '> Symphony Mode Active' : '> Terminal Mode') : activeTab === 'history' ? '> Command History' : '> System Settings'"></span>
             <span class="indicator-blink">_</span>
+            <a x-show="symphonyMode" href="/orchestration" class="symphony-config-link" title="Configure Agent Orchestra">
+                <i class="fas fa-cog"></i> Configure Orchestra
+            </a>
         </div>
     </div>
     
