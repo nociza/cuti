@@ -20,7 +20,7 @@ license = "MIT"
 name = "cuti"
 readme = "README.md"
 requires-python = ">=3.9"
-version = "0.1.0"
+version = "0.1.1"
 
 dependencies = [
     "aiofiles>=23.0.0",
@@ -49,7 +49,7 @@ dev = [
 ]
 
 [project.scripts]
-cuti = "cuti.cli.app:app"
+cuti     = "cuti.cli.app:app"
 cuti-web = "cuti.web.app:main"
 
 [tool.hatch.build.targets.wheel]

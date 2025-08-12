@@ -3,6 +3,7 @@ Main CLI application using Typer.
 """
 
 from typing import Optional
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -13,6 +14,10 @@ from ..services.history import PromptHistoryManager
 from .commands.queue import queue_app
 from .commands.alias import alias_app
 from .commands.agent import agent_app
+try:
+    from .commands.devcontainer import app as devcontainer_app
+except ImportError:
+    devcontainer_app = None
 
 app = typer.Typer(
     name="cuti",
@@ -66,6 +71,8 @@ def get_history_manager(storage_dir: str = "~/.cuti") -> PromptHistoryManager:
 app.add_typer(queue_app, name="queue", help="Queue management commands")
 app.add_typer(alias_app, name="alias", help="Alias management commands")  
 app.add_typer(agent_app, name="agent", help="Agent system commands")
+if devcontainer_app:
+    app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
 
 # Add top-level commands for convenience
 from .commands.queue import start_queue, add_prompt, show_status
@@ -73,6 +80,60 @@ from .commands.queue import start_queue, add_prompt, show_status
 app.command("start")(start_queue)
 app.command("add")(add_prompt)
 app.command("status")(show_status)
+
+
+@app.command()
+def container(
+    init: bool = typer.Option(False, "--init", help="Initialize devcontainer"),
+    command: Optional[str] = typer.Argument(None, help="Command to run in container"),
+    skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-setup")
+):
+    """Run cuti in a dev container with automatic setup."""
+    from ..services.devcontainer import DevContainerService, is_running_in_container
+    
+    if is_running_in_container():
+        console.print("[yellow]Already running in a container![/yellow]")
+        if command:
+            import subprocess
+            subprocess.run(command, shell=True)
+        return
+    
+    service = DevContainerService()
+    
+    # Initialize if requested or if no devcontainer exists
+    if init or not (Path.cwd() / ".devcontainer").exists():
+        console.print("[cyan]Initializing dev container...[/cyan]")
+        if not service.generate_devcontainer():
+            console.print("[red]Failed to initialize dev container[/red]")
+            raise typer.Exit(1)
+    
+    # Check Docker availability
+    if not service.docker_available:
+        if service.colima_available and not skip_colima:
+            console.print("[cyan]Docker not running, will start Colima...[/cyan]")
+            console.print("[dim]This may take 1-2 minutes on first start[/dim]")
+            if not service.setup_colima():
+                console.print("[red]Failed to start Colima automatically[/red]")
+                console.print("\n[yellow]Please try one of these options:[/yellow]")
+                console.print("1. Start Colima manually: [cyan]colima start[/cyan]")
+                console.print("2. Start Docker Desktop")
+                console.print("3. Run with --skip-colima flag if Docker is running")
+                raise typer.Exit(1)
+        else:
+            console.print("[red]Docker is not available[/red]")
+            if not service.colima_available:
+                console.print("Install Colima: [cyan]brew install colima[/cyan]")
+            console.print("Or start Docker Desktop")
+            raise typer.Exit(1)
+    
+    # Run in container
+    console.print("[green]Starting dev container...[/green]")
+    # If no command provided, just start an interactive shell
+    exit_code = service.run_in_container(command)
+    
+    if exit_code != 0:
+        console.print(f"[red]Container exited with code {exit_code}[/red]")
+        raise typer.Exit(exit_code)
 
 
 @app.command()
