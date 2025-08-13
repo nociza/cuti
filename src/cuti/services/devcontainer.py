@@ -439,6 +439,68 @@ ENV PATH="/root/.cargo/bin:${PATH}"
         
         return config
     
+    def _generate_standalone_dockerfile(self) -> str:
+        """Generate a standalone Dockerfile for cuti container that works from any directory."""
+        # Get the cuti installation path
+        import cuti
+        import sys
+        cuti_path = Path(cuti.__file__).parent.parent  # Get to the src directory
+        
+        return '''FROM python:3.11-bullseye
+
+# Install system dependencies
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \\
+    && apt-get -y install --no-install-recommends \\
+    curl ca-certificates git sudo zsh wget build-essential \\
+    procps lsb-release locales fontconfig \\
+    software-properties-common gnupg2 jq ripgrep fd-find bat \\
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Generate locale
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
+ENV LANG=en_US.UTF-8
+
+# Install Node.js for Claude CLI
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
+    && apt-get install -y nodejs && npm install -g npm@latest
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Install Claude CLI
+RUN npm install -g @anthropic-ai/claude-code
+
+# Copy cuti source
+COPY cuti /tmp/cuti-source
+
+# Install cuti and dependencies using uv
+RUN cd /tmp/cuti-source && \\
+    uv pip install --system pyyaml rich 'typer[all]' click fastapi uvicorn httpx watchdog aiofiles python-multipart \\
+    requests jinja2 psutil websockets pydantic-settings claude-monitor && \\
+    uv pip install --system -e . && \\
+    which cuti || (echo '#!/usr/bin/env python3' > /usr/local/bin/cuti && \\
+    echo 'from cuti.cli.app import app' >> /usr/local/bin/cuti && \\
+    echo 'if __name__ == "__main__": app()' >> /usr/local/bin/cuti && \\
+    chmod +x /usr/local/bin/cuti)
+
+# Install oh-my-zsh
+RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
+    && echo 'export PATH="/root/.local/bin:/usr/local/bin:$PATH"' >> ~/.zshrc \\
+    && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
+    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> ~/.zshrc \\
+    && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
+    && echo 'echo "   Current directory: $(pwd)"' >> ~/.zshrc \\
+    && echo 'echo "   • cuti web        - Start web interface"' >> ~/.zshrc \\
+    && echo 'echo "   • cuti cli        - Start CLI"' >> ~/.zshrc \\
+    && echo 'echo "   • cuti agent list - List agents"' >> ~/.zshrc \\
+    && echo 'echo ""' >> ~/.zshrc
+
+WORKDIR /workspace
+SHELL ["/bin/zsh", "-c"]
+CMD ["/bin/zsh"]
+'''
+    
     def _create_init_script(self):
         """Create initialization script for the container."""
         init_script = '''#!/bin/bash
@@ -497,32 +559,94 @@ echo "✅ Dev container initialization complete!"
             print("❌ Docker is not available. Please start Docker or Colima first.")
             return 1
         
-        if not self.devcontainer_dir.exists():
-            print("📦 No dev container found. Generating one...")
-            if not self.generate_devcontainer():
-                return 1
+        # Always use the pre-built cuti-dev-cuti image
+        container_image = "cuti-dev-cuti"
         
-        # Build the container
-        print("🔨 Building dev container...")
-        # Use project root as context if this is the cuti project itself
-        if (self.working_dir / "src" / "cuti").exists():
-            build_context = str(self.working_dir)
-            dockerfile_path = f"{self.devcontainer_dir}/Dockerfile"
-        else:
-            build_context = "."
-            dockerfile_path = "Dockerfile"
-        
-        build_result = subprocess.run(
-            ["docker", "build", "-t", f"cuti-dev-{self.working_dir.name}", 
-             "-f", dockerfile_path, build_context],
-            cwd=self.devcontainer_dir if not (self.working_dir / "src" / "cuti").exists() else self.working_dir,
+        # Check if the cuti container image exists
+        check_image = subprocess.run(
+            ["docker", "images", "-q", container_image],
             capture_output=True,
             text=True
         )
         
-        if build_result.returncode != 0:
-            print(f"❌ Failed to build container: {build_result.stderr}")
-            return 1
+        if not check_image.stdout.strip():
+            print("🔨 Building cuti dev container (one-time setup)...")
+            print("This will take a few minutes on first run...")
+            
+            # Get the cuti installation directory
+            import cuti
+            cuti_module_path = Path(cuti.__file__).parent  # cuti module directory
+            
+            # Check if we're in a development environment (editable install)
+            cuti_src_dir = cuti_module_path.parent.parent  # Try to get to project root
+            dockerfile_path = cuti_src_dir / ".devcontainer" / "Dockerfile"
+            
+            if dockerfile_path.exists() and (cuti_src_dir / "pyproject.toml").exists():
+                # We have the full source - use it
+                print(f"Building from source at {cuti_src_dir}")
+                build_result = subprocess.run(
+                    ["docker", "build", "-t", container_image, "-f", str(dockerfile_path), str(cuti_src_dir)],
+                    capture_output=True,
+                    text=True
+                )
+            else:
+                # Use the pre-built image from Docker Hub or build minimal
+                print("Building minimal container...")
+                
+                # First, try to pull from registry (if published)
+                pull_result = subprocess.run(
+                    ["docker", "pull", "nociza/cuti:latest"],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if pull_result.returncode == 0:
+                    # Tag it as our local image
+                    subprocess.run(
+                        ["docker", "tag", "nociza/cuti:latest", container_image],
+                        capture_output=True
+                    )
+                    build_result = subprocess.CompletedProcess([], 0)  # Success
+                else:
+                    # Build a minimal container
+                    import tempfile
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        temp_dockerfile = Path(tmpdir) / "Dockerfile"
+                        
+                        # Write a minimal Dockerfile
+                        minimal_dockerfile = """FROM python:3.11-bullseye
+RUN apt-get update && apt-get install -y curl git zsh wget && apt-get clean
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+RUN uv pip install --system pyyaml rich typer click fastapi uvicorn httpx requests
+RUN echo '#!/usr/bin/env python3' > /usr/local/bin/cuti-placeholder && \
+    echo 'print("⚠️  cuti is not installed in this container")' >> /usr/local/bin/cuti-placeholder && \
+    echo 'print("Please rebuild the container from the cuti source directory")' >> /usr/local/bin/cuti-placeholder && \
+    chmod +x /usr/local/bin/cuti-placeholder && \
+    ln -s /usr/local/bin/cuti-placeholder /usr/local/bin/cuti
+WORKDIR /workspace
+CMD ["/bin/bash"]
+"""
+                        temp_dockerfile.write_text(minimal_dockerfile)
+                        
+                        build_result = subprocess.run(
+                            ["docker", "build", "-t", container_image, "-f", str(temp_dockerfile), tmpdir],
+                            capture_output=True,
+                            text=True
+                        )
+            
+            if build_result.returncode != 0:
+                print(f"❌ Failed to build container: {build_result.stderr}")
+                print("\nTo fix this:")
+                print("1. Navigate to the cuti source directory:")
+                print("   cd ~/Documents/Projects/Personal\\ Projects/cuti")
+                print("2. Build the container:")
+                print("   docker build -t cuti-dev-cuti -f .devcontainer/Dockerfile .")
+                print("3. Then run 'cuti container' from any directory")
+                return 1
+            
+            print("✅ Container image built successfully")
+        
         
         # Run the container
         print("🚀 Starting dev container...")
@@ -533,14 +657,14 @@ echo "✅ Dev container initialization complete!"
             "-it",
             "--privileged",
             "--network", "host",  # Allow network access for cuti web
-            "-v", f"{self.working_dir}:/workspace",
+            "-v", f"{Path.cwd()}:/workspace",  # Mount current directory as workspace
             "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude",
             "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti-global",
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             "--env", "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
-            "--env", "PATH=/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
-            f"cuti-dev-{self.working_dir.name}"
+            "--env", "PATH=/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+            container_image
         ]
         
         if command:
