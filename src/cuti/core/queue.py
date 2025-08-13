@@ -112,9 +112,26 @@ class QueueProcessor:
                 p for p in self.state.prompts if p.status == PromptStatus.RATE_LIMITED
             ]
             if rate_limited_prompts:
-                print(
-                    f"Waiting for rate limit reset ({len(rate_limited_prompts)} prompts rate limited)"
-                )
+                # Find the earliest reset time
+                earliest_reset = None
+                for prompt in rate_limited_prompts:
+                    if prompt.reset_time:
+                        if earliest_reset is None or prompt.reset_time < earliest_reset:
+                            earliest_reset = prompt.reset_time
+                
+                if earliest_reset:
+                    wait_seconds = max(0, (earliest_reset - datetime.now()).total_seconds())
+                    if wait_seconds > 0:
+                        reset_time_str = earliest_reset.strftime("%I:%M %p")
+                        print(f"⏳ Rate limited. Next retry at {reset_time_str} ({wait_seconds/60:.1f} minutes)")
+                        
+                        # Use a shorter check interval when waiting for rate limit reset
+                        # Check every minute or at reset time, whichever is sooner
+                        self.check_interval = min(60, max(1, wait_seconds))
+                    else:
+                        print(f"Rate limit should have reset, checking prompts...")
+                else:
+                    print(f"Waiting for rate limit reset ({len(rate_limited_prompts)} prompts rate limited)")
             else:
                 print("No prompts in queue")
 
@@ -136,12 +153,22 @@ class QueueProcessor:
 
         for prompt in self.state.prompts:
             if prompt.status == PromptStatus.RATE_LIMITED:
-                # Check if enough time has passed since last rate limit (5+ minutes)
-                if (
+                # If we have a specific reset time from the rate limit info, use that
+                if prompt.reset_time:
+                    if current_time >= prompt.reset_time:
+                        if prompt.can_retry():
+                            prompt.status = PromptStatus.QUEUED
+                            prompt.add_log(f"Retrying after rate limit reset at {prompt.reset_time}")
+                            print(f"✓ Prompt {prompt.id} ready for retry after rate limit reset")
+                        else:
+                            prompt.status = PromptStatus.FAILED
+                            prompt.add_log(f"Max retries ({prompt.max_retries}) exceeded")
+                            print(f"✗ Prompt {prompt.id} failed - max retries exceeded")
+                # Fallback to time-based check (5+ minutes)
+                elif (
                     prompt.rate_limited_at
                     and current_time >= prompt.rate_limited_at + timedelta(minutes=5)
                 ):
-
                     if prompt.can_retry():
                         prompt.status = PromptStatus.QUEUED
                         prompt.add_log(f"Retrying after rate limit cooldown")
@@ -155,13 +182,31 @@ class QueueProcessor:
         """Execute a single prompt."""
         prompt.status = PromptStatus.EXECUTING
         prompt.last_executed = datetime.now()
-        prompt.add_log(
-            f"Started execution (attempt {prompt.retry_count + 1}/{prompt.max_retries})"
-        )
+        
+        # Check if this is a retry after rate limit
+        is_rate_limit_retry = (prompt.retry_count > 0 and 
+                               prompt.rate_limited_at is not None and 
+                               prompt.reset_time is not None)
+        
+        if is_rate_limit_retry:
+            # Append "continue" to the prompt for rate limit retries
+            original_content = prompt.content
+            prompt.content = "continue"
+            prompt.add_log(
+                f"Retrying with 'continue' after rate limit (attempt {prompt.retry_count + 1}/{prompt.max_retries})"
+            )
+        else:
+            prompt.add_log(
+                f"Started execution (attempt {prompt.retry_count + 1}/{prompt.max_retries})"
+            )
 
         self.storage.save_queue_state(self.state)
 
         result = self.claude_interface.execute_prompt(prompt)
+        
+        # Restore original content if it was modified
+        if is_rate_limit_retry:
+            prompt.content = original_content
 
         self._process_execution_result(prompt, result)
 
@@ -186,13 +231,28 @@ class QueueProcessor:
             prompt.rate_limited_at = datetime.now()
             prompt.retry_count += 1
 
-            prompt.add_log(f"{execution_summary} - RATE LIMITED")
+            # Store the reset time if available
+            if result.rate_limit_info and result.rate_limit_info.reset_time:
+                prompt.reset_time = result.rate_limit_info.reset_time
+                reset_time_str = result.rate_limit_info.reset_time.strftime("%I:%M %p")
+                wait_time = (result.rate_limit_info.reset_time - datetime.now()).total_seconds()
+                
+                prompt.add_log(f"{execution_summary} - RATE LIMITED (resets at {reset_time_str})")
+                print(f"⚠ Prompt {prompt.id} rate limited. Will retry at {reset_time_str} ({wait_time/60:.1f} minutes)")
+                
+                # Automatically send "continue" after rate limit reset
+                if wait_time > 0:
+                    print(f"📅 Scheduling automatic retry after rate limit reset...")
+                    prompt.add_log(f"Scheduled for automatic retry at {reset_time_str}")
+            else:
+                prompt.add_log(f"{execution_summary} - RATE LIMITED")
+                print(f"⚠ Prompt {prompt.id} rate limited, will retry later")
+                
             if result.rate_limit_info and result.rate_limit_info.limit_message:
                 prompt.add_log(f"Message: {result.rate_limit_info.limit_message}")
 
             if not was_already_rate_limited and self.state is not None:
                 self.state.rate_limited_count += 1
-            print(f"⚠ Prompt {prompt.id} rate limited, will retry later")
 
         else:
             prompt.retry_count += 1

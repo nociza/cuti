@@ -33,6 +33,7 @@ cuti status
 
 - Multi-agent orchestration (Claude, Gemini) with simple routing
 - Command queue with prompt aliases and history
+- Automatic rate limit handling with smart retry after reset
 - Web UI (FastAPI) for status, agents, and history
 - Real-time usage monitoring via claude-monitor
 - Per-project workspace under `.cuti/`

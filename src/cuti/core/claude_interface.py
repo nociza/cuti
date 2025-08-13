@@ -145,13 +145,60 @@ class ClaudeCodeInterface:
         """Extract reset time from Claude's limit message."""
         try:
             import re
+            from zoneinfo import ZoneInfo
 
+            # Pattern 1: "Your limit will reset at 9pm (America/New_York)"
+            pattern_reset = r"limit will reset at (\d{1,2}(?::\d{2})?)\s*([ap]m)\s*\(([^)]+)\)"
+            match_reset = re.search(pattern_reset, output, re.IGNORECASE)
+            if match_reset:
+                time_str = match_reset.group(1)
+                am_pm = match_reset.group(2).lower()
+                timezone_str = match_reset.group(3)
+                
+                # Parse the time
+                if ':' in time_str:
+                    hour, minute = map(int, time_str.split(':'))
+                else:
+                    hour = int(time_str)
+                    minute = 0
+                
+                # Convert to 24-hour format
+                if am_pm == 'pm' and hour != 12:
+                    hour += 12
+                elif am_pm == 'am' and hour == 12:
+                    hour = 0
+                
+                # Get current time in the specified timezone
+                try:
+                    tz = ZoneInfo(timezone_str)
+                    now_tz = datetime.now(tz)
+                    
+                    # Create reset time for today
+                    reset_time = now_tz.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                    
+                    # If reset time is in the past, it must be tomorrow
+                    if reset_time <= now_tz:
+                        reset_time += timedelta(days=1)
+                    
+                    # Convert to local timezone
+                    return reset_time.astimezone()
+                except Exception:
+                    # Fallback: assume EST/EDT
+                    from datetime import timezone
+                    now = datetime.now()
+                    reset_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                    if reset_time <= now:
+                        reset_time += timedelta(days=1)
+                    return reset_time
+
+            # Pattern 2: Unix timestamp format
             pattern1 = r"usage limit reached\|(\d+)"
             match1 = re.search(pattern1, output, re.IGNORECASE)
             if match1:
                 timestamp = int(match1.group(1))
                 return datetime.fromtimestamp(timestamp)
 
+            # Pattern 3: ISO format timestamps
             pattern2 = (
                 r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)"
             )
