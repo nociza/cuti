@@ -17,6 +17,8 @@ from ...core.models import QueuedPrompt
 from ...services.queue_service import QueueManager
 from ...services.aliases import PromptAliasManager
 from ...services.history import PromptHistoryManager
+from ...services.todo_service import TodoService
+from ...core.todo_models import TodoStatus
 
 queue_app = typer.Typer(help="Queue management commands")
 console = Console()
@@ -32,7 +34,7 @@ def get_managers(storage_dir: str):
 
 @queue_app.command("start")
 def start_queue(
-    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
+    storage_dir: str = typer.Option(".cuti", help="Storage directory"),
     claude_command: str = typer.Option("claude", help="Claude CLI command"),
     check_interval: int = typer.Option(30, help="Check interval in seconds"),
     timeout: int = typer.Option(3600, help="Command timeout in seconds"),
@@ -60,7 +62,7 @@ def add_prompt(
     context_files: List[str] = typer.Option([], "-f", "--context-files", help="Context files"),
     max_retries: int = typer.Option(3, "-r", "--max-retries", help="Maximum retry attempts"),
     estimated_tokens: Optional[int] = typer.Option(None, "-t", "--estimated-tokens", help="Estimated tokens"),
-    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
+    storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ):
     """Add a prompt to the queue (supports aliases)."""
     # Use current directory if not specified
@@ -101,7 +103,7 @@ def add_prompt(
 def create_template(
     filename: str = typer.Argument(..., help="Template filename"),
     priority: int = typer.Option(0, "-p", "--priority", help="Default priority"),
-    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
+    storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ):
     """Create a prompt template file."""
     manager, _, _ = get_managers(storage_dir)
@@ -114,7 +116,7 @@ def create_template(
 def show_status(
     detailed: bool = typer.Option(False, "-d", "--detailed", help="Show detailed info"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
-    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
+    storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ):
     """Show queue status."""
     manager, _, _ = get_managers(storage_dir)
@@ -180,7 +182,7 @@ def show_status(
 @queue_app.command("remove")
 def remove_prompt(
     prompt_id: str = typer.Argument(..., help="Prompt ID to remove"),
-    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
+    storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ):
     """Remove/cancel a prompt from the queue."""
     manager, _, _ = get_managers(storage_dir)
@@ -196,7 +198,7 @@ def remove_prompt(
 @queue_app.command("list")
 def list_prompts(
     status_filter: Optional[str] = typer.Option(None, "-s", "--status", help="Filter by status"),
-    storage_dir: str = typer.Option("~/.cuti", help="Storage directory"),
+    storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ):
     """List all prompts in the queue."""
     manager, _, _ = get_managers(storage_dir)
@@ -242,3 +244,61 @@ def list_prompts(
         )
     
     console.print(table)
+
+
+@queue_app.command("from-todo")
+def add_from_todo(
+    todo_id: Optional[str] = typer.Argument(None, help="Todo ID to convert to prompt"),
+    all_pending: bool = typer.Option(False, "--all-pending", help="Add all pending todos"),
+    priority: int = typer.Option(0, "-p", "--priority", help="Priority for prompts"),
+    storage_dir: str = typer.Option(".cuti", help="Storage directory"),  # Changed default
+):
+    """Create queue prompts from todo items."""
+    manager, _, _ = get_managers(storage_dir)
+    todo_service = TodoService(storage_dir)
+    
+    todos_to_process = []
+    
+    if all_pending:
+        # Get all pending todos
+        todos_to_process = todo_service.get_todos_by_status(TodoStatus.PENDING)
+        if not todos_to_process:
+            rprint("[yellow]No pending todos found[/yellow]")
+            return
+    elif todo_id:
+        # Get specific todo
+        todo = todo_service.get_todo(todo_id)
+        if not todo:
+            rprint(f"[red]Todo {todo_id} not found[/red]")
+            raise typer.Exit(1)
+        todos_to_process = [todo]
+    else:
+        rprint("[yellow]Specify a todo ID or use --all-pending[/yellow]")
+        raise typer.Exit(1)
+    
+    # Create prompts from todos
+    added_count = 0
+    for todo in todos_to_process:
+        # Create a prompt that asks Claude to work on this todo
+        prompt_content = f"Work on this task: {todo.content}"
+        
+        # Add context if todo has metadata
+        if todo.metadata.get("context"):
+            prompt_content += f"\n\nContext: {todo.metadata['context']}"
+        
+        # QueuedPrompt doesn't have a metadata field by default, just add the info to content
+        queued_prompt = QueuedPrompt(
+            content=prompt_content,
+            priority=priority
+        )
+        
+        if manager.add_prompt(queued_prompt):
+            # Mark todo as in progress
+            todo_service.update_todo(todo.id, {'status': TodoStatus.IN_PROGRESS})
+            added_count += 1
+            rprint(f"[green]✓[/green] Added prompt for todo: {todo.id[:8]}... {todo.content[:50]}")
+        else:
+            rprint(f"[red]✗[/red] Failed to add prompt for todo: {todo.id}")
+    
+    if added_count > 0:
+        rprint(f"\n[green]Added {added_count} prompt(s) to queue from todos[/green]")

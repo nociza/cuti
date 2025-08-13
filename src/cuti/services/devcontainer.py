@@ -69,12 +69,38 @@ RUN groupadd --gid $USER_GID $USERNAME \\
 
 # Install uv for Python package management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Install Claude Code CLI with permissions flag
 RUN npm install -g @anthropic-ai/claude-code \\
     && echo '#!/bin/bash\\nclaude-code --dangerously-skip-permissions "$@"' > /usr/local/bin/claude \\
     && chmod +x /usr/local/bin/claude
+
+# Create startup script to handle Claude auth
+RUN echo '#!/bin/bash' > /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Set up Claude config dir' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Copy .claude.json if available' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'if [ -f /host/.claude.json ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    cp /host/.claude.json /root/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    cp /host/.claude.json /home/cuti/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    chown cuti:cuti /home/cuti/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Test Claude auth' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'CLAUDE_CONFIG_DIR=/host/.claude claude-code --dangerously-skip-permissions --version > /dev/null 2>&1 && echo "✅ Claude authenticated" || echo "⚠️  Claude not authenticated"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && chmod +x /usr/local/bin/setup-claude-auth.sh
+
+# Create entrypoint script that runs auth setup
+RUN echo '#!/bin/bash' > /entrypoint.sh \\
+    && echo '# Run Claude auth setup as root' >> /entrypoint.sh \\
+    && echo 'if [ "$(id -u)" = "0" ]; then' >> /entrypoint.sh \\
+    && echo '    /usr/local/bin/setup-claude-auth.sh' >> /entrypoint.sh \\
+    && echo 'else' >> /entrypoint.sh \\
+    && echo '    sudo /usr/local/bin/setup-claude-auth.sh' >> /entrypoint.sh \\
+    && echo 'fi' >> /entrypoint.sh \\
+    && echo '# Execute the command' >> /entrypoint.sh \\
+    && echo 'exec "$@"' >> /entrypoint.sh \\
+    && chmod +x /entrypoint.sh
 
 # Install cuti and dependencies
 {CUTI_INSTALL}
@@ -84,13 +110,14 @@ USER $USERNAME
 
 # Install uv for the non-root user
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/home/$USERNAME/.cargo/bin:${PATH}"
+ENV PATH="/home/$USERNAME/.local/bin:${PATH}"
 
 # Install oh-my-zsh for better terminal experience
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
     && echo 'export PATH="/usr/local/bin:/home/$USERNAME/.cargo/bin:$HOME/.local/bin:$HOME/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> ~/.zshrc \\
+    && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> ~/.zshrc \\
     && echo '' >> ~/.zshrc \\
     && echo '# Welcome message' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
@@ -110,7 +137,10 @@ WORKDIR /workspace
 # Set shell
 SHELL ["/bin/zsh", "-c"]
 
-# Entry point
+# Set entrypoint to run auth setup
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command
 CMD ["/bin/zsh"]
 '''
 
@@ -135,11 +165,13 @@ CMD ["/bin/zsh"]
         "containerEnv": {
             "CUTI_IN_CONTAINER": "true",
             "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS": "true",
+            "CLAUDE_CONFIG_DIR": "/host/.claude",
             "PYTHONUNBUFFERED": "1",
             "TERM": "xterm-256color"
         },
         "mounts": [
-            "source=${localEnv:HOME}/.claude,target=/home/cuti/.claude,type=bind,consistency=cached",
+            "source=${localEnv:HOME}/.claude,target=/host/.claude,type=bind,consistency=cached",
+            "source=${localEnv:HOME}/.claude.json,target=/host/.claude.json,type=bind,consistency=cached",
             "source=${localEnv:HOME}/.cuti,target=/home/cuti/.cuti-global,type=bind,consistency=cached",
             "source=cuti-venv-${localWorkspaceFolderBasename},target=/workspace/.venv,type=volume",
             "source=cuti-cache-${localWorkspaceFolderBasename},target=/home/cuti/.cache,type=volume"
@@ -352,23 +384,20 @@ CMD ["/bin/zsh"]
         if (self.working_dir / "src" / "cuti").exists() and (self.working_dir / "pyproject.toml").exists():
             # This is the cuti project itself - install from local source
             cuti_install = """
+# Create workspace directory
+RUN mkdir -p /workspace
+
 # Copy source code
 COPY . /workspace
 
 # Install cuti and all dependencies using uv
 RUN cd /workspace && \\
-    uv pip install --system pyyaml rich 'typer[all]' click fastapi uvicorn httpx watchdog aiofiles python-multipart && \\
-    uv pip install --system -e . && \\
+    /root/.local/bin/uv pip install --system pyyaml rich 'typer[all]' click fastapi uvicorn httpx watchdog aiofiles python-multipart && \\
+    /root/.local/bin/uv pip install --system -e . && \\
     echo "Testing cuti installation..." && \\
     python -c "from cuti.cli.app import app; print('✅ cuti module works')" && \\
     echo "Testing cuti command..." && \\
-    which cuti && cuti --version || \\
-    (echo "Creating cuti wrapper..." && \\
-    echo '#!/usr/bin/env python3' > /usr/local/bin/cuti && \\
-    echo 'from cuti.cli.app import app' >> /usr/local/bin/cuti && \\
-    echo 'if __name__ == "__main__": app()' >> /usr/local/bin/cuti && \\
-    chmod +x /usr/local/bin/cuti && \\
-    /usr/local/bin/cuti --version && echo "✅ cuti command works")
+    which cuti && cuti --help > /dev/null && echo "✅ cuti command works"
 """
         else:
             # Regular project - install cuti from PyPI using uv
@@ -712,16 +741,14 @@ CMD ["/bin/bash"]
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             "--env", "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
-            "--env", "CLAUDE_CONFIG_DIR=/root/.claude",  # Set Claude config directory
+            "--env", "CLAUDE_CONFIG_DIR=/host/.claude",
             "--env", "PATH=/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
             container_image
         ]
         
         if command:
-            # For commands, source the zshrc to get the aliases and PATH
             docker_args.extend(["/bin/zsh", "-lc", command])
         else:
-            # Interactive shell
             docker_args.append("/bin/zsh")
         
         return subprocess.run(docker_args).returncode

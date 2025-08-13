@@ -37,6 +37,10 @@ try:
     from .api.enhanced_chat import enhanced_chat_router
 except ImportError:
     enhanced_chat_router = None
+try:
+    from .api.todos import router as todos_router
+except ImportError:
+    todos_router = None
 from .utils import WebSocketManager
 
 
@@ -158,6 +162,10 @@ def create_app(
     # Include enhanced chat router if available
     if enhanced_chat_router:
         app.include_router(enhanced_chat_router)
+    
+    # Include todos router if available
+    if todos_router:
+        app.include_router(todos_router)
     
     # Include main routes
     from .routes import main_router

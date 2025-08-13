@@ -14,6 +14,7 @@ from ..services.history import PromptHistoryManager
 from .commands.queue import queue_app
 from .commands.alias import alias_app
 from .commands.agent import agent_app
+from .commands.todo import app as todo_app
 try:
     from .commands.devcontainer import app as devcontainer_app
 except ImportError:
@@ -71,6 +72,7 @@ def get_history_manager(storage_dir: str = "~/.cuti") -> PromptHistoryManager:
 app.add_typer(queue_app, name="queue", help="Queue management commands")
 app.add_typer(alias_app, name="alias", help="Alias management commands")  
 app.add_typer(agent_app, name="agent", help="Agent system commands")
+app.add_typer(todo_app, name="todo", help="Todo list management commands")
 if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
 
