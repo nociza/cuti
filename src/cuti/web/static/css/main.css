@@ -13,6 +13,7 @@
     /* Core color palette - unified design system */
     --bg-darkest: #0a0f14;
     --bg-dark: #141e26;
+    --bg-secondary: #1a2530;
     --bg-card: #141e26;
     --bg-elevated: rgba(20, 30, 38, 0.95);
     
@@ -21,6 +22,9 @@
     --secondary: #60a5fa; /* Blue */
     --warning: #f59e0b; /* Amber */
     --error: #ef4444; /* Red */
+    --success-color: #10b981; /* Same as primary */
+    --warning-color: #f59e0b; /* Same as warning */
+    --error-color: #ef4444; /* Same as error */
     
     /* Text colors */
     --text-primary: #e2e8f0;
@@ -36,6 +40,7 @@
     
     /* Borders and surfaces */
     --border: rgba(255, 255, 255, 0.1);
+    --border-color: rgba(255, 255, 255, 0.1);
     --glass-bg: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.1);
     
@@ -290,6 +295,19 @@ body::after {
 
 .status-dot.active {
     background: var(--primary);
+}
+
+.status-dot.warning {
+    background: var(--warning-color, #f59e0b);
+}
+
+.status-dot.error {
+    background: var(--error-color, #ef4444);
+}
+
+.status-dot.pending {
+    background: var(--text-muted);
+    animation: pulse 1s infinite;
 }
 
 @keyframes pulse {

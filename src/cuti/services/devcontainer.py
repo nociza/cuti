@@ -501,6 +501,45 @@ SHELL ["/bin/zsh", "-c"]
 CMD ["/bin/zsh"]
 '''
     
+    def _setup_claude_host_config(self):
+        """Setup Claude configuration on host for container usage."""
+        claude_json_path = Path.home() / ".claude.json"
+        
+        # Check if we need to setup or update .claude.json
+        needs_setup = False
+        
+        if not claude_json_path.exists():
+            needs_setup = True
+        else:
+            # Check if bypassPermissionsModeAccepted is set
+            try:
+                import json
+                with open(claude_json_path, 'r') as f:
+                    config = json.load(f)
+                    if not config.get('bypassPermissionsModeAccepted', False):
+                        needs_setup = True
+            except:
+                needs_setup = True
+        
+        if needs_setup:
+            print("🔧 Setting up Claude configuration for container usage...")
+            
+            # Create or update .claude.json
+            config = {}
+            if claude_json_path.exists():
+                try:
+                    with open(claude_json_path, 'r') as f:
+                        config = json.load(f)
+                except:
+                    config = {}
+            
+            config['bypassPermissionsModeAccepted'] = True
+            
+            with open(claude_json_path, 'w') as f:
+                json.dump(config, f, indent=2)
+            
+            print(f"✅ Updated {claude_json_path}")
+    
     def _create_init_script(self):
         """Create initialization script for the container."""
         init_script = '''#!/bin/bash
@@ -558,6 +597,9 @@ echo "✅ Dev container initialization complete!"
         if not self.docker_available:
             print("❌ Docker is not available. Please start Docker or Colima first.")
             return 1
+        
+        # Setup Claude configuration on host if needed
+        self._setup_claude_host_config()
         
         # Always use the pre-built cuti-dev-cuti image
         container_image = "cuti-dev-cuti"
@@ -651,6 +693,12 @@ CMD ["/bin/bash"]
         # Run the container
         print("🚀 Starting dev container...")
         
+        # Check if .claude.json exists to mount it
+        claude_json_mount = []
+        claude_json_path = Path.home() / ".claude.json"
+        if claude_json_path.exists():
+            claude_json_mount = ["-v", f"{claude_json_path}:/host/.claude.json:ro"]
+        
         docker_args = [
             "docker", "run",
             "--rm",
@@ -658,11 +706,13 @@ CMD ["/bin/bash"]
             "--privileged",
             "--network", "host",  # Allow network access for cuti web
             "-v", f"{Path.cwd()}:/workspace",  # Mount current directory as workspace
-            "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude",
-            "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti-global",
+            "-v", f"{Path.home() / '.claude'}:/host/.claude:ro",  # Mount Claude config as read-only
+            "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global",  # Mount cuti config to root user
+            *claude_json_mount,  # Mount .claude.json if it exists
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             "--env", "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
+            "--env", "CLAUDE_CONFIG_DIR=/root/.claude",  # Set Claude config directory
             "--env", "PATH=/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
             container_image
         ]

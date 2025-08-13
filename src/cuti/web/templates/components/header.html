@@ -30,9 +30,36 @@
         </nav>
         
         <div class="header-status">
-            <div class="status-indicator">
-                <span class="status-dot active"></span>
-                <span class="status-text">Connected</span>
+            <div class="status-indicator" id="claude-status" x-data="claudeStatus()" x-init="checkStatus()">
+                <span class="status-dot" :class="statusClass"></span>
+                <span class="status-text" x-text="statusText"></span>
+                <i class="fas fa-info-circle" 
+                   x-show="statusDetails" 
+                   @click="showDetails = !showDetails"
+                   style="margin-left: 5px; cursor: pointer; font-size: 0.9em;"></i>
+                <div class="status-tooltip" 
+                     x-show="showDetails" 
+                     @click.away="showDetails = false"
+                     x-transition:enter="fade-in"
+                     style="position: absolute; top: 100%; right: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-top: 8px; min-width: 250px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000;">
+                    <div style="font-size: 0.9em; color: var(--text-secondary);">
+                        <div x-show="claude.installed">
+                            <i class="fas fa-check-circle" style="color: var(--success-color);"></i> Claude installed
+                        </div>
+                        <div x-show="!claude.installed">
+                            <i class="fas fa-times-circle" style="color: var(--error-color);"></i> Claude not installed
+                        </div>
+                        <div x-show="claude.authorized">
+                            <i class="fas fa-key" style="color: var(--success-color);"></i> Authorized <span x-text="claude.subscription_plan ? '(' + claude.subscription_plan + ')' : ''"></span>
+                        </div>
+                        <div x-show="!claude.authorized && claude.installed">
+                            <i class="fas fa-lock" style="color: var(--warning-color);"></i> Not authorized
+                        </div>
+                        <div x-show="claude.version" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color);">
+                            Version: <span x-text="claude.version"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="working-dir" x-data="{ showFullPath: false }" @mouseenter="showFullPath = true" @mouseleave="showFullPath = false">
                 <i class="fas fa-folder"></i>

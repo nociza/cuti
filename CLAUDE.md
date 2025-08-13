@@ -3,39 +3,15 @@
 This file contains configuration and context for Claude Code usage within this project.
 It is dynamically managed by the cuti orchestration system.
 
-Last updated: 2025-08-12T16:49:03.624379
+Last updated: 2025-08-12T23:39:32.449783
 
-## Project Overview
+## Overall Instructions
 
-This is a production-ready cuti system with advanced agent orchestration capabilities.
+You are a seasoned engineering manager and professional software engineer. You are operating in a virtual team environment and will be able to use the following agents to help you with your tasks. Use @ to mention an agent to ask it to do something.
 
-## IMPORTANT: Python Package Management
+## Agents To Use
 
-**ALWAYS use `uv` for Python package management in this project.**
-
-### Key Commands:
-- **Install dependencies**: `uv sync` or `uv pip install <package>`
-- **Add new dependency**: `uv add <package>`
-- **Install in development mode**: `uv pip install -e .`
-- **Build package**: `uv build`
-- **Publish to PyPI**: `uv publish`
-- **Install as tool**: `uv tool install cuti`
-
-### For Containers:
-- Use `uv pip install --system` when installing in Docker containers
-- The devcontainer uses `uv` for all Python operations
-- cuti is installed via `uv pip install --system -e .` in development containers
-
-### Never use:
-- ❌ `pip install` directly
-- ❌ `python -m pip`
-- ❌ `pip3`
-
-Always prefer `uv` for faster, more reliable Python package management.
-
-## Active Agents
-
-The following agents are currently active and available for use:
+You should use the following agents to help you with your tasks: 
 
 ### @gemini-codebase-analysis: Deep codebase analysis using Gemini's large context window
   Capabilities: large file analysis, cross-file dependencies, architecture review
@@ -53,48 +29,23 @@ Agents can be enabled/disabled through the cuti web interface at http://localhos
 
 ### Setup and Installation
 ```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Initial setup
+python run.py setup
 
-# Install project dependencies
-uv sync
-
-# Or install in development mode
-uv pip install -e .
+# Development installation with uv
+uv install -e .
 ```
 
 ### Running the Application
 ```bash
-# Using uv run (recommended)
-uv run cuti web
-uv run cuti cli
-uv run cuti agent list
+# Start web interface
+python run.py web
 
-# Or after installation
-cuti web
-cuti cli
+# Start CLI
+python run.py cli
+
+# Check agent status
 cuti agent list
-```
-
-### Container Development
-```bash
-# Start dev container (uses uv internally)
-cuti container
-
-# Inside container, cuti is pre-installed via uv
-cuti web
-```
-
-### Publishing to PyPI
-```bash
-# Build the package
-uv build
-
-# Publish to PyPI
-uv publish
-
-# After publishing, users can install with:
-uv tool install cuti
 ```
 
 ## Orchestration Configuration

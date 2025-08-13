@@ -1245,7 +1245,56 @@ function initAgentStatus() {
     setInterval(fetchData, 5000);
 }
 
+// Claude status checking function
+function claudeStatus() {
+    return {
+        claude: {
+            installed: false,
+            authorized: false,
+            version: null,
+            subscription_plan: null,
+            error: null
+        },
+        showDetails: false,
+        statusText: 'Checking...',
+        statusClass: 'pending',
+        statusDetails: false,
+        
+        async checkStatus() {
+            try {
+                const response = await fetch('/api/claude-status');
+                const data = await response.json();
+                
+                this.claude = data;
+                
+                // Update status display
+                if (!data.installed) {
+                    this.statusText = 'Claude Not Installed';
+                    this.statusClass = 'error';
+                } else if (!data.authorized) {
+                    this.statusText = 'Claude Not Authorized';
+                    this.statusClass = 'warning';
+                } else {
+                    this.statusText = 'Claude Ready';
+                    this.statusClass = 'active';
+                }
+                
+                this.statusDetails = true;
+            } catch (error) {
+                console.error('Failed to check Claude status:', error);
+                this.statusText = 'Status Unknown';
+                this.statusClass = 'error';
+                this.claude.error = error.message;
+            }
+            
+            // Recheck every 30 seconds
+            setTimeout(() => this.checkStatus(), 30000);
+        }
+    };
+}
+
 // Export functions for global use
 window.terminalInterface = terminalInterface;
 window.dashboard = dashboard;
+window.claudeStatus = claudeStatus;
 window.initAgentStatus = initAgentStatus;

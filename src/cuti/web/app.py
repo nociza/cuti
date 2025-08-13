@@ -32,6 +32,7 @@ from .api.claude_code_agents import claude_code_agents_router
 from .api.claude_settings import claude_settings_router
 from .api.claude_logs import claude_logs_router
 from .api.workspace import workspace_router
+from .api.claude_status import router as claude_status_router
 try:
     from .api.enhanced_chat import enhanced_chat_router
 except ImportError:
@@ -151,6 +152,7 @@ def create_app(
     app.include_router(claude_settings_router, prefix="/api")
     app.include_router(claude_logs_router, prefix="/api")
     app.include_router(workspace_router, prefix="/api")
+    app.include_router(claude_status_router)
     app.include_router(websocket_router)
     
     # Include enhanced chat router if available
