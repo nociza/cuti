@@ -742,20 +742,44 @@ echo "✅ Dev container initialization complete!"
         # Run the container
         print("🚀 Starting dev container...")
         
-        # Mount the entire Claude config directory if it exists
+        # Use separate config directory for containers to avoid macOS Keychain issues
+        # Store in ~/.cuti/container/ to keep everything organized
         claude_config_mount = []
-        claude_config_path = Path.home() / ".claude"
+        cuti_dir = Path.home() / ".cuti"
+        claude_container_path = cuti_dir / "container"
+        claude_main_path = Path.home() / ".claude"
         
-        if claude_config_path.exists():
-            # Mount Claude config directory to root's home for authentication
-            # Note: Must be read-write as Claude CLI needs to update config files
-            claude_config_mount = [
-                "-v", f"{claude_config_path}:/root/.claude",
-                "--env", f"CLAUDE_CONFIG_DIR=/root/.claude"
-            ]
-            print(f"✅ Mounting Claude config from {claude_config_path}")
-        else:
-            print(f"⚠️  Claude config directory not found at {claude_config_path}")
+        # Create container config directory if it doesn't exist
+        if not claude_container_path.exists():
+            claude_container_path.mkdir(parents=True, exist_ok=True)
+            print(f"📁 Created container Claude config at {claude_container_path}")
+            
+            # Copy CLAUDE.md if it exists in main config
+            if claude_main_path.exists():
+                claude_md_src = claude_main_path / "CLAUDE.md"
+                if claude_md_src.exists():
+                    import shutil
+                    shutil.copy2(claude_md_src, claude_container_path / "CLAUDE.md")
+                    print(f"📄 Copied CLAUDE.md to container config")
+        
+        # Mount container-specific config directory
+        claude_config_mount = [
+            "-v", f"{claude_container_path}:/root/.claude",
+            "--env", f"CLAUDE_CONFIG_DIR=/root/.claude"
+        ]
+        
+        # Also mount main .claude for read-only access to project configs
+        if claude_main_path.exists():
+            claude_config_mount.extend([
+                "-v", f"{claude_main_path}:/host/.claude-main:ro"
+            ])
+        
+        print(f"✅ Using container Claude config from {claude_container_path}")
+        
+        # Check if container config has credentials
+        if not (claude_container_path / ".credentials.json").exists():
+            print(f"⚠️  First time setup: You'll need to login to Claude once in the container")
+            print(f"    This login will persist for all future container sessions")
         
         # Determine if we need TTY based on the command and terminal availability
         use_tty = command is None or not command.strip()  # Only use TTY for interactive shell
