@@ -146,17 +146,65 @@ def stop():
 
 
 @app.command()
-def clean():
+def clean(
+    all_containers: bool = typer.Option(False, "--all", "-a", help="Clean ALL Docker containers and images"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")
+):
     """Clean up dev container files and images."""
     
-    working_dir = Path.cwd()
-    service = DevContainerService(working_dir)
+    import subprocess
     
-    console.print("[yellow]⚠️  This will remove:[/yellow]")
-    console.print("  • .devcontainer directory")
-    console.print(f"  • Docker image: cuti-dev-{working_dir.name}")
-    
-    if typer.confirm("Continue?"):
+    if all_containers:
+        console.print("[bold red]⚠️  This will remove:[/bold red]")
+        console.print("  • ALL Docker containers (running and stopped)")
+        console.print("  • ALL Docker images")
+        console.print("  • ALL Docker volumes")
+        console.print("  • ALL Docker build cache")
+        
+        if not force and not typer.confirm("Continue?"):
+            raise typer.Abort()
+        
+        console.print("[cyan]🧹 Cleaning all Docker resources...[/cyan]")
+        
+        # Stop all containers
+        subprocess.run(["docker", "stop", "$(docker ps -aq)"], shell=True, capture_output=True, text=True)
+        
+        # Remove all containers
+        subprocess.run(["docker", "rm", "$(docker ps -aq)"], shell=True, capture_output=True, text=True)
+        
+        # Remove all images
+        subprocess.run(["docker", "rmi", "$(docker images -q)"], shell=True, capture_output=True, text=True)
+        
+        # System prune everything
+        result = subprocess.run(
+            ["docker", "system", "prune", "-a", "-f", "--volumes"],
+            capture_output=True,
+            text=True
+        )
+        
+        if "Total reclaimed space:" in result.stdout:
+            # Extract the reclaimed space
+            for line in result.stdout.split('\n'):
+                if "Total reclaimed space:" in line:
+                    console.print(f"[green]✅ {line.strip()}[/green]")
+        
+        # Show final status
+        df_result = subprocess.run(["docker", "system", "df"], capture_output=True, text=True)
+        console.print("\n[bold]Docker disk usage after cleanup:[/bold]")
+        console.print(df_result.stdout)
+        
+        console.print("[green]✅ All Docker resources cleaned![/green]")
+    else:
+        working_dir = Path.cwd()
+        service = DevContainerService(working_dir)
+        
+        console.print("[yellow]⚠️  This will remove:[/yellow]")
+        console.print("  • .devcontainer directory")
+        console.print(f"  • Docker image: cuti-dev-{working_dir.name}")
+        
+        if not force and not typer.confirm("Continue?"):
+            raise typer.Abort()
+            
         if service.clean():
             console.print("[green]✅ Cleaned up dev container resources[/green]")
         else:

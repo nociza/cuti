@@ -71,63 +71,30 @@ RUN groupadd --gid $USER_GID $USERNAME \\
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Install Claude Code CLI with smart permissions handling
-RUN npm install -g @anthropic-ai/claude-code \\
-    && mv /usr/bin/claude /usr/bin/claude-code \\
-    && echo '#!/bin/bash' > /usr/local/bin/claude \\
-    && echo 'export CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR:-/host/.claude}' >> /usr/local/bin/claude \\
-    && echo '# Check if running as root' >> /usr/local/bin/claude \\
-    && echo 'if [ "$(id -u)" = "0" ]; then' >> /usr/local/bin/claude \\
-    && echo '    # Running as root, cannot use --dangerously-skip-permissions' >> /usr/local/bin/claude \\
-    && echo '    exec su cuti -c "/usr/bin/claude-code --dangerously-skip-permissions \\"$@\\""' >> /usr/local/bin/claude \\
-    && echo 'else' >> /usr/local/bin/claude \\
-    && echo '    # Not root, use permissions flag directly' >> /usr/local/bin/claude \\
-    && echo '    exec /usr/bin/claude-code --dangerously-skip-permissions "$@"' >> /usr/local/bin/claude \\
-    && echo 'fi' >> /usr/local/bin/claude \\
-    && chmod +x /usr/local/bin/claude
+# Install Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
 
-# Create startup script to handle Claude auth
+# Create startup script to verify Claude auth
 RUN echo '#!/bin/bash' > /usr/local/bin/setup-claude-auth.sh \\
-    && echo '# Set up Claude config dir' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '# Ensure .claude directory exists and is accessible' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'if [ -d /host/.claude ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    # Create symlinks for Claude config' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    ln -sf /host/.claude /root/.claude 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    ln -sf /host/.claude /home/cuti/.claude 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '# Copy or link .claude.json if available' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'if [ -f /host/.claude.json ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    ln -sf /host/.claude.json /root/.claude.json 2>/dev/null || cp /host/.claude.json /root/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    ln -sf /host/.claude.json /home/cuti/.claude.json 2>/dev/null || cp /host/.claude.json /home/cuti/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    chown cuti:cuti /home/cuti/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '# Export environment variables' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
-\
-    && echo '# Test Claude auth using proper config directory' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'if [ -d /host/.claude ] && [ -f /host/.claude.json ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    # Test if Claude can actually authenticate, not just if it runs' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    if /usr/bin/claude-code --version 2>&1 | grep -q "Claude Code"; then' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '        echo "✅ Claude CLI installed"' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '        echo "📁 Using config from: /host/.claude"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Check if Claude config is available' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'if [ -d "$CLAUDE_CONFIG_DIR" ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    echo "✅ Claude config found at: $CLAUDE_CONFIG_DIR"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    # Test Claude authentication' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    if claude --version > /dev/null 2>&1; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '        echo "✅ Claude CLI authenticated and ready"' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    else' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '        echo "⚠️  Claude CLI not working properly"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '        echo "⚠️  Claude CLI not authenticated. Run: claude login"' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    fi' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo 'else' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    echo "⚠️  Claude configuration not found on host"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    echo "⚠️  Claude config not mounted. Authentication will not persist."' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    echo "    Please ensure ~/.claude exists on your host machine."' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
     && chmod +x /usr/local/bin/setup-claude-auth.sh
 
 # Create entrypoint script that runs auth setup
 RUN echo '#!/bin/bash' > /entrypoint.sh \\
-    && echo '# Set up environment' >> /entrypoint.sh \\
-    && echo 'export PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /entrypoint.sh \\
-    && echo 'export CLAUDE_CONFIG_DIR="/host/.claude"' >> /entrypoint.sh \\
-\
     && echo '# Run Claude auth setup' >> /entrypoint.sh \\
-    && echo 'bash /usr/local/bin/setup-claude-auth.sh 2>/dev/null' >> /entrypoint.sh \\
+    && echo 'bash /usr/local/bin/setup-claude-auth.sh' >> /entrypoint.sh \\
     && echo '# Execute command' >> /entrypoint.sh \\
     && echo 'exec "$@"' >> /entrypoint.sh \\
     && chmod +x /entrypoint.sh
@@ -137,11 +104,6 @@ RUN echo '#!/bin/bash' > /entrypoint.sh \\
 
 # Configure environment for all users
 ENV PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
-ENV CLAUDE_CONFIG_DIR="/host/.claude"
-
-# Create global environment setup while still root
-RUN mkdir -p /etc/zsh && \\
-    echo 'export CLAUDE_CONFIG_DIR="/host/.claude"' >> /etc/zsh/zshenv && \\
 
 # Switch to non-root user
 USER $USERNAME
@@ -155,12 +117,8 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo '# Environment setup' >> ~/.zshrc \\
     && echo 'export PATH="/usr/local/bin:/home/$USERNAME/.cargo/bin:$HOME/.local/bin:$HOME/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
-\
-    && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> ~/.zshrc \\
     && echo '# Custom prompt showing cuti' >> ~/.zshrc \\
     && echo 'PROMPT="%{$fg[cyan]%}cuti%{$reset_color%}:%{$fg[green]%}%~%{$reset_color%} $ "' >> ~/.zshrc \\
-    && echo '# Aliases' >> ~/.zshrc \\
-    && echo 'alias claude="/usr/local/bin/claude"' >> ~/.zshrc \\
     && echo '' >> ~/.zshrc \\
     && echo '# Welcome message' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
@@ -168,6 +126,7 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'echo "     • cuti web        - Start the web interface"' >> ~/.zshrc \\
     && echo 'echo "     • cuti cli        - Start the CLI"' >> ~/.zshrc \\
     && echo 'echo "     • cuti agent list - List available agents"' >> ~/.zshrc \\
+    && echo 'echo "     • claude          - Claude Code CLI"' >> ~/.zshrc \\
     && echo 'echo ""' >> ~/.zshrc
 
 # Verify cuti installation
@@ -212,8 +171,7 @@ CMD ["/bin/zsh", "-l"]
             "TERM": "xterm-256color"
         },
         "mounts": [
-            "source=${localEnv:HOME}/.claude,target=/host/.claude,type=bind,consistency=cached",
-            "source=${localEnv:HOME}/.claude.json,target=/host/.claude.json,type=bind,consistency=cached",
+            "source=${localEnv:HOME}/.claude,target=/host/.claude,type=bind,readonly=true,consistency=cached",
             "source=${localEnv:HOME}/.cuti,target=/home/cuti/.cuti-global,type=bind,consistency=cached",
             "source=cuti-venv-${localWorkspaceFolderBasename},target=/workspace/.venv,type=volume",
             "source=cuti-cache-${localWorkspaceFolderBasename},target=/home/cuti/.cache,type=volume"
@@ -789,11 +747,15 @@ echo "✅ Dev container initialization complete!"
         claude_config_path = Path.home() / ".claude"
         
         if claude_config_path.exists():
-            # Mount Claude config to the same path in container
+            # Mount Claude config directory to root's home for authentication
+            # Note: Must be read-write as Claude CLI needs to update config files
             claude_config_mount = [
                 "-v", f"{claude_config_path}:/root/.claude",
-                "-v", f"{claude_config_path}:/home/cuti/.claude"
+                "--env", f"CLAUDE_CONFIG_DIR=/root/.claude"
             ]
+            print(f"✅ Mounting Claude config from {claude_config_path}")
+        else:
+            print(f"⚠️  Claude config directory not found at {claude_config_path}")
         
         # Determine if we need TTY based on the command and terminal availability
         use_tty = command is None or not command.strip()  # Only use TTY for interactive shell
@@ -810,12 +772,12 @@ echo "✅ Dev container initialization complete!"
             "--network", "host",  # Allow network access for cuti web
             "-v", f"{Path.cwd()}:/workspace",  # Mount current directory as workspace
             "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global",  # Mount cuti config to root user
-            *claude_config_mount,  # Mount Claude config directory if it exists
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             "--env", "IS_SANDBOX=1",  # Allow Claude --dangerously-skip-permissions as root
             "--env", "HOME=/root",  # Ensure HOME is set correctly
             "--env", "PATH=/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+            *claude_config_mount,  # Mount Claude config directory and set CLAUDE_CONFIG_DIR if it exists
         ]
         
         # Add TTY flags only if available

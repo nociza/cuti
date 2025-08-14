@@ -83,6 +83,8 @@ app.add_typer(agent_app, name="agent", help="Agent system commands")
 app.add_typer(todo_app, name="todo", help="Todo list management commands")
 if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
+    # Also add as 'container' for shorter command
+    app.add_typer(devcontainer_app, name="container", help="Container management (alias for devcontainer)")
 if settings_app:
     # Convert Click group to Typer app
     settings_typer = typer.Typer()
