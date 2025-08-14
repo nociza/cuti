@@ -73,37 +73,71 @@ ENV PATH="/root/.local/bin:${PATH}"
 
 # Install Claude Code CLI with permissions flag
 RUN npm install -g @anthropic-ai/claude-code \\
-    && echo '#!/bin/bash\\nclaude-code --dangerously-skip-permissions "$@"' > /usr/local/bin/claude \\
+    && mv /usr/bin/claude /usr/bin/claude-code \\
+    && echo '#!/bin/bash' > /usr/local/bin/claude \\
+    && echo 'export CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR:-/host/.claude}' >> /usr/local/bin/claude \\
+    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/claude \\
+    && echo '/usr/bin/claude-code --dangerously-skip-permissions "$@"' >> /usr/local/bin/claude \\
     && chmod +x /usr/local/bin/claude
 
 # Create startup script to handle Claude auth
 RUN echo '#!/bin/bash' > /usr/local/bin/setup-claude-auth.sh \\
     && echo '# Set up Claude config dir' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '# Copy .claude.json if available' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Ensure .claude directory exists and is accessible' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'if [ -d /host/.claude ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    # Create symlinks for Claude config' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    ln -sf /host/.claude /root/.claude 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    ln -sf /host/.claude /home/cuti/.claude 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Copy or link .claude.json if available' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo 'if [ -f /host/.claude.json ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    cp /host/.claude.json /root/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    cp /host/.claude.json /home/cuti/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    ln -sf /host/.claude.json /root/.claude.json 2>/dev/null || cp /host/.claude.json /root/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    ln -sf /host/.claude.json /home/cuti/.claude.json 2>/dev/null || cp /host/.claude.json /home/cuti/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    chown cuti:cuti /home/cuti/.claude.json 2>/dev/null || true' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '# Test Claude auth' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'CLAUDE_CONFIG_DIR=/host/.claude claude-code --dangerously-skip-permissions --version > /dev/null 2>&1 && echo "✅ Claude authenticated" || echo "⚠️  Claude not authenticated"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Export environment variables' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '# Test Claude auth using proper config directory' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'if [ -d /host/.claude ] && [ -f /host/.claude.json ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    # Test if Claude can actually authenticate, not just if it runs' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    if /usr/bin/claude-code --dangerously-skip-permissions --version 2>&1 | grep -q "Claude Code"; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '        echo "✅ Claude CLI installed"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '        echo "📁 Using config from: /host/.claude"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    else' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '        echo "⚠️  Claude CLI not working properly"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    fi' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'else' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    echo "⚠️  Claude configuration not found on host"' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
     && chmod +x /usr/local/bin/setup-claude-auth.sh
 
 # Create entrypoint script that runs auth setup
 RUN echo '#!/bin/bash' > /entrypoint.sh \\
-    && echo '# Run Claude auth setup as root' >> /entrypoint.sh \\
-    && echo 'if [ "$(id -u)" = "0" ]; then' >> /entrypoint.sh \\
-    && echo '    /usr/local/bin/setup-claude-auth.sh' >> /entrypoint.sh \\
-    && echo 'else' >> /entrypoint.sh \\
-    && echo '    sudo /usr/local/bin/setup-claude-auth.sh' >> /entrypoint.sh \\
-    && echo 'fi' >> /entrypoint.sh \\
-    && echo '# Execute the command' >> /entrypoint.sh \\
+    && echo '# Set up environment' >> /entrypoint.sh \\
+    && echo 'export PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /entrypoint.sh \\
+    && echo 'export CLAUDE_CONFIG_DIR="/host/.claude"' >> /entrypoint.sh \\
+    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /entrypoint.sh \\
+    && echo '# Run Claude auth setup' >> /entrypoint.sh \\
+    && echo 'bash /usr/local/bin/setup-claude-auth.sh 2>/dev/null' >> /entrypoint.sh \\
+    && echo '# Execute command' >> /entrypoint.sh \\
     && echo 'exec "$@"' >> /entrypoint.sh \\
     && chmod +x /entrypoint.sh
 
 # Install cuti and dependencies
 {CUTI_INSTALL}
+
+# Configure environment for all users
+ENV PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+ENV CLAUDE_CONFIG_DIR="/host/.claude"
+ENV CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS="true"
+
+# Create global environment setup while still root
+RUN mkdir -p /etc/zsh && \\
+    echo 'export CLAUDE_CONFIG_DIR="/host/.claude"' >> /etc/zsh/zshenv && \\
+    echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /etc/zsh/zshenv
 
 # Switch to non-root user
 USER $USERNAME
@@ -114,10 +148,15 @@ ENV PATH="/home/$USERNAME/.local/bin:${PATH}"
 
 # Install oh-my-zsh for better terminal experience
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
+    && echo '# Environment setup' >> ~/.zshrc \\
     && echo 'export PATH="/usr/local/bin:/home/$USERNAME/.cargo/bin:$HOME/.local/bin:$HOME/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> ~/.zshrc \\
     && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> ~/.zshrc \\
+    && echo '# Custom prompt showing cuti' >> ~/.zshrc \\
+    && echo 'PROMPT="%{$fg[cyan]%}cuti%{$reset_color%}:%{$fg[green]%}%~%{$reset_color%} $ "' >> ~/.zshrc \\
+    && echo '# Aliases' >> ~/.zshrc \\
+    && echo 'alias claude="/usr/bin/claude-code --dangerously-skip-permissions"' >> ~/.zshrc \\
     && echo '' >> ~/.zshrc \\
     && echo '# Welcome message' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
@@ -141,7 +180,7 @@ SHELL ["/bin/zsh", "-c"]
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command
-CMD ["/bin/zsh"]
+CMD ["/bin/zsh", "-l"]
 '''
 
     DEVCONTAINER_JSON_TEMPLATE = {
@@ -402,10 +441,11 @@ RUN cd /workspace && \\
         else:
             # Regular project - install cuti from PyPI using uv
             cuti_install = """
-# Install cuti using uv (once published to PyPI)
-RUN uv tool install cuti && \\
-    ln -sf $HOME/.local/share/uv/tools/cuti/bin/cuti /usr/local/bin/cuti && \\
-    cuti --version && echo "✅ cuti installed via uv"
+# Install cuti using uv tool
+RUN /root/.local/bin/uv tool install cuti && \\
+    ln -sf /root/.local/share/uv/tools/cuti/bin/cuti /usr/local/bin/cuti && \\
+    echo "Testing cuti installation..." && \\
+    cuti --help > /dev/null && echo "✅ cuti installed via uv tool"
 """
         
         # Add project-specific dependencies
@@ -569,6 +609,30 @@ CMD ["/bin/zsh"]
             
             print(f"✅ Updated {claude_json_path}")
     
+    def _build_minimal_container(self, container_image: str):
+        """Build a minimal container as fallback."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_dockerfile = Path(tmpdir) / "Dockerfile"
+            
+            # Write a minimal Dockerfile
+            minimal_dockerfile = """FROM python:3.11-bullseye
+RUN apt-get update && apt-get install -y curl git zsh wget && apt-get clean
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+RUN uv tool install cuti && \
+    ln -sf /root/.local/share/uv/tools/cuti/bin/cuti /usr/local/bin/cuti
+WORKDIR /workspace
+CMD ["/bin/bash"]
+"""
+            temp_dockerfile.write_text(minimal_dockerfile)
+            
+            return subprocess.run(
+                ["docker", "build", "-t", container_image, "-f", str(temp_dockerfile), tmpdir],
+                capture_output=True,
+                text=True
+            )
+    
     def _create_init_script(self):
         """Create initialization script for the container."""
         init_script = '''#!/bin/bash
@@ -630,8 +694,16 @@ echo "✅ Dev container initialization complete!"
         # Setup Claude configuration on host if needed
         self._setup_claude_host_config()
         
-        # Always use the pre-built cuti-dev-cuti image
-        container_image = "cuti-dev-cuti"
+        # Determine which container to use based on current directory
+        # If we're in the cuti source directory, use the dev container
+        # Otherwise use the universal container with cuti from PyPI
+        current_dir = Path.cwd()
+        is_cuti_source = (current_dir / "src" / "cuti").exists() and (current_dir / "pyproject.toml").exists()
+        
+        if is_cuti_source:
+            container_image = "cuti-dev-cuti"
+        else:
+            container_image = "cuti-dev-universal"
         
         # Check if the cuti container image exists
         check_image = subprocess.run(
@@ -644,67 +716,54 @@ echo "✅ Dev container initialization complete!"
             print("🔨 Building cuti dev container (one-time setup)...")
             print("This will take a few minutes on first run...")
             
+            # Clean up dangling images first
+            print("🧹 Cleaning up old Docker images...")
+            subprocess.run(
+                ["docker", "image", "prune", "-f"],
+                capture_output=True,
+                text=True
+            )
+            
             # Get the cuti installation directory
             import cuti
             cuti_module_path = Path(cuti.__file__).parent  # cuti module directory
             
             # Check if we're in a development environment (editable install)
             cuti_src_dir = cuti_module_path.parent.parent  # Try to get to project root
-            dockerfile_path = cuti_src_dir / ".devcontainer" / "Dockerfile"
             
-            if dockerfile_path.exists() and (cuti_src_dir / "pyproject.toml").exists():
-                # We have the full source - use it
-                print(f"Building from source at {cuti_src_dir}")
-                build_result = subprocess.run(
-                    ["docker", "build", "-t", container_image, "-f", str(dockerfile_path), str(cuti_src_dir)],
-                    capture_output=True,
-                    text=True
-                )
-            else:
-                # Use the pre-built image from Docker Hub or build minimal
-                print("Building minimal container...")
-                
-                # First, try to pull from registry (if published)
-                pull_result = subprocess.run(
-                    ["docker", "pull", "nociza/cuti:latest"],
-                    capture_output=True,
-                    text=True
-                )
-                
-                if pull_result.returncode == 0:
-                    # Tag it as our local image
-                    subprocess.run(
-                        ["docker", "tag", "nociza/cuti:latest", container_image],
-                        capture_output=True
+            if container_image == "cuti-dev-universal":
+                # Build universal container from Dockerfile.universal
+                dockerfile_path = cuti_src_dir / ".devcontainer" / "Dockerfile.universal"
+                if dockerfile_path.exists():
+                    print(f"Building universal container with cuti from PyPI...")
+                    build_result = subprocess.run(
+                        ["docker", "build", "-t", container_image, "-f", str(dockerfile_path), str(cuti_src_dir)],
+                        capture_output=True,
+                        text=True
                     )
-                    build_result = subprocess.CompletedProcess([], 0)  # Success
                 else:
-                    # Build a minimal container
-                    import tempfile
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        temp_dockerfile = Path(tmpdir) / "Dockerfile"
-                        
-                        # Write a minimal Dockerfile
-                        minimal_dockerfile = """FROM python:3.11-bullseye
-RUN apt-get update && apt-get install -y curl git zsh wget && apt-get clean
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:${PATH}"
-RUN uv pip install --system pyyaml rich typer click fastapi uvicorn httpx requests
-RUN echo '#!/usr/bin/env python3' > /usr/local/bin/cuti-placeholder && \
-    echo 'print("⚠️  cuti is not installed in this container")' >> /usr/local/bin/cuti-placeholder && \
-    echo 'print("Please rebuild the container from the cuti source directory")' >> /usr/local/bin/cuti-placeholder && \
-    chmod +x /usr/local/bin/cuti-placeholder && \
-    ln -s /usr/local/bin/cuti-placeholder /usr/local/bin/cuti
-WORKDIR /workspace
-CMD ["/bin/bash"]
-"""
-                        temp_dockerfile.write_text(minimal_dockerfile)
-                        
-                        build_result = subprocess.run(
-                            ["docker", "build", "-t", container_image, "-f", str(temp_dockerfile), tmpdir],
-                            capture_output=True,
-                            text=True
-                        )
+                    # Fallback to minimal container
+                    print("Building minimal container...")
+                    build_result = self._build_minimal_container(container_image)
+            elif container_image == "cuti-dev-cuti":
+                # Build from source for cuti development
+                dockerfile_path = cuti_src_dir / ".devcontainer" / "Dockerfile"
+                if dockerfile_path.exists() and (cuti_src_dir / "pyproject.toml").exists():
+                    # We have the full source - use it
+                    print(f"Building from source at {cuti_src_dir}")
+                    build_result = subprocess.run(
+                        ["docker", "build", "-t", container_image, "-f", str(dockerfile_path), str(cuti_src_dir)],
+                        capture_output=True,
+                        text=True
+                    )
+                else:
+                    # Fallback to minimal container
+                    print("Building minimal container...")
+                    build_result = self._build_minimal_container(container_image)
+            else:
+                # Shouldn't reach here, but build minimal as fallback
+                print("Building minimal container...")
+                build_result = self._build_minimal_container(container_image)
             
             if build_result.returncode != 0:
                 print(f"❌ Failed to build container: {build_result.stderr}")
@@ -726,30 +785,43 @@ CMD ["/bin/bash"]
         claude_json_mount = []
         claude_json_path = Path.home() / ".claude.json"
         if claude_json_path.exists():
-            claude_json_mount = ["-v", f"{claude_json_path}:/host/.claude.json:ro"]
+            claude_json_mount = ["-v", f"{claude_json_path}:/host/.claude.json"]  # Remove :ro to allow Claude to write if needed
+        
+        # Determine if we need TTY based on the command and terminal availability
+        use_tty = command is None or not command.strip()  # Only use TTY for interactive shell
+        
+        # Check if we're in a real terminal (not Claude Code or similar)
+        import sys
+        if not sys.stdin.isatty():
+            use_tty = False
         
         docker_args = [
             "docker", "run",
             "--rm",
-            "-it",
             "--privileged",
             "--network", "host",  # Allow network access for cuti web
             "-v", f"{Path.cwd()}:/workspace",  # Mount current directory as workspace
-            "-v", f"{Path.home() / '.claude'}:/host/.claude:ro",  # Mount Claude config as read-only
+            "-v", f"{Path.home() / '.claude'}:/host/.claude",  # Mount Claude config directory
             "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global",  # Mount cuti config to root user
             *claude_json_mount,  # Mount .claude.json if it exists
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             "--env", "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
             "--env", "CLAUDE_CONFIG_DIR=/host/.claude",
+            "--env", "HOME=/root",  # Ensure HOME is set correctly
             "--env", "PATH=/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
-            container_image
         ]
+        
+        # Add TTY flags only if available
+        if use_tty:
+            docker_args.insert(2, "-it")
+        
+        docker_args.append(container_image)
         
         if command:
             docker_args.extend(["/bin/zsh", "-lc", command])
         else:
-            docker_args.append("/bin/zsh")
+            docker_args.extend(["/bin/zsh", "-l"])
         
         return subprocess.run(docker_args).returncode
     
