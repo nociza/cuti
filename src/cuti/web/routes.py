@@ -14,7 +14,8 @@ def get_nav_items(current_page: str = "chat"):
         {"url": "/", "label": "Chat", "active": current_page == "chat"},
         {"url": "/todos", "label": "Todos", "active": current_page == "todos"},
         {"url": "/agents", "label": "Agent Manager", "active": current_page == "agents"},
-        {"url": "/statistics", "label": "Statistics", "active": current_page == "statistics"}
+        {"url": "/statistics", "label": "Statistics", "active": current_page == "statistics"},
+        {"url": "/global-settings", "label": "Global Settings", "active": current_page == "settings"}
     ]
     return nav_items
 
@@ -118,4 +119,17 @@ async def enhanced_chat_page(request: Request):
         "working_directory": str(request.app.state.working_directory),
         "nav_items": nav_items,
         "status_info": status_info
+    })
+
+
+@main_router.get("/global-settings", response_class=HTMLResponse)
+async def global_settings(request: Request):
+    """Global settings page."""
+    templates = request.app.state.templates
+    
+    nav_items = get_nav_items("settings")
+    
+    return templates.TemplateResponse("global_settings.html", {
+        "request": request,
+        "nav_items": nav_items
     })

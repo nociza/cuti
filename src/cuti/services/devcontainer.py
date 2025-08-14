@@ -71,13 +71,19 @@ RUN groupadd --gid $USER_GID $USERNAME \\
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Install Claude Code CLI with permissions flag
+# Install Claude Code CLI with smart permissions handling
 RUN npm install -g @anthropic-ai/claude-code \\
     && mv /usr/bin/claude /usr/bin/claude-code \\
     && echo '#!/bin/bash' > /usr/local/bin/claude \\
     && echo 'export CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR:-/host/.claude}' >> /usr/local/bin/claude \\
-    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/claude \\
-    && echo '/usr/bin/claude-code --dangerously-skip-permissions "$@"' >> /usr/local/bin/claude \\
+    && echo '# Check if running as root' >> /usr/local/bin/claude \\
+    && echo 'if [ "$(id -u)" = "0" ]; then' >> /usr/local/bin/claude \\
+    && echo '    # Running as root, cannot use --dangerously-skip-permissions' >> /usr/local/bin/claude \\
+    && echo '    exec su cuti -c "/usr/bin/claude-code --dangerously-skip-permissions \\"$@\\""' >> /usr/local/bin/claude \\
+    && echo 'else' >> /usr/local/bin/claude \\
+    && echo '    # Not root, use permissions flag directly' >> /usr/local/bin/claude \\
+    && echo '    exec /usr/bin/claude-code --dangerously-skip-permissions "$@"' >> /usr/local/bin/claude \\
+    && echo 'fi' >> /usr/local/bin/claude \\
     && chmod +x /usr/local/bin/claude
 
 # Create startup script to handle Claude auth
@@ -98,12 +104,12 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-claude-auth.sh \\
     && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '# Export environment variables' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/setup-claude-auth.sh \\
+\
     && echo '# Test Claude auth using proper config directory' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo 'if [ -d /host/.claude ] && [ -f /host/.claude.json ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    # Test if Claude can actually authenticate, not just if it runs' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    export CLAUDE_CONFIG_DIR=/host/.claude' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    if /usr/bin/claude-code --dangerously-skip-permissions --version 2>&1 | grep -q "Claude Code"; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    if /usr/bin/claude-code --version 2>&1 | grep -q "Claude Code"; then' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '        echo "✅ Claude CLI installed"' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '        echo "📁 Using config from: /host/.claude"' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    else' >> /usr/local/bin/setup-claude-auth.sh \\
@@ -119,7 +125,7 @@ RUN echo '#!/bin/bash' > /entrypoint.sh \\
     && echo '# Set up environment' >> /entrypoint.sh \\
     && echo 'export PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /entrypoint.sh \\
     && echo 'export CLAUDE_CONFIG_DIR="/host/.claude"' >> /entrypoint.sh \\
-    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /entrypoint.sh \\
+\
     && echo '# Run Claude auth setup' >> /entrypoint.sh \\
     && echo 'bash /usr/local/bin/setup-claude-auth.sh 2>/dev/null' >> /entrypoint.sh \\
     && echo '# Execute command' >> /entrypoint.sh \\
@@ -132,12 +138,10 @@ RUN echo '#!/bin/bash' > /entrypoint.sh \\
 # Configure environment for all users
 ENV PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV CLAUDE_CONFIG_DIR="/host/.claude"
-ENV CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS="true"
 
 # Create global environment setup while still root
 RUN mkdir -p /etc/zsh && \\
     echo 'export CLAUDE_CONFIG_DIR="/host/.claude"' >> /etc/zsh/zshenv && \\
-    echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /etc/zsh/zshenv
 
 # Switch to non-root user
 USER $USERNAME
@@ -151,12 +155,12 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo '# Environment setup' >> ~/.zshrc \\
     && echo 'export PATH="/usr/local/bin:/home/$USERNAME/.cargo/bin:$HOME/.local/bin:$HOME/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
-    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> ~/.zshrc \\
+\
     && echo 'export CLAUDE_CONFIG_DIR=/host/.claude' >> ~/.zshrc \\
     && echo '# Custom prompt showing cuti' >> ~/.zshrc \\
     && echo 'PROMPT="%{$fg[cyan]%}cuti%{$reset_color%}:%{$fg[green]%}%~%{$reset_color%} $ "' >> ~/.zshrc \\
     && echo '# Aliases' >> ~/.zshrc \\
-    && echo 'alias claude="/usr/bin/claude-code --dangerously-skip-permissions"' >> ~/.zshrc \\
+    && echo 'alias claude="/usr/local/bin/claude"' >> ~/.zshrc \\
     && echo '' >> ~/.zshrc \\
     && echo '# Welcome message' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
@@ -203,7 +207,6 @@ CMD ["/bin/zsh", "-l"]
         ],
         "containerEnv": {
             "CUTI_IN_CONTAINER": "true",
-            "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS": "true",
             "CLAUDE_CONFIG_DIR": "/host/.claude",
             "PYTHONUNBUFFERED": "1",
             "TERM": "xterm-256color"
@@ -557,7 +560,7 @@ RUN cd /tmp/cuti-source && \\
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
     && echo 'export PATH="/root/.local/bin:/usr/local/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
-    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> ~/.zshrc \\
+\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
     && echo 'echo "   Current directory: $(pwd)"' >> ~/.zshrc \\
     && echo 'echo "   • cuti web        - Start web interface"' >> ~/.zshrc \\
@@ -781,11 +784,16 @@ echo "✅ Dev container initialization complete!"
         # Run the container
         print("🚀 Starting dev container...")
         
-        # Check if .claude.json exists to mount it
-        claude_json_mount = []
-        claude_json_path = Path.home() / ".claude.json"
-        if claude_json_path.exists():
-            claude_json_mount = ["-v", f"{claude_json_path}:/host/.claude.json"]  # Remove :ro to allow Claude to write if needed
+        # Mount the entire Claude config directory if it exists
+        claude_config_mount = []
+        claude_config_path = Path.home() / ".claude"
+        
+        if claude_config_path.exists():
+            # Mount Claude config to the same path in container
+            claude_config_mount = [
+                "-v", f"{claude_config_path}:/root/.claude",
+                "-v", f"{claude_config_path}:/home/cuti/.claude"
+            ]
         
         # Determine if we need TTY based on the command and terminal availability
         use_tty = command is None or not command.strip()  # Only use TTY for interactive shell
@@ -801,13 +809,11 @@ echo "✅ Dev container initialization complete!"
             "--privileged",
             "--network", "host",  # Allow network access for cuti web
             "-v", f"{Path.cwd()}:/workspace",  # Mount current directory as workspace
-            "-v", f"{Path.home() / '.claude'}:/host/.claude",  # Mount Claude config directory
             "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global",  # Mount cuti config to root user
-            *claude_json_mount,  # Mount .claude.json if it exists
+            *claude_config_mount,  # Mount Claude config directory if it exists
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
-            "--env", "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
-            "--env", "CLAUDE_CONFIG_DIR=/host/.claude",
+            "--env", "IS_SANDBOX=1",  # Allow Claude --dangerously-skip-permissions as root
             "--env", "HOME=/root",  # Ensure HOME is set correctly
             "--env", "PATH=/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
         ]

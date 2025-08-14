@@ -24,6 +24,8 @@ from ..services.claude_logs_reader import ClaudeLogsReader
 from ..services.workspace_manager import WorkspaceManager
 from ..services.log_sync import LogSyncService
 from ..services.claude_orchestration import ClaudeOrchestrationManager
+from ..services.usage_sync_service import UsageSyncManager
+from ..services.global_data_manager import GlobalDataManager
 from .api.queue import queue_router
 from .api.agents import agents_router, get_orchestration_manager
 from .api.monitoring import monitoring_router
@@ -41,6 +43,10 @@ try:
     from .api.todos import router as todos_router
 except ImportError:
     todos_router = None
+try:
+    from .api.global_settings import router as global_settings_router
+except ImportError:
+    global_settings_router = None
 from .utils import WebSocketManager
 
 
@@ -97,6 +103,14 @@ def create_app(
     log_sync_service.sync_all()
     # Start auto-sync in background
     log_sync_service.auto_sync(interval=300)  # Sync every 5 minutes
+    
+    # Initialize global data manager and usage sync
+    global_data_manager = GlobalDataManager()
+    if global_data_manager.settings.usage_tracking_enabled:
+        # Start background usage sync service
+        UsageSyncManager.start_service()
+        # Perform initial sync
+        UsageSyncManager.sync_now()
     
     # Initialize Claude Code agent manager (reads from .claude/agents)
     claude_code_agent_manager = ClaudeCodeAgentManager(
@@ -166,6 +180,10 @@ def create_app(
     # Include todos router if available
     if todos_router:
         app.include_router(todos_router)
+    
+    # Include global settings router if available
+    if global_settings_router:
+        app.include_router(global_settings_router)
     
     # Include main routes
     from .routes import main_router

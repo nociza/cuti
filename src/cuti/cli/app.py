@@ -19,6 +19,14 @@ try:
     from .commands.devcontainer import app as devcontainer_app
 except ImportError:
     devcontainer_app = None
+try:
+    from .commands.settings import settings as settings_app
+except ImportError:
+    settings_app = None
+try:
+    from .commands.favorites import favorites as favorites_app
+except ImportError:
+    favorites_app = None
 
 app = typer.Typer(
     name="cuti",
@@ -75,6 +83,18 @@ app.add_typer(agent_app, name="agent", help="Agent system commands")
 app.add_typer(todo_app, name="todo", help="Todo list management commands")
 if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
+if settings_app:
+    # Convert Click group to Typer app
+    settings_typer = typer.Typer()
+    for cmd in settings_app.commands.values():
+        settings_typer.command()(cmd.callback)
+    app.add_typer(settings_typer, name="settings", help="Global settings management")
+if favorites_app:
+    # Convert Click group to Typer app
+    favorites_typer = typer.Typer()
+    for cmd in favorites_app.commands.values():
+        favorites_typer.command()(cmd.callback)
+    app.add_typer(favorites_typer, name="favorites", help="Favorite prompts management")
 
 # Add top-level commands for convenience
 from .commands.queue import start_queue, add_prompt, show_status

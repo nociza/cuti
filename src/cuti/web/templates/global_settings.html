@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Settings - Cuti</title>
+    <link href="/static/css/output.css" rel="stylesheet">
+    <link href="/static/css/custom.css" rel="stylesheet">
+    <style>
+        .settings-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .storage-bar {
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .storage-fill {
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">Global Settings</h1>
+            <p class="text-gray-400">Manage cuti global preferences and usage tracking</p>
+        </div>
+
+        <!-- Storage Info Card -->
+        <div class="settings-card rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4">Storage Usage</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <p class="text-sm opacity-75">Total Storage</p>
+                    <p class="text-xl font-bold" id="total-storage">0 MB</p>
+                </div>
+                <div>
+                    <p class="text-sm opacity-75">Database Size</p>
+                    <p class="text-xl font-bold" id="db-size">0 MB</p>
+                </div>
+                <div>
+                    <p class="text-sm opacity-75">File Count</p>
+                    <p class="text-xl font-bold" id="file-count">0</p>
+                </div>
+            </div>
+            <div class="storage-bar h-4 mb-2">
+                <div class="storage-fill" id="storage-bar" style="width: 0%"></div>
+            </div>
+            <p class="text-sm" id="storage-text">0 MB / 500 MB (0%)</p>
+        </div>
+
+        <!-- Settings Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Privacy Settings -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h3 class="text-xl font-semibold mb-4">Privacy Settings</h3>
+                
+                <div class="space-y-4">
+                    <label class="flex items-center justify-between">
+                        <span>Usage Tracking</span>
+                        <input type="checkbox" id="usage-tracking" class="toggle-checkbox">
+                    </label>
+                    
+                    <label class="flex items-center justify-between">
+                        <span>Privacy Mode</span>
+                        <input type="checkbox" id="privacy-mode" class="toggle-checkbox">
+                    </label>
+                    
+                    <label class="flex items-center justify-between">
+                        <span>Favorite Prompts</span>
+                        <input type="checkbox" id="favorite-prompts" class="toggle-checkbox">
+                    </label>
+                    
+                    <div class="pt-2">
+                        <label class="block text-sm mb-1">Auto Cleanup (days)</label>
+                        <input type="number" id="cleanup-days" min="1" max="365" 
+                               class="w-full px-3 py-2 bg-gray-700 rounded">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subscription Settings -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h3 class="text-xl font-semibold mb-4">Subscription Settings</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm mb-1">Claude Plan</label>
+                        <select id="claude-plan" class="w-full px-3 py-2 bg-gray-700 rounded">
+                            <option value="pro">Pro</option>
+                            <option value="max5">Max 5</option>
+                            <option value="max20">Max 20</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm mb-1">Max Storage (MB)</label>
+                        <input type="number" id="max-storage" min="100" max="10000" 
+                               class="w-full px-3 py-2 bg-gray-700 rounded">
+                    </div>
+                    
+                    <label class="flex items-center justify-between">
+                        <span>Notifications</span>
+                        <input type="checkbox" id="notifications" class="toggle-checkbox">
+                    </label>
+                    
+                    <div>
+                        <label class="block text-sm mb-1">Theme</label>
+                        <select id="theme" class="w-full px-3 py-2 bg-gray-700 rounded">
+                            <option value="auto">Auto</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usage Statistics -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <h3 class="text-xl font-semibold mb-4">Usage Statistics</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="bg-gray-700 rounded p-4">
+                    <p class="text-sm text-gray-400">Today</p>
+                    <p class="text-2xl font-bold" id="today-tokens">0</p>
+                    <p class="text-sm text-gray-400">tokens</p>
+                </div>
+                <div class="bg-gray-700 rounded p-4">
+                    <p class="text-sm text-gray-400">This Month</p>
+                    <p class="text-2xl font-bold" id="month-tokens">0</p>
+                    <p class="text-sm text-gray-400">tokens</p>
+                </div>
+                <div class="bg-gray-700 rounded p-4">
+                    <p class="text-sm text-gray-400">Total Cost</p>
+                    <p class="text-2xl font-bold" id="total-cost">$0.00</p>
+                    <p class="text-sm text-gray-400">this month</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-4">
+                <button onclick="syncUsage()" class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700">
+                    Sync Usage Data
+                </button>
+                <button onclick="viewDetails()" class="px-4 py-2 bg-gray-600 rounded hover:bg-gray-700">
+                    View Details
+                </button>
+            </div>
+        </div>
+
+        <!-- Sync Service Status -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <h3 class="text-xl font-semibold mb-4">Sync Service</h3>
+            
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm text-gray-400">Status</p>
+                    <p class="text-lg" id="sync-status">🔴 Stopped</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-400">Last Sync</p>
+                    <p class="text-lg" id="last-sync">Never</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-400">Sync Count</p>
+                    <p class="text-lg" id="sync-count">0</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-4">
+                <button onclick="startSync()" class="px-4 py-2 bg-green-600 rounded hover:bg-green-700">
+                    Start Service
+                </button>
+                <button onclick="stopSync()" class="px-4 py-2 bg-red-600 rounded hover:bg-red-700">
+                    Stop Service
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-4 flex-wrap">
+            <button onclick="saveSettings()" class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 font-semibold">
+                Save Settings
+            </button>
+            <button onclick="resetSettings()" class="px-6 py-3 bg-gray-600 rounded-lg hover:bg-gray-700">
+                Reset to Defaults
+            </button>
+            <button onclick="cleanupData()" class="px-6 py-3 bg-orange-600 rounded-lg hover:bg-orange-700">
+                Cleanup Old Data
+            </button>
+            <button onclick="createBackup()" class="px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700">
+                Create Backup
+            </button>
+            <button onclick="exportData()" class="px-6 py-3 bg-green-600 rounded-lg hover:bg-green-700">
+                Export Data
+            </button>
+        </div>
+    </div>
+
+    <style>
+        .toggle-checkbox {
+            appearance: none;
+            width: 48px;
+            height: 24px;
+            background: #4a5568;
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .toggle-checkbox:checked {
+            background: #48bb78;
+        }
+        
+        .toggle-checkbox::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        
+        .toggle-checkbox:checked::after {
+            transform: translateX(24px);
+        }
+    </style>
+
+    <script>
+        let currentSettings = {};
+
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/global/settings');
+                const data = await response.json();
+                currentSettings = data.settings;
+                
+                // Update UI with settings
+                document.getElementById('usage-tracking').checked = data.settings.usage_tracking_enabled;
+                document.getElementById('privacy-mode').checked = data.settings.privacy_mode;
+                document.getElementById('favorite-prompts').checked = data.settings.favorite_prompts_enabled;
+                document.getElementById('cleanup-days').value = data.settings.auto_cleanup_days;
+                document.getElementById('claude-plan').value = data.settings.claude_plan;
+                document.getElementById('max-storage').value = data.settings.max_storage_mb;
+                document.getElementById('notifications').checked = data.settings.notifications_enabled;
+                document.getElementById('theme').value = data.settings.theme;
+                
+                // Update storage info
+                const storage = data.storage;
+                document.getElementById('total-storage').textContent = `${storage.total_size_mb} MB`;
+                document.getElementById('db-size').textContent = `${storage.database_size_mb} MB`;
+                document.getElementById('file-count').textContent = storage.file_count;
+                document.getElementById('storage-bar').style.width = `${storage.usage_percentage}%`;
+                document.getElementById('storage-text').textContent = 
+                    `${storage.total_size_mb} MB / ${storage.max_storage_mb} MB (${storage.usage_percentage}%)`;
+                
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        async function loadUsageStats() {
+            try {
+                const response = await fetch('/api/global/usage/stats');
+                const stats = await response.json();
+                
+                document.getElementById('today-tokens').textContent = 
+                    stats.today.tokens.toLocaleString();
+                document.getElementById('month-tokens').textContent = 
+                    stats.this_month.tokens.toLocaleString();
+                document.getElementById('total-cost').textContent = 
+                    `$${stats.this_month.cost.toFixed(2)}`;
+                    
+            } catch (error) {
+                console.error('Failed to load usage stats:', error);
+            }
+        }
+
+        async function loadSyncStatus() {
+            try {
+                const response = await fetch('/api/global/usage/sync/status');
+                const status = await response.json();
+                
+                document.getElementById('sync-status').textContent = 
+                    status.running ? '🟢 Running' : '🔴 Stopped';
+                document.getElementById('last-sync').textContent = 
+                    status.last_sync ? new Date(status.last_sync).toLocaleString() : 'Never';
+                document.getElementById('sync-count').textContent = status.sync_count;
+                
+            } catch (error) {
+                console.error('Failed to load sync status:', error);
+            }
+        }
+
+        async function saveSettings() {
+            const settings = {
+                usage_tracking_enabled: document.getElementById('usage-tracking').checked,
+                privacy_mode: document.getElementById('privacy-mode').checked,
+                favorite_prompts_enabled: document.getElementById('favorite-prompts').checked,
+                auto_cleanup_days: parseInt(document.getElementById('cleanup-days').value),
+                claude_plan: document.getElementById('claude-plan').value,
+                max_storage_mb: parseInt(document.getElementById('max-storage').value),
+                notifications_enabled: document.getElementById('notifications').checked,
+                theme: document.getElementById('theme').value
+            };
+            
+            try {
+                const response = await fetch('/api/global/settings', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(settings)
+                });
+                
+                if (response.ok) {
+                    alert('Settings saved successfully!');
+                    loadSettings();
+                } else {
+                    alert('Failed to save settings');
+                }
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+                alert('Error saving settings');
+            }
+        }
+
+        async function resetSettings() {
+            if (!confirm('Reset all settings to defaults?')) return;
+            
+            const defaults = {
+                usage_tracking_enabled: true,
+                privacy_mode: false,
+                favorite_prompts_enabled: true,
+                auto_cleanup_days: 90,
+                claude_plan: 'pro',
+                max_storage_mb: 500,
+                notifications_enabled: true,
+                theme: 'auto'
+            };
+            
+            try {
+                const response = await fetch('/api/global/settings', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(defaults)
+                });
+                
+                if (response.ok) {
+                    alert('Settings reset to defaults!');
+                    loadSettings();
+                }
+            } catch (error) {
+                console.error('Failed to reset settings:', error);
+            }
+        }
+
+        async function syncUsage() {
+            try {
+                const response = await fetch('/api/global/usage/sync', {method: 'POST'});
+                const result = await response.json();
+                alert(`Synced ${result.imported} new usage records`);
+                loadUsageStats();
+            } catch (error) {
+                console.error('Failed to sync usage:', error);
+            }
+        }
+
+        async function startSync() {
+            try {
+                await fetch('/api/global/usage/sync/start', {method: 'POST'});
+                alert('Sync service started');
+                loadSyncStatus();
+            } catch (error) {
+                console.error('Failed to start sync:', error);
+            }
+        }
+
+        async function stopSync() {
+            try {
+                await fetch('/api/global/usage/sync/stop', {method: 'POST'});
+                alert('Sync service stopped');
+                loadSyncStatus();
+            } catch (error) {
+                console.error('Failed to stop sync:', error);
+            }
+        }
+
+        async function cleanupData() {
+            const days = document.getElementById('cleanup-days').value;
+            if (!confirm(`Delete data older than ${days} days?`)) return;
+            
+            try {
+                await fetch(`/api/global/data/cleanup?days=${days}`, {method: 'POST'});
+                alert('Old data cleaned up');
+                loadSettings();
+            } catch (error) {
+                console.error('Failed to cleanup data:', error);
+            }
+        }
+
+        async function createBackup() {
+            try {
+                const response = await fetch('/api/global/data/backup', {method: 'POST'});
+                const result = await response.json();
+                alert(`Backup created: ${result.backup_path}`);
+            } catch (error) {
+                console.error('Failed to create backup:', error);
+            }
+        }
+
+        async function exportData() {
+            try {
+                const response = await fetch('/api/global/data/export', {method: 'POST'});
+                const data = await response.json();
+                
+                // Create download link
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cuti_export_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Failed to export data:', error);
+            }
+        }
+
+        function viewDetails() {
+            window.location.href = '/statistics';
+        }
+
+        // Load everything on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            loadUsageStats();
+            loadSyncStatus();
+            
+            // Refresh sync status every 10 seconds
+            setInterval(loadSyncStatus, 10000);
+        });
+    </script>
+</body>
+</html>

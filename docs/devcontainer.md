@@ -1,334 +1,447 @@
-# cuti DevContainer Support
+# Dev Container Documentation
 
-## Overview
-
-cuti provides automatic dev container generation and management for ANY project, with Colima support on macOS and automatic permission handling for Claude Code.
-
-## Features
-
-- Automatic Container Generation: Creates optimized dev containers for any project type
-- Colima Support: Uses Colima as the container runtime on macOS
-- Automatic Permissions: Claude Code runs with `--dangerously-skip-permissions` in containers
-- Project Detection: Automatically detects Python, Node.js, Ruby, Go, Rust projects
-- Dependency Management: Installs project dependencies automatically
-- Zero Configuration: Works out of the box with sensible defaults
+The cuti dev container provides a fully configured development environment with cuti, Claude CLI, and all necessary tools pre-installed and configured.
 
 ## Quick Start
 
-### 1. Run cuti in a Container (Easiest)
-
 ```bash
-# In any project directory
+# Start an interactive container session (works from any directory)
 cuti container
 
-# This will:
-# - Generate a dev container if it doesn't exist
-# - Start Colima if on macOS
-# - Build and run the container
-# - Start cuti web interface inside the container
+# Run a specific command in the container
+cuti container --command "cuti web"
+cuti container --command "claude 'Explain this project'"
 ```
 
-### 2. Initialize DevContainer Only
+## Key Features
 
+### 🔐 Automatic Claude Authentication
+- Claude configuration automatically propagates from your host machine
+- No need to re-authenticate inside the container
+- Uses `--dangerously-skip-permissions` flag for container compatibility
+- Just run `claude` and it works
+
+### 🎯 Smart Container Selection
+- **Universal Container** (`cuti-dev-universal`): Used when running from any project directory
+  - Installs cuti from PyPI via `uv tool install`
+  - Perfect for using cuti with any project
+  - Pre-configured with all tools
+  
+- **Development Container** (`cuti-dev-cuti`): Used when running from cuti source directory
+  - Installs cuti from local source code
+  - Ideal for cuti development and testing
+  - Includes development dependencies
+
+### 🎨 Custom Environment
+- Custom prompt: `cuti:~/path $` for clear container identification
+- Pre-configured with oh-my-zsh for better terminal experience
+- All cuti commands available immediately
+- Python 3.11, Node.js 20, and common development tools pre-installed
+
+## Prerequisites
+
+### macOS
 ```bash
-# Generate dev container configuration
-cuti devcontainer init
+# Install Colima (recommended Docker alternative for Mac)
+brew install colima
 
-# Or specify project type
-cuti devcontainer init --type python
+# Start Colima
+colima start
+
+# Or use Docker Desktop
+# Download from https://www.docker.com/products/docker-desktop
 ```
 
-### 3. Start DevContainer
-
+### Linux
 ```bash
-# Start the container and get an interactive shell
-cuti devcontainer start
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
 
-# Or run a specific command
-cuti devcontainer start "cuti web"
+# Add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
-## How It Works
+### Windows
+- Install Docker Desktop from https://www.docker.com/products/docker-desktop
+- Or use WSL2 with Docker
 
-### Container Generation
+## Usage Examples
 
-When you run `cuti container` or `cuti devcontainer init`, cuti will:
-
-1. Detect Project Type: Analyzes your project files (package.json, pyproject.toml, etc.)
-2. Generate Dockerfile: Creates an optimized Dockerfile with:
-   - Python 3.11 base image
-   - Node.js installation
-   - Claude Code CLI with permissions flag
-   - Project-specific tools (uv, npm, yarn, etc.)
-   - Non-root user with sudo access
-3. Create devcontainer.json: VS Code compatible configuration
-4. Setup Scripts: Initialization scripts for dependencies
-
-### Colima Integration
-
-On macOS, cuti automatically:
-- Detects if Colima is installed
-- Starts Colima if not running
-- Configures with optimal settings (4 CPU, 8GB RAM, 60GB disk)
-
-### Permission Handling
-
-Inside containers:
-- Claude Code automatically uses `--dangerously-skip-permissions`
-- No permission prompts or issues
-- Full access to project files
-- Seamless integration with cuti
-
-## Project Types
-
-cuti automatically detects and configures for:
-
-| Project Type | Detection | Additional Setup |
-|-------------|-----------|------------------|
-| Python | `pyproject.toml`, `requirements.txt` | uv, black, ruff, pytest |
-| JavaScript | `package.json` | yarn, pnpm, typescript, nodemon |
-| Full-stack | `package.json` + `pyproject.toml` | Both Python and JS tools |
-| Ruby | `Gemfile` | Ruby, Bundler |
-| Go | `go.mod` | Go 1.21+ |
-| Rust | `Cargo.toml` | Rust, Cargo |
-| General | Default | Basic development tools |
-
-## Commands
-
-### Main Commands
-
+### Interactive Development
 ```bash
-# Quick start - run cuti in container
-cuti container [COMMAND]
-
-# Initialize dev container
-cuti devcontainer init [--type TYPE] [--force]
-
-# Start dev container
-cuti devcontainer start [COMMAND] [--build/--no-build]
-
-# Stop running container
-cuti devcontainer stop
-
-# Check status
-cuti devcontainer status
-
-# Clean up
-cuti devcontainer clean
-```
-
-### Examples
-
-```bash
-# Run cuti web interface in container
+# Start container from any project
+cd ~/my-project
 cuti container
 
-# Run specific command in container
-cuti container "cuti add 'Fix the bug in auth.py'"
+# You'll see the custom prompt:
+# cuti:/workspace $ 
 
-# Initialize for Python project
-cuti devcontainer init --type python
-
-# Start container with custom command
-cuti devcontainer start "python manage.py runserver"
-
-# Check if running in container
-cuti devcontainer status
+# Inside container, all commands work:
+cuti web          # Start web UI (accessible at http://localhost:8000)
+cuti cli          # Start interactive CLI
+cuti agent list   # List available agents
+claude --help     # Use Claude CLI (already authenticated)
 ```
 
-## Environment Variables
+### Non-Interactive Commands
+```bash
+# Run cuti commands
+cuti container --command "cuti add 'Review this code and suggest improvements'"
+cuti container --command "cuti start"
+cuti container --command "cuti status"
 
-Inside the container, these variables are set:
+# Run Claude directly
+cuti container --command "claude 'What does this project do?'"
 
+# Run Python scripts
+cuti container --command "python script.py"
+```
+
+### Web Development
+```bash
+# Start web UI in container (accessible from host)
+cuti container --command "cuti web"
+# Then open http://localhost:8000 in your browser
+
+# Run development servers
+cuti container --command "npm run dev"
+cuti container --command "python manage.py runserver"
+```
+
+## Architecture
+
+### Container Images
+
+#### `cuti-dev-universal` (Default for most projects)
+- Base: `python:3.11-bullseye`
+- Cuti: Installed from PyPI via `uv tool install cuti`
+- Claude CLI: Latest version with auth propagation
+- Tools: git, zsh, ripgrep, fd-find, bat, jq, curl, wget
+- Python: uv package manager, pytest, httpx, fastapi, uvicorn
+- Node.js: v20 with latest npm
+- Shell: Zsh with oh-my-zsh and custom cuti prompt
+
+#### `cuti-dev-cuti` (For cuti development)
+- Same base as universal
+- Cuti: Installed from local source code
+- Includes all cuti development dependencies
+- Used automatically when running from cuti source directory
+
+### Volume Mounts
+
+The container automatically mounts:
+| Host Path | Container Path | Purpose |
+|-----------|---------------|---------|
+| Current directory | `/workspace` | Your project files |
+| `~/.claude/` | `/host/.claude` | Claude configuration |
+| `~/.claude.json` | `/host/.claude.json` | Claude settings |
+| `~/.cuti/` | `/root/.cuti-global` | Global cuti config |
+
+### Environment Variables
+
+Automatically set in container:
 - `CUTI_IN_CONTAINER=true` - Indicates running in container
-- `CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true` - Skip Claude permissions
+- `CLAUDE_CONFIG_DIR=/host/.claude` - Claude config location
+- `CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true` - Skip permission checks
 - `PYTHONUNBUFFERED=1` - Python unbuffered output
 - `TERM=xterm-256color` - Color terminal support
 
-## VS Code Integration
+### Network Configuration
 
-The generated dev container is fully compatible with VS Code:
+Container runs with `--network host` for easy service access:
+- Port 8000: cuti web interface
+- Port 8080: Alternative web services
+- Port 3000: Frontend dev servers
+- Port 5000: Flask/FastAPI apps
+- Port 5173: Vite dev server
 
-1. Open your project in VS Code
-2. Install "Dev Containers" extension
-3. Command Palette: "Dev Containers: Reopen in Container"
-4. VS Code will use the generated configuration
+## Project Type Detection
 
-### Included Extensions
+When generating dev containers, cuti automatically detects:
 
-- Python + Pylance
-- GitHub Copilot
-- GitLens
-- ESLint + Prettier (for JS projects)
-- And more based on project type
-
-## Mounts and Volumes
-
-The container automatically mounts:
-
-- Project Files: `/workspace` (your project)
-- Claude Config: `~/.claude` → `/home/cuti/.claude`
-- Global cuti: `~/.cuti` → `/home/cuti/.cuti-global`
-- Python venv: Persistent volume for virtual environment
-- Cache: Persistent volume for package caches
+| Project Type | Detection Files | Additional Tools |
+|-------------|----------------|------------------|
+| Python | `pyproject.toml`, `requirements.txt` | pytest, black, ruff, mypy |
+| JavaScript | `package.json` | yarn, pnpm, typescript, nodemon |
+| Full-stack | Both Python + JS files | All Python + JS tools |
+| Ruby | `Gemfile` | Ruby, Bundler |
+| Go | `go.mod` | Go 1.21+ |
+| Rust | `Cargo.toml` | Rust, Cargo |
+| General | None of above | Basic dev tools |
 
 ## Troubleshooting
 
-### Colima Not Starting
+### Container Won't Start
 
+1. **Check Docker/Colima is running:**
 ```bash
-# Install Colima
-brew install colima
-
-# Start manually with custom settings
-colima start --cpu 4 --memory 8 --disk 60
-
-# Check status
+# For Colima
 colima status
+
+# For Docker
+docker version
 ```
+
+2. **Start if needed:**
+```bash
+# Colima (macOS)
+colima start
+
+# Docker Desktop - start from application
+```
+
+3. **Verify image exists:**
+```bash
+docker images | grep cuti-dev
+```
+
+### Claude Authentication Issues
+
+**Important Note:** Claude Code uses a browser-based authentication system with limitations in containerized environments. Authentication tokens are session-based and not easily transferable to containers.
+
+#### What's Implemented:
+- Claude CLI is installed and available in the container
+- `IS_SANDBOX=1` environment variable enables `--dangerously-skip-permissions` for root users
+- Your `.claude` configuration directory is mounted to the container
+- Commands like `claude --version` and `claude --help` work correctly
+
+#### Current Limitations:
+- `claude login` requires a browser and won't work in containers
+- Authentication tokens are not stored in mountable config files
+- The `setup-token` command requires an interactive terminal
+- Even with config mounted, authentication doesn't transfer to the container
+
+#### Technical Details:
+The container uses:
+- `IS_SANDBOX=1` to allow `--dangerously-skip-permissions` as root
+- Mounts `~/.claude` to `/root/.claude` in the container
+- Custom wrapper script at `/usr/local/bin/claude`
+
+#### Workarounds:
+1. **Use Claude on your host machine** for authenticated operations
+2. **Use Claude web interface** at https://claude.ai
+3. **Use Claude API** with API keys for programmatic access
+
+#### Container Claude Status:
+```bash
+# Check Claude installation in container
+cuti container "claude --version"
+
+# Output:
+# ✅ Claude configuration directory found
+# 1.0.80 (Claude Code)
+
+# Try to use Claude (will show auth error)
+cuti container "claude --print 'Hello'"
+
+# Output:
+# Invalid API key · Please run /login
+```
+
+Note: Full Claude authentication in containers is a known limitation of the current Claude Code architecture. The container is prepared for when a solution becomes available.
+
+### Cuti Not Found in Container
+
+1. **Check which container is being used:**
+```bash
+docker images | grep cuti-dev
+```
+
+2. **Force rebuild:**
+```bash
+# Remove old images
+docker rmi cuti-dev-universal cuti-dev-cuti
+
+# Rebuild
+cuti container
+```
+
+3. **Verify installation:**
+```bash
+docker run --rm cuti-dev-universal which cuti
+docker run --rm cuti-dev-universal cuti --help
+```
+
+### "input device is not a TTY" Error
+
+This occurs in non-interactive environments (like Claude Code). The container automatically detects and handles this - no action needed.
 
 ### Permission Issues
 
-The container runs with:
-- Privileged mode for full access
-- Non-root user with sudo
-- Claude with `--dangerously-skip-permissions`
-
-If you still have issues:
-```bash
-# Rebuild container
-cuti devcontainer start --build
-
-# Or clean and restart
-cuti devcontainer clean
-cuti devcontainer init --force
-```
-
-### Port Forwarding
-
-Default forwarded ports:
-- 8000 - cuti web interface
-- 8080 - Alternative web
-- 3000 - Frontend dev server
-- 5000 - Flask/FastAPI
-- 5173 - Vite
-
-Add more in `.devcontainer/devcontainer.json`:
-```json
-"forwardPorts": [8000, 8080, 3000, 5000, 5173, 9000]
-```
-
-### Container Not Building
+The container runs as root for simplicity. To fix file ownership after container use:
 
 ```bash
-# Check Docker/Colima
-docker version
-colima status
+# On host after exiting container
+sudo chown -R $(whoami) .
+```
 
-# View build logs
-cd .devcontainer
-docker build -t cuti-dev .
+### Port Already in Use
 
-# Clean and retry
-cuti devcontainer clean
-cuti devcontainer init --force
+If port 8000 is already in use:
+```bash
+# Find what's using the port
+lsof -i :8000
+
+# Kill the process or use different port
+cuti container --command "cuti web --port 8001"
+```
+
+### Colima Specific Issues (macOS)
+
+**Colima won't start:**
+```bash
+# Stop and clean
+colima stop -f
+colima delete
+
+# Start with specific settings
+colima start --arch aarch64 --vm-type vz --cpu 2 --memory 4
+```
+
+**Docker commands fail after Colima start:**
+```bash
+# Check Docker context
+docker context ls
+
+# Set to use Colima
+docker context use colima
 ```
 
 ## Advanced Usage
 
 ### Custom Dockerfile
 
-Edit `.devcontainer/Dockerfile` after generation:
+After generating dev container files:
 
-```dockerfile
-# Add custom tools
-RUN apt-get update && apt-get install -y postgresql-client
+```bash
+# Generate container configuration
+cuti devcontainer generate
 
-# Add custom Python packages
-RUN pip install pandas numpy scikit-learn
+# Edit .devcontainer/Dockerfile to add custom tools
+# Then rebuild
+docker build -t my-custom-cuti -f .devcontainer/Dockerfile .
 ```
 
-### Custom Entry Point
+### VS Code Integration
 
-Modify `.devcontainer/devcontainer.json`:
+1. Install "Dev Containers" extension
+2. Run `cuti devcontainer generate` in your project
+3. Command Palette: "Dev Containers: Reopen in Container"
+4. VS Code uses the generated configuration
 
-```json
-{
-  "postCreateCommand": "custom-setup.sh",
-  "postStartCommand": "echo 'Custom start'",
-  "postAttachCommand": "source .env && cuti web"
-}
+### Running Services
+
+```bash
+# Database in background
+cuti container --command "docker run -d postgres:15"
+
+# Redis
+cuti container --command "docker run -d redis:7"
+
+# Your app
+cuti container --command "cuti web"
 ```
 
-### Multi-Container Setup
+### Persistent Data
 
-Create `.devcontainer/docker-compose.yml`:
+Create named volumes for persistence:
+```bash
+# Create volume
+docker volume create myproject-data
 
-```yaml
-version: '3.8'
-services:
-  cuti:
-    build: .
-    volumes:
-      - ..:/workspace
-    depends_on:
-      - postgres
-      - redis
-  
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_PASSWORD: password
-  
-  redis:
-    image: redis:7
+# Use in container
+docker run -v myproject-data:/data ...
 ```
 
-Then update `devcontainer.json`:
-```json
-{
-  "dockerComposeFile": "docker-compose.yml",
-  "service": "cuti"
-}
+## Command Reference
+
+### Main Commands
+
+```bash
+# Interactive container
+cuti container
+
+# Run specific command
+cuti container --command "COMMAND"
+
+# Generate dev container files
+cuti devcontainer generate [--type TYPE]
+
+# Clean up
+cuti devcontainer clean
 ```
 
-## Benefits
+### Docker Management
 
-### Why Use DevContainers?
+```bash
+# List cuti images
+docker images | grep cuti
 
-1. Consistency: Same environment across all machines
-2. Isolation: No conflicts with system packages
-3. Permissions: No Claude permission issues
-4. Portability: Share exact environment with team
-5. Clean System: Keep your host system clean
+# Remove cuti images
+docker rmi cuti-dev-universal cuti-dev-cuti
 
-### Why Colima?
+# Clean all Docker resources
+docker system prune -a
 
-- Lightweight Docker Desktop alternative
-- Better performance on macOS
-- Lower resource usage
-- Open source
-- Simple CLI interface
+# Check container logs
+docker logs [container-name]
 
-## Security Notes
+# Execute command in running container
+docker exec -it [container-name] bash
+```
+
+## Implementation Details
+
+### Container Build Process
+
+1. **Detection**: Determines if running from cuti source or other project
+2. **Image Selection**: Chooses `cuti-dev-universal` or `cuti-dev-cuti`
+3. **Build Check**: Checks if image exists, builds if missing
+4. **Mount Setup**: Configures volume mounts for project and configs
+5. **Environment**: Sets environment variables
+6. **Execution**: Runs container with appropriate flags
+
+### File Locations
+
+- Dockerfile templates: `src/cuti/services/devcontainer.py`
+- Universal Dockerfile: `.devcontainer/Dockerfile.universal`
+- Development Dockerfile: `.devcontainer/Dockerfile`
+- Generated files: `.devcontainer/` in your project
+
+### Security Considerations
 
 - Containers run with `--privileged` for full functionality
 - Claude uses `--dangerously-skip-permissions` only in containers
-- Your home `.claude` directory is mounted read-only
-- Non-root user with sudo access
+- Config directories mounted with appropriate permissions
 - No telemetry or external connections
+- Local-first approach
 
 ## Contributing
 
-To improve devcontainer support:
+To improve dev container support:
 
 1. Edit `src/cuti/services/devcontainer.py`
-2. Add project type detection in `_detect_project_type()`
-3. Add setup in `_generate_dockerfile()`
-4. Test with `cuti devcontainer init --type YOUR_TYPE`
+2. Update Dockerfile templates
+3. Test with both container types:
+   ```bash
+   # Test universal container
+   cd ~/some-project
+   cuti container
+   
+   # Test development container  
+   cd ~/cuti-source
+   cuti container
+   ```
+4. Submit PR with test results
+
+## Related Documentation
+
+- [Todo System](todo-system.md) - Task management in cuti
+- [Rate Limit Handling](rate-limit-handling.md) - How cuti handles API limits
+- [Main README](../README.md) - Project overview
 
 ## License
 
 Part of the cuti project - MIT License
-
-

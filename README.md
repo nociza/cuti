@@ -41,13 +41,25 @@ cuti status
 
 ### Dev containers
 
-Dev container support is under development. Early preview:
+Run your project in a containerized dev environment with cuti and all tools pre-configured:
 
 ```bash
-cuti container --init
+# Start interactive container (works from any directory)
+cuti container
+
+# Run a specific command
+cuti container "cuti web"
+cuti container "python script.py"
 ```
 
-Requires Docker (or Colima on macOS). Details and troubleshooting live in `docs/devcontainer.md`.
+Features:
+- Cuti installed and ready (from PyPI via `uv tool install`)
+- Claude CLI installed (note: auth limitations in containers)
+- Custom prompt shows `cuti:~/path $`
+- Works from any project directory
+- Python 3.11, Node.js 20, development tools included
+
+Requires Docker (or Colima on macOS). See `docs/devcontainer.md` for details and Claude authentication notes.
 
 ### License
 
