@@ -12,13 +12,14 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.9",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Systems Administration",
     "Topic :: Utilities",
 ]
 dependencies = [
     "aiofiles>=23.0.0",
+    "anyio>=4.10.0",
+    "claude-code-sdk>=0.0.20",
     "claude-monitor>=3.1.0",
     "fastapi>=0.104.0",
     "httpx>=0.25.0",
@@ -37,8 +38,8 @@ keywords = ["ai", "automation", "claude", "cli", "orchestration", "queue"]
 license = "Apache-2.0"
 name = "cuti"
 readme = "README.md"
-requires-python = ">=3.9"
-version = "0.1.13"
+requires-python = ">=3.10"
+version = "0.1.15"
 
 [project.optional-dependencies]
 dev = [

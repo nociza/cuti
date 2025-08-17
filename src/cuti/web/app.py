@@ -40,6 +40,10 @@ try:
 except ImportError:
     enhanced_chat_router = None
 try:
+    from .api.improved_chat import improved_chat_router
+except ImportError:
+    improved_chat_router = None
+try:
     from .api.todos import router as todos_router
 except ImportError:
     todos_router = None
@@ -176,6 +180,10 @@ def create_app(
     # Include enhanced chat router if available
     if enhanced_chat_router:
         app.include_router(enhanced_chat_router)
+    
+    # Include improved chat router if available
+    if improved_chat_router:
+        app.include_router(improved_chat_router)
     
     # Include todos router if available
     if todos_router:
