@@ -5,7 +5,13 @@ The `cuti container` command provides a seamless development environment with al
 ## Quick Start
 
 ```bash
-# Run container from any directory
+# First time on macOS - automatic dependency installation
+cuti container
+# ✅ Detects missing dependencies (Homebrew, Docker, Colima)
+# 🛠️  Offers to install them automatically
+# 🚀 Launches container with all tools pre-installed
+
+# Subsequent runs - instant launch
 cuti container
 
 # Clean all Docker resources
@@ -83,16 +89,36 @@ claude --version  # Already authenticated!
 
 ## Docker Setup
 
-### Automatic Colima Management
+### Automatic Dependency Installation (macOS)
 
-If Docker isn't running, cuti will automatically start Colima (if installed):
+On macOS, cuti will automatically detect and offer to install missing dependencies:
 
 ```bash
-# Install Colima if needed
+# First time on a new Mac - cuti handles everything
+cuti container
+# ✅ Checks for Homebrew, Docker, and Colima
+# 🛠️  Offers to install missing dependencies
+# 🚀 Launches container when ready
+```
+
+**What cuti installs automatically:**
+- **Homebrew**: Package manager for macOS (if missing)
+- **Colima**: Lightweight Docker runtime (recommended)
+- **Docker Desktop**: Alternative with GUI (user choice)
+
+### Manual Installation Options
+
+If you prefer to install manually:
+
+```bash
+# Install Homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Option 1: Install Colima (recommended)
 brew install colima
 
-# cuti will auto-start it when running containers
-cuti container
+# Option 2: Install Docker Desktop
+brew install docker
 ```
 
 ### Manual Docker Control

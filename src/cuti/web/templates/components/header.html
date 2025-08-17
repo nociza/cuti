@@ -19,10 +19,14 @@
                {% if nav_item.target %}target="{{ nav_item.target }}"{% endif %}>
                 {% if nav_item.label == "Chat" %}
                 <i class="fas fa-comments"></i>
+                {% elif nav_item.label == "Todos" %}
+                <i class="fas fa-tasks"></i>
                 {% elif nav_item.label == "Agent Manager" %}
                 <i class="fas fa-robot"></i>
                 {% elif nav_item.label == "Statistics" %}
                 <i class="fas fa-chart-line"></i>
+                {% elif nav_item.label == "Global Settings" %}
+                <i class="fas fa-cog"></i>
                 {% endif %}
                 <span>{{ nav_item.label }}</span>
             </a>

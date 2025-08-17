@@ -12,6 +12,15 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import platform
 
+try:
+    from rich.console import Console
+    from rich.prompt import Confirm, IntPrompt
+except ImportError:
+    # Fallback for environments without rich
+    Console = None
+    Confirm = None
+    IntPrompt = None
+
 
 class DevContainerService:
     """Manages dev container generation and execution for any project."""
@@ -201,8 +210,23 @@ CMD ["/bin/zsh", "-l"]
         """Initialize the dev container service."""
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
         self.devcontainer_dir = self.working_dir / ".devcontainer"
+        self.is_macos = platform.system() == "Darwin"
+        self.homebrew_available = self._check_homebrew()
         self.colima_available = self._check_colima()
         self.docker_available = self._check_docker()
+        
+    def _check_homebrew(self) -> bool:
+        """Check if Homebrew is available."""
+        try:
+            result = subprocess.run(
+                ["brew", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return False
         
     def _check_colima(self) -> bool:
         """Check if Colima is available."""
@@ -229,6 +253,169 @@ CMD ["/bin/zsh", "-l"]
             return result.returncode == 0
         except (subprocess.SubprocessError, FileNotFoundError):
             return False
+    
+    def _prompt_user_install(self, tool: str, install_command: str) -> bool:
+        """Prompt user to install a missing dependency."""
+        if Console is None or Confirm is None:
+            # Fallback for environments without rich
+            print(f"\nMissing dependency: {tool}")
+            print(f"To use containers, cuti needs {tool} installed.")
+            print(f"Install command: {install_command}")
+            response = input(f"Would you like cuti to install {tool} automatically? (y/N): ").lower()
+            return response in ['y', 'yes']
+        
+        console = Console()
+        console.print(f"\n[yellow]Missing dependency: {tool}[/yellow]")
+        console.print(f"To use containers, cuti needs {tool} installed.")
+        console.print(f"Install command: [cyan]{install_command}[/cyan]")
+        
+        return Confirm.ask(f"Would you like cuti to install {tool} automatically?")
+    
+    def _install_homebrew(self) -> bool:
+        """Install Homebrew."""
+        if Console is None:
+            print("🍺 Installing Homebrew...")
+        else:
+            console = Console()
+            console.print("🍺 Installing Homebrew...")
+        
+        install_script = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        
+        result = subprocess.run(
+            install_script,
+            shell=True,
+            capture_output=False,  # Show output to user
+            text=True
+        )
+        
+        if result.returncode == 0:
+            # Update PATH for current session
+            import os
+            if "/opt/homebrew/bin" not in os.environ["PATH"]:
+                os.environ["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.environ['PATH']}"
+            
+            if Console is None:
+                print("✅ Homebrew installed successfully!")
+            else:
+                console = Console()
+                console.print("✅ Homebrew installed successfully!")
+            return True
+        else:
+            if Console is None:
+                print("❌ Failed to install Homebrew")
+            else:
+                console = Console()
+                console.print("❌ Failed to install Homebrew")
+            return False
+    
+    def _install_with_brew(self, package: str) -> bool:
+        """Install a package with Homebrew."""
+        if Console is None:
+            print(f"📦 Installing {package} with Homebrew...")
+        else:
+            console = Console()
+            console.print(f"📦 Installing {package} with Homebrew...")
+        
+        result = subprocess.run(
+            ["brew", "install", package],
+            capture_output=False,  # Show output to user
+            text=True
+        )
+        
+        if result.returncode == 0:
+            if Console is None:
+                print(f"✅ {package} installed successfully!")
+            else:
+                console = Console()
+                console.print(f"✅ {package} installed successfully!")
+            return True
+        else:
+            if Console is None:
+                print(f"❌ Failed to install {package}")
+            else:
+                console = Console()
+                console.print(f"❌ Failed to install {package}")
+            return False
+    
+    def ensure_dependencies(self) -> bool:
+        """Ensure all required dependencies are installed on macOS."""
+        if not self.is_macos:
+            # Non-macOS systems - just check what's available
+            return self.docker_available or self.colima_available
+        
+        # Check Homebrew first
+        if not self.homebrew_available:
+            if self._prompt_user_install("Homebrew", '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'):
+                if not self._install_homebrew():
+                    if Console is None:
+                        print("Cannot proceed without Homebrew on macOS")
+                    else:
+                        console = Console()
+                        console.print("[red]Cannot proceed without Homebrew on macOS[/red]")
+                    return False
+                self.homebrew_available = True
+            else:
+                if Console is None:
+                    print("Skipped Homebrew installation. You'll need to install Docker manually.")
+                else:
+                    console = Console()
+                    console.print("[yellow]Skipped Homebrew installation. You'll need to install Docker manually.[/yellow]")
+                return False
+        
+        # Check Docker Desktop or Colima
+        if not self.docker_available and not self.colima_available:
+            if Console is None or IntPrompt is None:
+                # Fallback for environments without rich
+                print("\nContainer runtime needed")
+                print("Choose an option:")
+                print("1. Colima (lightweight, recommended)")
+                print("2. Docker Desktop (GUI, more features)")  
+                print("3. Skip installation")
+                choice = input("Select option (1-3, default 1): ").strip() or "1"
+            else:
+                console = Console()
+                console.print("\n[yellow]Container runtime needed[/yellow]")
+                console.print("Choose an option:")
+                console.print("1. [cyan]Colima[/cyan] (lightweight, recommended)")
+                console.print("2. [cyan]Docker Desktop[/cyan] (GUI, more features)")
+                console.print("3. [dim]Skip installation[/dim]")
+                choice = str(IntPrompt.ask("Select option", choices=["1", "2", "3"], default=1))
+            
+            if choice == "1":
+                # Install Colima
+                if self._install_with_brew("colima"):
+                    self.colima_available = True
+                    if Console is None:
+                        print("ℹ️  Colima installed. It will auto-start when you run containers.")
+                    else:
+                        console = Console()
+                        console.print("ℹ️  Colima installed. It will auto-start when you run containers.")
+                else:
+                    return False
+            elif choice == "2":
+                # Install Docker Desktop
+                if self._install_with_brew("docker"):
+                    if Console is None:
+                        print("✅ Docker Desktop installed!")
+                        print("🔄 Please start Docker Desktop from your Applications folder")
+                        print("   Then run 'cuti container' again")
+                    else:
+                        console = Console()
+                        console.print("✅ Docker Desktop installed!")
+                        console.print("🔄 Please start Docker Desktop from your Applications folder")
+                        console.print("   Then run 'cuti container' again")
+                    return False  # User needs to start Docker manually
+                else:
+                    return False
+            else:
+                if Console is None:
+                    print("Skipped container runtime installation")
+                else:
+                    console = Console()
+                    console.print("[yellow]Skipped container runtime installation[/yellow]")
+                return False
+        
+        return True
     
     def setup_colima(self) -> bool:
         """Setup Colima if not already running."""
@@ -576,23 +763,70 @@ CMD ["/bin/zsh"]
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_dockerfile = Path(tmpdir) / "Dockerfile"
             
-            # Write a minimal Dockerfile
+            # Write a comprehensive Dockerfile with all required tools
             minimal_dockerfile = """FROM python:3.11-bullseye
-RUN apt-get update && apt-get install -y curl git zsh wget && apt-get clean
+
+# Install system dependencies
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \\
+    && apt-get -y install --no-install-recommends \\
+    curl ca-certificates git sudo zsh wget build-essential \\
+    procps lsb-release locales fontconfig \\
+    software-properties-common gnupg2 jq ripgrep fd-find bat \\
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Generate locale
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+
+# Install Node.js for Claude CLI
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
+    && apt-get install -y nodejs \\
+    && npm install -g npm@latest
+
+# Install uv for Python package management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
-RUN uv tool install cuti && \
-    ln -sf /root/.local/share/uv/tools/cuti/bin/cuti /usr/local/bin/cuti
+
+# Install Claude CLI globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Verify Claude CLI is installed and accessible
+RUN which claude || (echo "ERROR: Claude CLI not installed!" && exit 1)
+
+# Install cuti from PyPI
+RUN /root/.local/bin/uv tool install cuti \\
+    && ln -sf /root/.local/share/uv/tools/cuti/bin/cuti /usr/local/bin/cuti
+
+# Install oh-my-zsh for better terminal experience
+RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
+    && echo 'export PATH="/usr/local/bin:/root/.local/bin:$PATH"' >> ~/.zshrc \\
+    && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
+    && echo 'export CLAUDE_CONFIG_DIR="/root/.claude"' >> ~/.zshrc \\
+    && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
+    && echo 'echo "   Commands available:"' >> ~/.zshrc \\
+    && echo 'echo "     • cuti web        - Start web interface"' >> ~/.zshrc \\
+    && echo 'echo "     • cuti cli        - Start CLI"' >> ~/.zshrc \\
+    && echo 'echo "     • claude          - Use Claude CLI"' >> ~/.zshrc \\
+    && echo 'echo ""' >> ~/.zshrc
+
+# Set working directory
 WORKDIR /workspace
-CMD ["/bin/bash"]
+
+# Use zsh as default shell
+SHELL ["/bin/zsh", "-c"]
+CMD ["/bin/zsh", "-l"]
 """
             temp_dockerfile.write_text(minimal_dockerfile)
             
-            return subprocess.run(
+            print("Building container with Node.js and Claude CLI...")
+            result = subprocess.run(
                 ["docker", "build", "-t", container_image, "-f", str(temp_dockerfile), tmpdir],
-                capture_output=True,
+                capture_output=False,  # Show build output to see any errors
                 text=True
             )
+            return result
     
     def _create_init_script(self):
         """Create initialization script for the container."""
@@ -685,46 +919,10 @@ echo "✅ Dev container initialization complete!"
                 text=True
             )
             
-            # Get the cuti installation directory
-            import cuti
-            cuti_module_path = Path(cuti.__file__).parent  # cuti module directory
-            
-            # Check if we're in a development environment (editable install)
-            cuti_src_dir = cuti_module_path.parent.parent  # Try to get to project root
-            
-            if container_image == "cuti-dev-universal":
-                # Build universal container from Dockerfile.universal
-                dockerfile_path = cuti_src_dir / ".devcontainer" / "Dockerfile.universal"
-                if dockerfile_path.exists():
-                    print(f"Building universal container with cuti from PyPI...")
-                    build_result = subprocess.run(
-                        ["docker", "build", "-t", container_image, "-f", str(dockerfile_path), str(cuti_src_dir)],
-                        capture_output=True,
-                        text=True
-                    )
-                else:
-                    # Fallback to minimal container
-                    print("Building minimal container...")
-                    build_result = self._build_minimal_container(container_image)
-            elif container_image == "cuti-dev-cuti":
-                # Build from source for cuti development
-                dockerfile_path = cuti_src_dir / ".devcontainer" / "Dockerfile"
-                if dockerfile_path.exists() and (cuti_src_dir / "pyproject.toml").exists():
-                    # We have the full source - use it
-                    print(f"Building from source at {cuti_src_dir}")
-                    build_result = subprocess.run(
-                        ["docker", "build", "-t", container_image, "-f", str(dockerfile_path), str(cuti_src_dir)],
-                        capture_output=True,
-                        text=True
-                    )
-                else:
-                    # Fallback to minimal container
-                    print("Building minimal container...")
-                    build_result = self._build_minimal_container(container_image)
-            else:
-                # Shouldn't reach here, but build minimal as fallback
-                print("Building minimal container...")
-                build_result = self._build_minimal_container(container_image)
+            # Always use the embedded template for consistent behavior
+            # This ensures the container works on any machine in any directory
+            print(f"Building {container_image} with full cuti environment...")
+            build_result = self._build_minimal_container(container_image)
             
             if build_result.returncode != 0:
                 print(f"❌ Failed to build container: {build_result.stderr}")

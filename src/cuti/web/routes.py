@@ -64,11 +64,62 @@ async def todos_dashboard(request: Request):
     
     nav_items = get_nav_items("todos")
     
-    return templates.TemplateResponse("todos.html", {
-        "request": request,
-        "working_directory": str(request.app.state.working_directory),
-        "nav_items": nav_items
-    })
+    # Check if todos.html template exists, fallback to a simple page if not
+    try:
+        return templates.TemplateResponse("todos.html", {
+            "request": request,
+            "working_directory": str(request.app.state.working_directory),
+            "nav_items": nav_items
+        })
+    except Exception:
+        # Fallback for older versions without todos.html template
+        from fastapi.responses import HTMLResponse
+        fallback_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Todos - cuti</title>
+            <style>
+                body {{ font-family: system-ui, sans-serif; padding: 20px; background: #f9fafb; }}
+                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+                .header {{ text-align: center; margin-bottom: 30px; }}
+                .title {{ font-size: 2rem; color: #1f2937; margin: 0 0 10px 0; }}
+                .subtitle {{ color: #6b7280; margin: 0; }}
+                .message {{ text-align: center; padding: 60px 20px; color: #6b7280; }}
+                .icon {{ font-size: 3rem; margin-bottom: 20px; }}
+                .nav {{ margin-bottom: 20px; }}
+                .nav a {{ display: inline-block; padding: 8px 16px; margin-right: 10px; text-decoration: none; color: #374151; background: #f3f4f6; border-radius: 4px; }}
+                .nav a.active {{ background: #3b82f6; color: white; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="nav">
+                    <a href="/">Chat</a>
+                    <a href="/todos" class="active">Todos</a>
+                    <a href="/agents">Agents</a>
+                    <a href="/statistics">Statistics</a>
+                </div>
+                <div class="header">
+                    <h1 class="title">Todo Manager</h1>
+                    <p class="subtitle">Task management coming soon</p>
+                </div>
+                <div class="message">
+                    <div class="icon">📝</div>
+                    <h3>Todo Management</h3>
+                    <p>This feature is available in the latest version of cuti.</p>
+                    <p>Use the CLI commands for now:</p>
+                    <ul style="text-align: left; display: inline-block;">
+                        <li><code>cuti todo add "Task description"</code></li>
+                        <li><code>cuti todo list</code></li>
+                        <li><code>cuti todo complete &lt;id&gt;</code></li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=fallback_html)
 
 
 @main_router.get("/statistics", response_class=HTMLResponse)

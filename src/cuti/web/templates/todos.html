@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}cuti - Todo Manager{% endblock %}
+
+{% block head %}
+<style>
+.todos-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    margin-bottom: 30px;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 20px;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 8px 0;
+}
+
+.page-subtitle {
+    color: #6b7280;
+    margin: 0;
+}
+
+.todos-container {
+    display: grid;
+    gap: 20px;
+}
+
+.todo-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.2s ease;
+}
+
+.todo-card:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.todo-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.todo-title {
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.todo-status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-in_progress {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-completed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.todo-content {
+    color: #4b5563;
+    margin-bottom: 15px;
+}
+
+.todo-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6b7280;
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+}
+
+.empty-state-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+}
+</style>
+{% endblock %}
+
+{% set body_class = "" %}
+{% set alpine_data = "todoManager()" %}
+
+{% block content %}
+<div class="todos-page">
+    <div class="page-header">
+        <h1 class="page-title">Todo Manager</h1>
+        <p class="page-subtitle">Track your tasks and project goals</p>
+    </div>
+    
+    <!-- Todos Container -->
+    <div class="todos-container" x-show="todos.length > 0">
+        <template x-for="todo in todos" :key="todo.id">
+            <div class="todo-card">
+                <div class="todo-header">
+                    <h3 class="todo-title" x-text="todo.content"></h3>
+                    <span class="todo-status" :class="`status-${todo.status}`" x-text="formatStatus(todo.status)"></span>
+                </div>
+                <div class="todo-content" x-show="todo.description" x-text="todo.description"></div>
+                <div class="todo-meta">
+                    <span x-text="formatDate(todo.created_at)"></span>
+                    <span x-show="todo.updated_at && todo.updated_at !== todo.created_at" x-text="`Updated ${formatDate(todo.updated_at)}`"></span>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Empty State -->
+    <div x-show="todos.length === 0" class="empty-state">
+        <div class="empty-state-icon">📝</div>
+        <div class="empty-state-title">No Todos Yet</div>
+        <div class="empty-state-description">
+            Start organizing your tasks and goals with the todo system
+        </div>
+        <button @click="openCLI()" class="btn-primary" style="margin-top: 20px;">
+            Open CLI to Add Todos
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function todoManager() {
+    return {
+        todos: [],
+        
+        async init() {
+            await this.loadTodos();
+        },
+        
+        async loadTodos() {
+            try {
+                const response = await fetch('/api/claude-logs/todos');
+                if (response.ok) {
+                    this.todos = await response.json();
+                }
+            } catch (error) {
+                console.error('Error loading todos:', error);
+            }
+        },
+        
+        formatStatus(status) {
+            switch (status) {
+                case 'pending': return 'Pending';
+                case 'in_progress': return 'In Progress';
+                case 'completed': return 'Completed';
+                default: return status;
+            }
+        },
+        
+        formatDate(dateStr) {
+            if (!dateStr) return 'Recently created';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            
+            if (days === 0) return 'Today';
+            if (days === 1) return 'Yesterday';
+            if (days < 7) return `${days} days ago`;
+            if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+            return date.toLocaleDateString();
+        },
+        
+        openCLI() {
+            window.location.href = '/';
+        }
+    }
+}
+</script>
+{% endblock %}

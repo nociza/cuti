@@ -8,6 +8,15 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+# Version information - dynamically imported from package
+try:
+    from importlib.metadata import version
+    __version__ = version("cuti")
+except ImportError:
+    # Fallback for Python < 3.8
+    from importlib_metadata import version
+    __version__ = version("cuti")
+
 from ..services.queue_service import QueueManager
 from ..services.aliases import PromptAliasManager
 from ..services.history import PromptHistoryManager
@@ -35,6 +44,14 @@ app = typer.Typer(
 )
 
 console = Console()
+
+
+def version_callback(value: bool):
+    """Print version and exit."""
+    if value:
+        console.print(f"cuti version {__version__}")
+        raise typer.Exit()
+
 
 # Global state
 _manager: Optional[QueueManager] = None
@@ -76,6 +93,13 @@ def get_history_manager(storage_dir: str = "~/.cuti") -> PromptHistoryManager:
     return _history_manager
 
 
+# Version command
+@app.command(name="version")
+def show_version():
+    """Show version information."""
+    console.print(f"cuti version {__version__}")
+
+
 # Add sub-applications
 app.add_typer(queue_app, name="queue", help="Queue management commands")
 app.add_typer(alias_app, name="alias", help="Alias management commands")  
@@ -83,8 +107,6 @@ app.add_typer(agent_app, name="agent", help="Agent system commands")
 app.add_typer(todo_app, name="todo", help="Todo list management commands")
 if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
-    # Also add as 'container' for shorter command
-    app.add_typer(devcontainer_app, name="container", help="Container management (alias for devcontainer)")
 if settings_app:
     # Convert Click group to Typer app
     settings_typer = typer.Typer()
@@ -109,11 +131,15 @@ app.command("status")(show_status)
 @app.command()
 def container(
     init: bool = typer.Option(False, "--init", help="Initialize devcontainer"),
-    command: Optional[str] = typer.Argument(None, help="Command to run in container"),
+    command: Optional[str] = typer.Argument(None, help="Command to run in container (or 'start' for interactive shell)"),
     skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-setup")
 ):
     """Run cuti in a dev container with automatic setup."""
     from ..services.devcontainer import DevContainerService, is_running_in_container
+    
+    # Handle 'start' as a special case - treat it as no command (interactive mode)
+    if command == "start":
+        command = None
     
     if is_running_in_container():
         console.print("[yellow]Already running in a container![/yellow]")
@@ -123,6 +149,16 @@ def container(
         return
     
     service = DevContainerService()
+    
+    # Ensure dependencies are installed on macOS
+    console.print("[cyan]Checking container dependencies...[/cyan]")
+    if not service.ensure_dependencies():
+        console.print("[red]Container dependencies not available[/red]")
+        raise typer.Exit(1)
+    
+    # Re-check availability after potential installation
+    service.colima_available = service._check_colima()
+    service.docker_available = service._check_docker()
     
     # Initialize if requested or if no devcontainer exists
     if init or not (Path.cwd() / ".devcontainer").exists():
