@@ -118,6 +118,16 @@ function terminalInterface() {
         todos: [],
         nextTodoId: 1,
         
+        // Token counting
+        tokenCount: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        tokenRate: 0,
+        totalCost: '$0.0000',
+        sessionCost: '$0.0000',
+        tokenAnimationTimer: null,
+        targetTokenCount: 0,
+        
         // History functionality
         commandHistory: [],
         filteredHistory: [],
@@ -205,32 +215,85 @@ function terminalInterface() {
             window.cutiUtils.toggleSymphonyMode(event);
         },
         
+        // Method to animate token count
+        animateTokenCount(targetValue) {
+            if (this.tokenAnimationTimer) {
+                clearInterval(this.tokenAnimationTimer);
+            }
+            
+            const startValue = this.tokenCount;
+            const difference = targetValue - startValue;
+            const duration = 500; // milliseconds
+            const steps = 20;
+            const increment = difference / steps;
+            let currentStep = 0;
+            
+            this.tokenAnimationTimer = setInterval(() => {
+                currentStep++;
+                if (currentStep >= steps) {
+                    this.tokenCount = targetValue;
+                    clearInterval(this.tokenAnimationTimer);
+                } else {
+                    this.tokenCount = Math.round(startValue + (increment * currentStep));
+                }
+            }, duration / steps);
+        },
+        
         connectChatWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            this.chatWs = new WebSocket(`${protocol}//${window.location.host}/chat-ws`);
+            // Use the streaming WebSocket for token tracking
+            this.chatWs = new WebSocket(`${protocol}//${window.location.host}/streaming-chat-ws`);
             
             this.chatWs.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 
-                if (data.type === 'start') {
+                // Handle different message types
+                if (data.type === 'connected') {
+                    console.log('Connected to streaming chat:', data.session_id);
+                } else if (data.type === 'stream_start') {
                     this.isStreaming = true;
+                    this.tokenCount = 0;
+                    this.inputTokens = data.input_tokens || 0;
                     this.currentStreamingMessage = {
                         id: Date.now(),
                         role: 'assistant',
                         content: '',
                         timestamp: new Date()
                     };
-                } else if (data.type === 'stream' && this.currentStreamingMessage) {
+                    // Show input tokens immediately
+                    if (data.input_tokens) {
+                        this.animateTokenCount(data.input_tokens);
+                    }
+                } else if (data.type === 'token_update') {
+                    // Update token count with animation
+                    if (data.output_tokens) {
+                        const totalTokens = (this.inputTokens || 0) + data.output_tokens;
+                        this.animateTokenCount(totalTokens);
+                        this.outputTokens = data.output_tokens;
+                        this.tokenRate = data.token_rate || 0;
+                        this.totalCost = data.total_cost || '$0.0000';
+                    }
+                } else if (data.type === 'text' && this.currentStreamingMessage) {
                     this.currentStreamingMessage.content += data.content;
                     this.extractTodosFromContent(data.content);
                     this.scrollToBottom();
-                } else if (data.type === 'end') {
+                } else if (data.type === 'stream_complete') {
                     if (this.currentStreamingMessage) {
                         this.chatMessages.push(this.currentStreamingMessage);
                         this.currentStreamingMessage = null;
                         this.scrollToBottom();
                     }
+                    // Update final token metrics
+                    if (data.token_metrics) {
+                        this.tokenCount = data.token_metrics.total_tokens || 0;
+                        this.totalCost = data.token_metrics.total_cost || '$0.0000';
+                        this.sessionCost = data.session_totals?.total_cost || '$0.0000';
+                    }
                     this.isStreaming = false;
+                    // Keep token count visible for a few seconds
+                    setTimeout(() => {
+                        this.tokenCount = 0;
+                    }, 5000);
                     if (this.$refs.promptInput) {
                         this.$refs.promptInput.focus();
                     }

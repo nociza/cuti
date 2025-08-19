@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="/static/css/symphony-toggle.css">
 <!-- Markdown Rendering Styles -->
 <link rel="stylesheet" href="/static/css/markdown.css">
+<!-- Token Counter Styles -->
+<link rel="stylesheet" href="/static/css/token-counter.css">
 {% endblock %}
 
 {% set body_class = "" %}
@@ -167,10 +169,16 @@
                     </div>
                 </div>
                 <div x-show="isStreaming" class="processing-indicator">
-                    <div class="processing-dot"></div>
-                    <div class="processing-dot"></div>
-                    <div class="processing-dot"></div>
-                    <span>Processing</span>
+                    <div class="token-counter" x-show="tokenCount > 0">
+                        <span class="token-arrow">↑</span>
+                        <span class="token-number" x-text="tokenCount"></span>
+                        <span class="token-label">tokens</span>
+                    </div>
+                    <div x-show="!tokenCount || tokenCount === 0" class="processing-dots">
+                        <div class="processing-dot"></div>
+                        <div class="processing-dot"></div>
+                        <div class="processing-dot"></div>
+                    </div>
                 </div>
             </div>
         </div>

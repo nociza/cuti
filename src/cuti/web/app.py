@@ -44,6 +44,10 @@ try:
 except ImportError:
     improved_chat_router = None
 try:
+    from .api.streaming_chat import streaming_chat_router
+except ImportError:
+    streaming_chat_router = None
+try:
     from .api.todos import router as todos_router
 except ImportError:
     todos_router = None
@@ -184,6 +188,10 @@ def create_app(
     # Include improved chat router if available
     if improved_chat_router:
         app.include_router(improved_chat_router)
+    
+    # Include streaming chat router if available
+    if streaming_chat_router:
+        app.include_router(streaming_chat_router)
     
     # Include todos router if available
     if todos_router:

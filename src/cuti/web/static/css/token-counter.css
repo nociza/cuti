@@ -1,0 +1,161 @@
+/* 
+ * Token Counter - Real-time jumping number display
+ */
+
+/* Token counter styles */
+.token-counter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(96, 165, 250, 0.1) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 20px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.token-arrow {
+    color: #10b981;
+    font-size: 18px;
+    animation: bounce 1s infinite;
+}
+
+.token-number {
+    font-size: 20px;
+    font-weight: 700;
+    color: #10b981;
+    font-family: 'Monaco', 'Courier New', monospace;
+    min-width: 60px;
+    text-align: center;
+    animation: pulse 0.3s ease-out;
+}
+
+.token-label {
+    font-size: 14px;
+    color: rgba(16, 185, 129, 0.8);
+    font-weight: 500;
+}
+
+/* Animations */
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Number increment animation */
+.token-number.incrementing {
+    animation: numberJump 0.2s ease-out;
+}
+
+@keyframes numberJump {
+    0% {
+        transform: scale(1) translateY(0);
+    }
+    50% {
+        transform: scale(1.2) translateY(-2px);
+        color: #34d399;
+    }
+    100% {
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Processing dots fallback */
+.processing-dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.processing-indicator {
+    display: flex;
+    align-items: center;
+    margin-left: 12px;
+}
+
+/* Alternative inline token display */
+.inline-token-counter {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.inline-token-counter .token-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.inline-token-counter .token-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.inline-token-counter .token-label {
+    color: #94a3b8;
+    min-width: 50px;
+}
+
+.inline-token-counter .token-value {
+    color: #10b981;
+    font-weight: 600;
+    font-family: 'Monaco', 'Courier New', monospace;
+    min-width: 60px;
+    text-align: right;
+}
+
+.inline-token-counter .token-cost {
+    color: #60a5fa;
+    font-size: 11px;
+    opacity: 0.8;
+}
