@@ -110,11 +110,12 @@ function terminalInterface() {
         symphonyMode: localStorage.getItem('symphonyMode') === 'true',
         
         // Chat functionality
-        chatMessages: [],
+        chatMessages: JSON.parse(localStorage.getItem('cuti_chat_messages') || '[]'),
         chatInput: '',
         isStreaming: false,
         chatWs: null,
         currentStreamingMessage: null,
+        currentThinkingMessage: null,
         todos: [],
         nextTodoId: 1,
         
@@ -264,6 +265,66 @@ function terminalInterface() {
                     if (data.input_tokens) {
                         this.animateTokenCount(data.input_tokens);
                     }
+                } else if (data.type === 'thinking') {
+                    // Handle thought process
+                    if (!this.currentThinkingMessage) {
+                        this.currentThinkingMessage = {
+                            id: Date.now() + 1,
+                            role: 'thinking',
+                            content: '',
+                            timestamp: new Date()
+                        };
+                        this.chatMessages.push(this.currentThinkingMessage);
+                    }
+                    this.currentThinkingMessage.content += data.content;
+                    this.persistChatMessages();
+                    this.scrollToBottom();
+                } else if (data.type === 'tool_start') {
+                    // Show tool usage
+                    this.chatMessages.push({
+                        id: Date.now(),
+                        role: 'system',
+                        content: `🔧 Using tool: ${data.tool}`,
+                        timestamp: new Date()
+                    });
+                    this.scrollToBottom();
+                } else if (data.type === 'file_operation') {
+                    // Show file operations
+                    const icon = data.operation === 'read' ? '📖' : '✏️';
+                    this.chatMessages.push({
+                        id: Date.now(),
+                        role: 'system',
+                        content: `${icon} ${data.operation === 'read' ? 'Reading' : 'Writing'} file: ${data.file}`,
+                        timestamp: new Date()
+                    });
+                    this.scrollToBottom();
+                } else if (data.type === 'command') {
+                    // Show command execution
+                    this.chatMessages.push({
+                        id: Date.now(),
+                        role: 'system',
+                        content: `💻 Running: ${data.command}`,
+                        timestamp: new Date()
+                    });
+                    this.scrollToBottom();
+                } else if (data.type === 'command_output') {
+                    // Show command output
+                    this.chatMessages.push({
+                        id: Date.now(),
+                        role: 'system',
+                        content: `📋 Output:\n${data.content}`,
+                        timestamp: new Date()
+                    });
+                    this.scrollToBottom();
+                } else if (data.type === 'progress') {
+                    // Show progress updates
+                    this.chatMessages.push({
+                        id: Date.now(),
+                        role: 'system',
+                        content: `⏳ ${data.content}`,
+                        timestamp: new Date()
+                    });
+                    this.scrollToBottom();
                 } else if (data.type === 'token_update') {
                     // Update token count with animation
                     if (data.output_tokens) {
@@ -274,6 +335,10 @@ function terminalInterface() {
                         this.totalCost = data.total_cost || '$0.0000';
                     }
                 } else if (data.type === 'text' && this.currentStreamingMessage) {
+                    // Clear thinking message when actual response starts
+                    if (this.currentThinkingMessage) {
+                        this.currentThinkingMessage = null;
+                    }
                     this.currentStreamingMessage.content += data.content;
                     this.extractTodosFromContent(data.content);
                     this.scrollToBottom();
@@ -281,19 +346,24 @@ function terminalInterface() {
                     if (this.currentStreamingMessage) {
                         this.chatMessages.push(this.currentStreamingMessage);
                         this.currentStreamingMessage = null;
+                        this.persistChatMessages();
                         this.scrollToBottom();
                     }
                     // Update final token metrics
                     if (data.token_metrics) {
                         this.tokenCount = data.token_metrics.total_tokens || 0;
+                        this.inputTokens = data.token_metrics.input_tokens || 0;
+                        this.outputTokens = data.token_metrics.output_tokens || 0;
                         this.totalCost = data.token_metrics.total_cost || '$0.0000';
                         this.sessionCost = data.session_totals?.total_cost || '$0.0000';
                     }
                     this.isStreaming = false;
-                    // Keep token count visible for a few seconds
+                    // Keep token count visible for 10 seconds after completion
                     setTimeout(() => {
                         this.tokenCount = 0;
-                    }, 5000);
+                        this.inputTokens = 0;
+                        this.outputTokens = 0;
+                    }, 10000);
                     if (this.$refs.promptInput) {
                         this.$refs.promptInput.focus();
                     }
@@ -304,6 +374,7 @@ function terminalInterface() {
                         content: data.content,
                         timestamp: new Date()
                     });
+                    this.persistChatMessages();
                     this.isStreaming = false;
                     if (this.$refs.promptInput) {
                         this.$refs.promptInput.focus();
@@ -329,6 +400,9 @@ function terminalInterface() {
                 timestamp: new Date()
             });
             
+            // Persist messages immediately
+            this.persistChatMessages();
+            
             // Add to history
             this.addToHistory(messageContent);
             
@@ -342,10 +416,17 @@ function terminalInterface() {
             this.scrollToBottom();
         },
         
+        persistChatMessages() {
+            // Keep only last 100 messages to avoid localStorage limits
+            const messagesToStore = this.chatMessages.slice(-100);
+            localStorage.setItem('cuti_chat_messages', JSON.stringify(messagesToStore));
+        },
+        
         clearTerminal() {
             this.chatMessages = [];
             this.todos = [];
             this.chatInput = '';
+            localStorage.removeItem('cuti_chat_messages');
         },
         
         extractTodosFromContent(content) {
@@ -381,7 +462,11 @@ function terminalInterface() {
             }
         },
         
-        formatTerminalMessage(content) {
+        formatTerminalMessage(content, role) {
+            // Special formatting for thinking messages
+            if (role === 'thinking') {
+                return '<div style="opacity: 0.7; font-style: italic; color: #94a3b8;">💭 ' + window.cutiUtils.formatTerminalMessage(content) + '</div>';
+            }
             return window.cutiUtils.formatTerminalMessage(content);
         },
         

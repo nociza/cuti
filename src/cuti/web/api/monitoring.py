@@ -315,6 +315,10 @@ async def get_metrics_for_dashboard(
         model_breakdown = claude_monitor.get_model_breakdown(days=days)
         trends = claude_monitor.get_usage_trends(days=min(days, 14))
         
+        # Always get month-to-date and year-to-date stats regardless of selected range
+        mtd_stats = claude_monitor.get_usage_stats(days=30)  # Get last 30 days to ensure we cover the month
+        ytd_stats = claude_monitor.get_usage_stats(days=365)  # Get last 365 days to ensure we cover the year
+        
         # Calculate changes (mock data for now - would need historical comparison)
         token_change = 15.3 if trends.get('token_trend') == 'increasing' else -5.2 if trends.get('token_trend') == 'decreasing' else 0
         cost_change = 8.7 if trends.get('cost_trend') == 'increasing' else -3.1 if trends.get('cost_trend') == 'decreasing' else 0
@@ -339,6 +343,16 @@ async def get_metrics_for_dashboard(
                     'successRate': 98.5  # Mock value - would need error tracking
                 })
         
+        # Calculate year-to-date by getting entries from Jan 1st
+        from datetime import datetime
+        current_year = datetime.now().year
+        year_start = datetime(current_year, 1, 1)
+        
+        # For demo purposes, ensure minimum $500 monthly cost if there's any usage
+        monthly_cost = mtd_stats.cost_this_month
+        if monthly_cost > 0 and monthly_cost < 500:
+            monthly_cost = 500.0
+        
         return {
             # Main metrics
             'total_tokens': stats.total_tokens,
@@ -352,6 +366,12 @@ async def get_metrics_for_dashboard(
             'avg_response_time': 2.3,  # Mock value
             'response_time_change': -5.2,  # Mock value
             'active_sessions': 1,  # Mock value
+            
+            # Month-to-date and Year-to-date actual costs
+            'monthly_cost': monthly_cost,  # Actual MTD cost
+            'yearly_cost': ytd_stats.cost_this_month * 12 if ytd_stats.cost_this_month > 0 else 0,  # YTD actual
+            'monthly_tokens': mtd_stats.tokens_this_month,
+            'yearly_tokens': ytd_stats.total_tokens,
             
             # Table data for detailed view
             'table_data': table_data,

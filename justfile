@@ -175,10 +175,126 @@ build:
     echo "🏗️  Building package..."
     uv build
 
-# Install development version locally
+# Install development version locally (editable install in current environment)
 install-dev:
     echo "🔧 Installing development version..."
     uv pip install -e . --force-reinstall
+
+# Build and install cuti as a global tool from current development code (overrides PyPI version)
+dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    echo "🔨 Building and installing cuti from current development code..."
+    echo ""
+    
+    # Get current version from pyproject.toml
+    current_version=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+    echo "📌 Development version: $current_version"
+    
+    # Clean any existing builds
+    echo "🧹 Cleaning old build artifacts..."
+    rm -rf dist/ build/ *.egg-info/
+    
+    # Build the package
+    echo "🏗️  Building package from current code..."
+    uv build
+    
+    # Check if build was successful
+    if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
+        echo "❌ Build failed - no dist directory or files created"
+        exit 1
+    fi
+    
+    # Uninstall existing cuti tool if present
+    if uv tool list | grep -q "^cuti "; then
+        echo "🗑️  Removing existing cuti tool installation..."
+        uv tool uninstall cuti
+    fi
+    
+    # Install from the local wheel file
+    echo "📦 Installing cuti tool from local build..."
+    wheel_file=$(ls dist/*.whl | head -n1)
+    
+    if [ -z "$wheel_file" ]; then
+        echo "❌ No wheel file found in dist/"
+        exit 1
+    fi
+    
+    echo "   Installing from: $wheel_file"
+    uv tool install "$wheel_file" --force
+    
+    # Verify installation
+    echo ""
+    echo "✅ Verifying installation..."
+    
+    # Check if cuti is available
+    if ! command -v cuti >/dev/null 2>&1; then
+        echo "⚠️  cuti command not found in PATH"
+        echo "   You may need to add ~/.local/bin to your PATH"
+        echo "   Run: export PATH=\"\$HOME/.local/bin:\$PATH\""
+    else
+        installed_version=$(cuti --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "unknown")
+        echo "📍 Installed cuti version: $installed_version"
+        echo "📍 Expected version: $current_version"
+        
+        if [ "$installed_version" = "$current_version" ]; then
+            echo "✅ Successfully installed development version!"
+        else
+            echo "⚠️  Version mismatch - installation may have issues"
+        fi
+    fi
+    
+    # Show where it's installed
+    echo ""
+    echo "📂 Installation details:"
+    uv tool list | grep -A 2 "^cuti " || echo "Could not get installation details"
+    
+    echo ""
+    echo "🎉 Development installation complete!"
+    echo "   Run 'cuti' to test your changes"
+
+# Switch back to production version from PyPI
+prod:
+    echo "📦 Switching to production version from PyPI..."
+    uv tool uninstall cuti || true
+    uv tool install cuti
+    echo "✅ Done! Using $(cuti --version 2>/dev/null || echo 'cuti')"
+
+# Build, install as tool, and run web interface for testing
+dev-test-web:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    echo "🚀 Building, installing, and running cuti web interface..."
+    
+    # First install the development version
+    just dev
+    
+    echo ""
+    echo "🌐 Starting web interface..."
+    echo "   Access at: http://localhost:8000"
+    echo ""
+    
+    # Run the web interface
+    cuti web
+
+# Build, install as tool, and run CLI for testing  
+dev-test-cli:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    echo "🚀 Building, installing, and running cuti CLI..."
+    
+    # First install the development version
+    just dev
+    
+    echo ""
+    echo "💻 Starting CLI interface..."
+    echo ""
+    
+    # Run the CLI
+    cuti cli
 
 # Show current version
 version:

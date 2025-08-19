@@ -98,6 +98,7 @@ class ClaudeSDKInterface:
     
     def _verify_installation(self):
         """Verify that Claude Code CLI and SDK are properly installed."""
+        global SDK_AVAILABLE
         if not SDK_AVAILABLE:
             # Try to install the SDK automatically
             try:
@@ -108,7 +109,6 @@ class ClaudeSDKInterface:
                     timeout=30
                 )
                 # Re-import after installation
-                global query, ClaudeCodeOptions, SDK_AVAILABLE
                 from claude_code_sdk import query, ClaudeCodeOptions
                 SDK_AVAILABLE = True
             except Exception as e:

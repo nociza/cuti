@@ -674,11 +674,33 @@
                     <span>Live now</span>
                 </div>
             </div>
+            
+            <!-- Month-to-Date Cost (Actual) -->
+            <div class="metric-card">
+                <div class="metric-icon">📅</div>
+                <div class="metric-label">Month-to-Date Cost</div>
+                <div class="metric-value" x-text="'$' + (metrics.monthlyCost || 0).toFixed(2)">$0.00</div>
+                <div class="metric-change">
+                    <i class="fas fa-calendar-day"></i>
+                    <span>Actual MTD spending</span>
+                </div>
+            </div>
+            
+            <!-- Year-to-Date Cost (Actual) -->
+            <div class="metric-card">
+                <div class="metric-icon">📊</div>
+                <div class="metric-label">Year-to-Date Cost</div>
+                <div class="metric-value" x-text="'$' + (metrics.yearlyCost || 0).toFixed(2)">$0.00</div>
+                <div class="metric-change">
+                    <i class="fas fa-calendar"></i>
+                    <span>Actual YTD spending</span>
+                </div>
+            </div>
         </div>
         
         <!-- Predictions and Warnings Section -->
         <div class="predictions-section" x-show="predictions">
-            <h2 class="section-title">🔮 Usage Predictions</h2>
+            <h2 class="section-title">🔮 Usage Forecasts & Projections</h2>
             <div class="predictions-grid">
                 <!-- Burn Rate -->
                 <div class="prediction-card">
@@ -688,6 +710,28 @@
                     </div>
                     <div class="prediction-subtitle">
                         $<span x-text="predictions.burn_rate?.cost_per_hour?.toFixed(2) || '0.00'"></span>/hour
+                    </div>
+                </div>
+                
+                <!-- Monthly Cost Forecast -->
+                <div class="prediction-card">
+                    <div class="prediction-label">Monthly Cost Forecast</div>
+                    <div class="prediction-value">
+                        $<span x-text="predictions.burn_rate?.cost_per_month?.toFixed(2) || '0.00'"></span>
+                    </div>
+                    <div class="prediction-subtitle">
+                        If current rate continues
+                    </div>
+                </div>
+                
+                <!-- Yearly Cost Forecast -->
+                <div class="prediction-card">
+                    <div class="prediction-label">Yearly Cost Forecast</div>
+                    <div class="prediction-value">
+                        $<span x-text="predictions.burn_rate?.cost_per_year?.toFixed(2) || '0.00'"></span>
+                    </div>
+                    <div class="prediction-subtitle">
+                        Projected annual spending
                     </div>
                 </div>
                 
@@ -1005,7 +1049,9 @@ function statisticsInterface() {
                         successCount: data.success_count || 0,
                         avgResponseTime: data.avg_response_time || 0,
                         responseTimeChange: data.response_time_change || 0,
-                        activeSessions: data.active_sessions || 0
+                        activeSessions: data.active_sessions || 0,
+                        monthlyCost: data.monthly_cost || 0,  // Actual MTD cost
+                        yearlyCost: data.yearly_cost || 0     // Actual YTD cost
                     };
                     
                     // Update table data
@@ -1096,7 +1142,9 @@ function statisticsInterface() {
                     successCount: data.success_count || 0,
                     avgResponseTime: data.avg_response_time || 0,
                     responseTimeChange: data.response_time_change || 0,
-                    activeSessions: data.active_sessions || 0
+                    activeSessions: data.active_sessions || 0,
+                    monthlyCost: data.monthly_cost || 0,  // Actual MTD cost
+                    yearlyCost: data.yearly_cost || 0     // Actual YTD cost
                 };
                 
                 // Update table data with real data

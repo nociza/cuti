@@ -110,13 +110,22 @@ class ClaudeStreamInterface:
                 metadata={"working_dir": str(working_path)}
             )
             
-            # Start the process with proper pipe configuration
+            # Start the process with proper pipe configuration and verbose mode
+            env = {**os.environ}
+            env['CLAUDE_EXPERIMENTAL_STREAMING'] = '1'  # Enable experimental streaming if available
+            env['CLAUDE_DEBUG'] = '1'  # Enable debug mode for more detailed output
+            env['CLAUDE_VERBOSE'] = '1'  # Enable verbose mode
+            
+            # Add verbose flag to command if supported
+            if '--verbose' not in cmd:
+                cmd.insert(1, '--verbose')
+            
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 stdin=asyncio.subprocess.PIPE,
-                env={**os.environ, 'CLAUDE_EXPERIMENTAL_STREAMING': '1'}  # Enable experimental streaming if available
+                env=env
             )
             
             # Create tasks for reading stdout and stderr
@@ -216,12 +225,16 @@ class ClaudeStreamInterface:
         if not line:
             return
         
-        # Detect tool usage patterns
+        # Detect tool usage patterns - expanded to catch more Claude output patterns
         tool_patterns = {
             r"Using tool:?\s*(\w+)": StreamEventType.TOOL_START,
             r"Tool\s+(\w+)\s+started": StreamEventType.TOOL_START,
             r"Running\s+(\w+)\s+tool": StreamEventType.TOOL_START,
             r"Executing\s+(\w+)": StreamEventType.TOOL_START,
+            r"<(\w+)>": StreamEventType.TOOL_START,  # XML-style tool tags
+            r"I'll use the (\w+) tool": StreamEventType.TOOL_START,
+            r"Let me use (\w+)": StreamEventType.TOOL_START,
+            r"Using (\w+) to": StreamEventType.TOOL_START,
         }
         
         for pattern, event_type in tool_patterns.items():

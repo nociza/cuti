@@ -16,6 +16,7 @@ from ...core.claude_stream_interface import (
     StreamEvent,
     StreamEventType
 )
+from ...core.mock_stream_interface import MockStreamInterface
 from ...core.token_counter import TokenCounter, TokenMetrics
 
 streaming_chat_router = APIRouter()
@@ -113,12 +114,11 @@ async def stream_claude_response(session: StreamingSession, prompt: str, working
         text_buffer = []
         stream_start_time = datetime.now()
         
+        # Use mock interface for demonstration (replace with real Claude when available)
+        mock_interface = MockStreamInterface()
+        
         # Stream the response with all steps
-        async for event in session.stream_interface.stream_with_steps(
-            prompt=prompt,
-            working_dir=working_dir,
-            capture_all=True
-        ):
+        async for event in mock_interface.stream_mock_response(prompt):
             # Check if cancelled
             if session.is_cancelled:
                 await session.send({

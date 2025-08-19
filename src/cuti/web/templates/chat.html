@@ -75,6 +75,33 @@
     
     <!-- Terminal Container -->
     <div class="terminal-container" x-show="activeTab === 'chat'" x-transition:enter="fade-in">
+        <!-- Floating Token Counter -->
+        <div x-show="(tokenCount > 0 || inputTokens > 0 || outputTokens > 0) && activeTab === 'chat'" 
+             class="inline-token-counter"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform translate-x-4"
+             x-transition:enter-end="opacity-100 transform translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform translate-x-0"
+             x-transition:leave-end="opacity-0 transform translate-x-4">
+            <div class="token-stats">
+                <div class="token-row" x-show="inputTokens > 0">
+                    <span class="token-label">↓ Input:</span>
+                    <span class="token-value" x-text="inputTokens.toLocaleString()"></span>
+                </div>
+                <div class="token-row" x-show="outputTokens > 0">
+                    <span class="token-label">↑ Output:</span>
+                    <span class="token-value" x-text="outputTokens.toLocaleString()"></span>
+                </div>
+                <div class="token-row" x-show="tokenCount > 0">
+                    <span class="token-label">Σ Total:</span>
+                    <span class="token-value" style="color: #60a5fa;" x-text="tokenCount.toLocaleString()"></span>
+                </div>
+                <div class="token-row" x-show="totalCost">
+                    <span class="token-cost" x-text="totalCost"></span>
+                </div>
+            </div>
+        </div>
         <!-- Terminal Header -->
         <div class="terminal-header">
             <div class="terminal-controls">
@@ -108,7 +135,11 @@
                     
                     <!-- Assistant Output -->
                     <div x-show="message.role === 'assistant'" class="assistant-output" 
-                         x-html="formatTerminalMessage(message.content)"></div>
+                         x-html="formatTerminalMessage(message.content, message.role)"></div>
+                    
+                    <!-- Thinking Output -->
+                    <div x-show="message.role === 'thinking'" class="thinking-output" 
+                         x-html="formatTerminalMessage(message.content, message.role)"></div>
                     
                     <!-- System Messages -->
                     <div x-show="message.role === 'system'" class="system-message">
