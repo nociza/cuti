@@ -100,10 +100,17 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-claude-auth.sh \\
     && echo 'fi' >> /usr/local/bin/setup-claude-auth.sh \\
     && chmod +x /usr/local/bin/setup-claude-auth.sh
 
-# Create entrypoint script that runs auth setup
+# Create entrypoint script that runs auth setup and starts usage sync
 RUN echo '#!/bin/bash' > /entrypoint.sh \\
     && echo '# Run Claude auth setup' >> /entrypoint.sh \\
     && echo 'bash /usr/local/bin/setup-claude-auth.sh' >> /entrypoint.sh \\
+    && echo '' >> /entrypoint.sh \\
+    && echo '# Start usage sync in background if cuti is available' >> /entrypoint.sh \\
+    && echo 'if command -v python3 >/dev/null 2>&1; then' >> /entrypoint.sh \\
+    && echo '    nohup python3 -c "from cuti.services.container_usage_sync import start_container_sync; start_container_sync()" >/dev/null 2>&1 &' >> /entrypoint.sh \\
+    && echo '    echo "✅ Started usage sync service"' >> /entrypoint.sh \\
+    && echo 'fi' >> /entrypoint.sh \\
+    && echo '' >> /entrypoint.sh \\
     && echo '# Execute command' >> /entrypoint.sh \\
     && echo 'exec "$@"' >> /entrypoint.sh \\
     && chmod +x /entrypoint.sh
@@ -733,7 +740,6 @@ CMD ["/bin/zsh"]
         else:
             # Check if bypassPermissionsModeAccepted is set
             try:
-                import json
                 with open(claude_json_path, 'r') as f:
                     config = json.load(f)
                     if not config.get('bypassPermissionsModeAccepted', False):
@@ -993,6 +999,7 @@ echo "✅ Dev container initialization complete!"
             "--network", "host",  # Allow network access for cuti web
             "-v", f"{Path.cwd()}:/workspace",  # Mount current directory as workspace
             "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global",  # Mount cuti config to root user
+            "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti",  # Also mount to cuti user for sync
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             "--env", "IS_SANDBOX=1",  # Allow Claude --dangerously-skip-permissions as root

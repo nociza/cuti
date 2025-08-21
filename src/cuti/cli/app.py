@@ -36,6 +36,10 @@ try:
     from .commands.favorites import favorites as favorites_app
 except ImportError:
     favorites_app = None
+try:
+    from .commands.sync import app as sync_app
+except ImportError:
+    sync_app = None
 
 app = typer.Typer(
     name="cuti",
@@ -119,6 +123,10 @@ if favorites_app:
     for cmd in favorites_app.commands.values():
         favorites_typer.command()(cmd.callback)
     app.add_typer(favorites_typer, name="favorites", help="Favorite prompts management")
+
+# Add sync commands if available
+if sync_app:
+    app.add_typer(sync_app, name="sync", help="Sync usage data")
 
 # Add top-level commands for convenience
 from .commands.queue import start_queue, add_prompt, show_status
