@@ -39,7 +39,7 @@ license = "Apache-2.0"
 name = "cuti"
 readme = "README.md"
 requires-python = ">=3.10"
-version = "0.1.17"
+version = "0.1.18"
 
 [project.optional-dependencies]
 dev = [

@@ -11,8 +11,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Install cuti
 uv tool install cuti
 
-# Verify
+# Verify installation
 cuti --help
+
+# Check version
+cuti --version  # or cuti -v
 ```
 
 Requires Python 3.9+. Claude Code CLI is required. Google Gemini is optional and would suppliment the agent orchestration if you have a working google gemini cli.

@@ -57,6 +57,25 @@ def version_callback(value: bool):
         raise typer.Exit()
 
 
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show version and exit.",
+        callback=version_callback,
+        is_eager=True,
+    ),
+):
+    """
+    cuti - Production-ready AI command queue and orchestration system
+    
+    Use --help with any command for more information.
+    """
+    pass
+
+
 # Global state
 _manager: Optional[QueueManager] = None
 _alias_manager: Optional[PromptAliasManager] = None
