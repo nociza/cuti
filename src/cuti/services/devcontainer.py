@@ -89,7 +89,7 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-claude-auth.sh \\
     && echo 'if [ -d "$CLAUDE_CONFIG_DIR" ]; then' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    echo "✅ Claude config found at: $CLAUDE_CONFIG_DIR"' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    # Test Claude authentication' >> /usr/local/bin/setup-claude-auth.sh \\
-    && echo '    if claude --version > /dev/null 2>&1; then' >> /usr/local/bin/setup-claude-auth.sh \\
+    && echo '    if claude --dangerously-skip-permissions --version > /dev/null 2>&1; then' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '        echo "✅ Claude CLI authenticated and ready"' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '    else' >> /usr/local/bin/setup-claude-auth.sh \\
     && echo '        echo "⚠️  Claude CLI not authenticated. Run: claude login"' >> /usr/local/bin/setup-claude-auth.sh \\
@@ -126,6 +126,8 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo '# Environment setup' >> ~/.zshrc \\
     && echo 'export PATH="/usr/local/bin:/home/$USERNAME/.cargo/bin:$HOME/.local/bin:$HOME/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
+    && echo '# Claude alias for container usage' >> ~/.zshrc \\
+    && echo 'alias claude="claude-code --dangerously-skip-permissions"' >> ~/.zshrc \\
     && echo '# Custom prompt showing cuti' >> ~/.zshrc \\
     && echo 'PROMPT="%{$fg[cyan]%}cuti%{$reset_color%}:%{$fg[green]%}%~%{$reset_color%} $ "' >> ~/.zshrc \\
     && echo '' >> ~/.zshrc \\
@@ -135,7 +137,7 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'echo "     • cuti web        - Start the web interface"' >> ~/.zshrc \\
     && echo 'echo "     • cuti cli        - Start the CLI"' >> ~/.zshrc \\
     && echo 'echo "     • cuti agent list - List available agents"' >> ~/.zshrc \\
-    && echo 'echo "     • claude          - Claude Code CLI"' >> ~/.zshrc \\
+    && echo 'echo "     • claude          - Claude Code CLI (auto-aliased)"' >> ~/.zshrc \\
     && echo 'echo ""' >> ~/.zshrc
 
 # Verify cuti installation
@@ -705,12 +707,13 @@ RUN cd /tmp/cuti-source && \\
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
     && echo 'export PATH="/root/.local/bin:/usr/local/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
-\
+    && echo 'alias claude="claude-code --dangerously-skip-permissions"' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
     && echo 'echo "   Current directory: $(pwd)"' >> ~/.zshrc \\
     && echo 'echo "   • cuti web        - Start web interface"' >> ~/.zshrc \\
     && echo 'echo "   • cuti cli        - Start CLI"' >> ~/.zshrc \\
     && echo 'echo "   • cuti agent list - List agents"' >> ~/.zshrc \\
+    && echo 'echo "   • claude          - Claude Code CLI (auto-aliased)"' >> ~/.zshrc \\
     && echo 'echo ""' >> ~/.zshrc
 
 WORKDIR /workspace
@@ -804,11 +807,12 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'export PATH="/usr/local/bin:/root/.local/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export CLAUDE_CONFIG_DIR="/root/.claude"' >> ~/.zshrc \\
+    && echo 'alias claude="claude-code --dangerously-skip-permissions"' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
     && echo 'echo "   Commands available:"' >> ~/.zshrc \\
     && echo 'echo "     • cuti web        - Start web interface"' >> ~/.zshrc \\
     && echo 'echo "     • cuti cli        - Start CLI"' >> ~/.zshrc \\
-    && echo 'echo "     • claude          - Use Claude CLI"' >> ~/.zshrc \\
+    && echo 'echo "     • claude          - Claude Code CLI (auto-aliased)"' >> ~/.zshrc \\
     && echo 'echo ""' >> ~/.zshrc
 
 # Set working directory
@@ -834,11 +838,6 @@ CMD ["/bin/zsh", "-l"]
 set -e
 
 echo "🔧 Initializing cuti dev container..."
-
-# Ensure Claude uses --dangerously-skip-permissions
-if ! grep -q "dangerously-skip-permissions" ~/.zshrc; then
-    echo 'alias claude="claude-code --dangerously-skip-permissions"' >> ~/.zshrc
-fi
 
 # Initialize Python virtual environment if needed
 if [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
