@@ -158,6 +158,7 @@ app.command("status")(show_status)
 @app.command()
 def container(
     init: bool = typer.Option(False, "--init", help="Initialize devcontainer"),
+    rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild the container image"),
     command: Optional[str] = typer.Argument(None, help="Command to run in container (or 'start' for interactive shell)"),
     skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-setup")
 ):
@@ -187,9 +188,10 @@ def container(
     service.colima_available = service._check_colima()
     service.docker_available = service._check_docker()
     
-    # Initialize if requested or if no devcontainer exists
-    if init or not (Path.cwd() / ".devcontainer").exists():
-        console.print("[cyan]Initializing dev container...[/cyan]")
+    # The container command should work without creating any local devcontainer files
+    # Skip devcontainer initialization entirely - use embedded minimal container
+    if init:
+        console.print("[cyan]Initializing dev container configuration...[/cyan]")
         if not service.generate_devcontainer():
             console.print("[red]Failed to initialize dev container[/red]")
             raise typer.Exit(1)
@@ -216,7 +218,7 @@ def container(
     # Run in container
     console.print("[green]Starting dev container...[/green]")
     # If no command provided, just start an interactive shell
-    exit_code = service.run_in_container(command)
+    exit_code = service.run_in_container(command, rebuild=rebuild)
     
     if exit_code != 0:
         console.print(f"[red]Container exited with code {exit_code}[/red]")

@@ -86,12 +86,10 @@ def start(
             subprocess.run(command, shell=True)
         return
     
-    # Check if devcontainer exists
+    # Check if devcontainer exists - for the start command, we need devcontainer files
     if not (working_dir / ".devcontainer").exists():
-        console.print("[yellow]⚠️  No dev container found. Initializing...[/yellow]")
-        if not service.generate_devcontainer():
-            console.print("[red]❌ Failed to initialize dev container[/red]")
-            raise typer.Exit(1)
+        console.print("[yellow]⚠️  No dev container found. Run 'cuti devcontainer init' first.[/yellow]")
+        raise typer.Exit(1)
     
     # Check Docker availability
     if not service.docker_available:
