@@ -31,8 +31,16 @@ class ClaudeSettingsManager:
     
     def __init__(self, working_directory: Optional[str] = None):
         """Initialize the settings manager."""
+        import os
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
-        self.claude_dir = self.working_dir / ".claude"
+        
+        # Use environment variable for storage directory if set (for containers)
+        storage_override = os.getenv("CLAUDE_CONFIG_DIR")
+        if storage_override:
+            self.claude_dir = Path(storage_override)
+        else:
+            self.claude_dir = self.working_dir / ".claude"
+            
         self.settings_file = self.claude_dir / "settings.local.json"
         self.global_settings_file = Path.home() / ".claude" / "settings.json"
     

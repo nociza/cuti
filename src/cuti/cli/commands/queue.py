@@ -26,9 +26,11 @@ console = Console()
 
 def get_managers(storage_dir: str):
     """Get manager instances."""
-    manager = QueueManager(storage_dir)
-    alias_manager = PromptAliasManager(storage_dir)
-    history_manager = PromptHistoryManager(storage_dir)
+    # Use environment variable if set, otherwise use provided storage_dir
+    actual_storage_dir = os.getenv("CLAUDE_QUEUE_STORAGE_DIR", storage_dir)
+    manager = QueueManager(actual_storage_dir)
+    alias_manager = PromptAliasManager(actual_storage_dir)
+    history_manager = PromptHistoryManager(actual_storage_dir)
     return manager, alias_manager, history_manager
 
 
@@ -41,7 +43,9 @@ def start_queue(
     verbose: bool = typer.Option(False, "-v", "--verbose", help="Verbose output"),
 ):
     """Start the queue processor."""
-    manager = QueueManager(storage_dir, claude_command, check_interval, timeout)
+    # Use environment variable if set, otherwise use provided storage_dir
+    actual_storage_dir = os.getenv("CLAUDE_QUEUE_STORAGE_DIR", storage_dir)
+    manager = QueueManager(actual_storage_dir, claude_command, check_interval, timeout)
     
     def status_callback(state):
         if verbose:

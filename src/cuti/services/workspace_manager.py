@@ -17,7 +17,14 @@ class WorkspaceManager:
     def __init__(self, working_directory: Optional[str] = None):
         """Initialize the workspace manager."""
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
-        self.cuti_dir = self.working_dir / ".cuti"
+        
+        # Use environment variable for storage directory if set (for containers)
+        storage_override = os.getenv("CLAUDE_QUEUE_STORAGE_DIR")
+        if storage_override:
+            self.cuti_dir = Path(storage_override)
+        else:
+            self.cuti_dir = self.working_dir / ".cuti"
+        
         self.ensure_workspace()
     
     def ensure_workspace(self) -> Path:
@@ -68,6 +75,10 @@ class WorkspaceManager:
     
     def _update_gitignore(self):
         """Add .cuti to .gitignore if not already present."""
+        # Skip gitignore update if we're using an alternative storage directory
+        if os.getenv("CLAUDE_QUEUE_STORAGE_DIR"):
+            return
+            
         gitignore_path = self.working_dir / ".gitignore"
         cuti_entry = ".cuti/"
         

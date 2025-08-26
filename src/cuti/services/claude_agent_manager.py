@@ -86,7 +86,14 @@ class ClaudeCodeAgentManager:
     def __init__(self, working_directory: Optional[str] = None):
         """Initialize the agent manager."""
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
-        self.local_agents_dir = self.working_dir / ".claude" / "agents"
+        
+        # Use environment variable for storage directory if set (for containers)
+        storage_override = os.getenv("CLAUDE_CONFIG_DIR")
+        if storage_override:
+            self.local_agents_dir = Path(storage_override) / "agents"
+        else:
+            self.local_agents_dir = self.working_dir / ".claude" / "agents"
+            
         self.global_agents_dir = Path.home() / ".claude" / "agents"
         # Get built-in agents directory from package
         try:

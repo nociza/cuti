@@ -39,11 +39,19 @@ class ClaudeOrchestrationManager:
     """Manages the CLAUDE.md file for dynamic agent orchestration."""
     
     def __init__(self, project_root: Path):
+        import os
         self.project_root = Path(project_root)
         self.claude_md_path = self.project_root / "CLAUDE.md"
         self.agents: Dict[str, AgentConfig] = {}
         self.active_agents: Set[str] = set()
         self._lock = asyncio.Lock()
+        
+        # Use environment variable for storage directory if set (for containers)
+        storage_override = os.getenv("CLAUDE_QUEUE_STORAGE_DIR")
+        if storage_override:
+            self.storage_dir = Path(storage_override)
+        else:
+            self.storage_dir = self.project_root / ".cuti"
         
         # Load built-in agents
         self._load_builtin_agents()
@@ -94,7 +102,7 @@ class ClaudeOrchestrationManager:
     async def load_config(self, config_path: Optional[Path] = None):
         """Load agent configuration from file."""
         if config_path is None:
-            config_path = self.project_root / ".cuti" / "agents.json"
+            config_path = self.storage_dir / "agents.json"
             
         if not config_path.exists():
             # Initialize with default config
@@ -121,7 +129,7 @@ class ClaudeOrchestrationManager:
     async def save_config(self, config_path: Optional[Path] = None):
         """Save agent configuration to file."""
         if config_path is None:
-            config_path = self.project_root / ".cuti" / "agents.json"
+            config_path = self.storage_dir / "agents.json"
             
         config_path.parent.mkdir(parents=True, exist_ok=True)
         

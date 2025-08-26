@@ -135,8 +135,13 @@ def create_app(
         working_directory=working_directory
     )
     
-    # Initialize project settings if needed
-    if not (Path(working_directory or Path.cwd()) / ".claude").exists():
+    # Initialize project settings if needed (skip in containers with CLAUDE_CONFIG_DIR)
+    import os
+    if not os.getenv("CLAUDE_CONFIG_DIR"):
+        if not (Path(working_directory or Path.cwd()) / ".claude").exists():
+            claude_settings_manager.initialize_project_settings()
+    else:
+        # In container, always initialize settings in the config directory
         claude_settings_manager.initialize_project_settings()
     
     # Initialize orchestration manager
