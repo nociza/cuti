@@ -7,6 +7,11 @@ dist/
 # Cuti workspace data
 .cuti/
 
+# Claude project configuration (auto-generated)
+.claude/.claude.json
+.claude/.claude.json.backup
+.claude/settings.local.json
+
 .devcontainer/
 
 prompt.txt

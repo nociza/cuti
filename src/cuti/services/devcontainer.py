@@ -40,6 +40,12 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \\
         ripgrep fd-find bat \\
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install Docker CLI (not daemon) for Docker-in-Docker support
+RUN curl -fsSL https://get.docker.com -o get-docker.sh \\
+    && sh get-docker.sh \\
+    && rm get-docker.sh \\
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Configure locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
@@ -53,18 +59,21 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Create non-root user with sudo access
+# Create non-root user with sudo access and add to docker group
 RUN groupadd --gid $USER_GID $USERNAME \\
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME -s /bin/zsh \\
     && echo $USERNAME ALL=\\(root\\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \\
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+    && chmod 0440 /etc/sudoers.d/$USERNAME \\
+    && usermod -aG docker $USERNAME
 
-# Install Claude Code CLI (version 1.0.60 for stability)
-RUN npm install -g @anthropic-ai/claude-code@1.0.60 \\
+# Install Claude Code CLI (latest version)
+RUN npm install -g @anthropic-ai/claude-code@latest \\
     && echo '#!/bin/bash' > /usr/local/bin/claude \\
+    && echo '# Claude wrapper script for container environment' >> /usr/local/bin/claude \\
     && echo 'export IS_SANDBOX=1' >> /usr/local/bin/claude \\
     && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/claude \\
-    && echo 'export CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR:-/home/cuti/.claude}' >> /usr/local/bin/claude \\
+    && echo '# Use Linux-specific config directory to avoid macOS conflicts' >> /usr/local/bin/claude \\
+    && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> /usr/local/bin/claude \\
     && echo 'exec node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js "$@"' >> /usr/local/bin/claude \\
     && chmod +x /usr/local/bin/claude
 
@@ -86,7 +95,7 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'export PYTHONPATH="/workspace/src:$PYTHONPATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
-    && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude' >> ~/.zshrc \\
+    && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
     && echo 'echo "Commands: cuti web | cuti cli | claude"' >> ~/.zshrc
 
@@ -114,7 +123,8 @@ CMD ["/bin/zsh", "-l"]
             "PYTHONUNBUFFERED": "1"
         },
         "mounts": [
-            "source=${localEnv:HOME}/.claude,target=/home/cuti/.claude,type=bind,consistency=cached",
+            "source=${localEnv:HOME}/.cuti/claude-linux,target=/home/cuti/.claude-linux,type=bind,consistency=cached",
+            "source=${localEnv:HOME}/.claude,target=/home/cuti/.claude-macos,type=bind,consistency=cached,readonly",
             "source=cuti-cache-${localWorkspaceFolderBasename},target=/home/cuti/.cache,type=volume"
         ],
         "forwardPorts": [8000, 8080, 3000, 5000],
@@ -135,13 +145,38 @@ CMD ["/bin/zsh", "-l"]
     def _run_command(self, cmd: List[str], timeout: int = 30, show_output: bool = False) -> subprocess.CompletedProcess:
         """Run a command with consistent error handling."""
         try:
-            return subprocess.run(
-                cmd,
-                capture_output=not show_output,
-                text=True,
-                timeout=timeout,
-                check=False
-            )
+            if show_output:
+                # Use Popen to show output in real-time but still capture it
+                import sys
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                output = []
+                for line in process.stdout:
+                    print(line, end='')
+                    sys.stdout.flush()
+                    output.append(line)
+                
+                process.wait(timeout=timeout)
+                return subprocess.CompletedProcess(
+                    cmd, 
+                    process.returncode,
+                    stdout=''.join(output),
+                    stderr=None
+                )
+            else:
+                return subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    check=False
+                )
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"Command timed out: {' '.join(cmd)}")
         except FileNotFoundError:
@@ -277,21 +312,21 @@ RUN /root/.local/bin/uv pip install --system cuti \\
     
     def _setup_claude_host_config(self):
         """Setup Claude configuration on host for container usage."""
-        # Create container-specific Claude config directory
-        container_claude_dir = Path.home() / ".cuti" / "container" / ".claude"
-        container_claude_dir.mkdir(parents=True, exist_ok=True)
+        # Create Linux-specific Claude config directory (separate from macOS)
+        linux_claude_dir = Path.home() / ".cuti" / "claude-linux"
+        linux_claude_dir.mkdir(parents=True, exist_ok=True)
         
         # Create subdirectories that Claude CLI expects
         for subdir in ["plugins", "plugins/repos", "todos", "sessions", "projects", 
                        "statsig", "shell-snapshots", "ide"]:
-            (container_claude_dir / subdir).mkdir(parents=True, exist_ok=True)
+            (linux_claude_dir / subdir).mkdir(parents=True, exist_ok=True)
         
         # Set permissions to be writable for all users and files
         import stat
         try:
             # Make the directory world-writable to avoid UID/GID issues
-            container_claude_dir.chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-            for item in container_claude_dir.rglob("*"):
+            linux_claude_dir.chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+            for item in linux_claude_dir.rglob("*"):
                 if item.is_dir():
                     item.chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
                 else:
@@ -300,62 +335,70 @@ RUN /root/.local/bin/uv pip install --system cuti \\
         except Exception as e:
             print(f"⚠️  Could not set permissions: {e}")
         
-        # Copy important files from host .claude if they exist (one-time sync)
+        # Copy non-credential files from host .claude if Linux dir is empty
         host_claude_dir = Path.home() / ".claude"
         
-        # Copy credentials (most important)
-        host_credentials = host_claude_dir / ".credentials.json"
-        container_credentials = container_claude_dir / ".credentials.json"
-        if host_credentials.exists() and not container_credentials.exists():
+        # Only copy configuration files, not credentials (to avoid conflicts)
+        if host_claude_dir.exists() and not any(linux_claude_dir.iterdir()):
+            print("📋 Initializing Linux Claude config from host settings...")
             import shutil
-            shutil.copy2(host_credentials, container_credentials)
-            print("🔑 Synced Claude credentials from host to container config")
+            
+            # Copy CLAUDE.md if it exists
+            host_claude_md = host_claude_dir / "CLAUDE.md"
+            if host_claude_md.exists():
+                shutil.copy2(host_claude_md, linux_claude_dir / "CLAUDE.md")
+                print("📄 Copied CLAUDE.md from host")
+            
+            # Copy settings if they exist
+            host_settings = host_claude_dir / "settings.json"
+            if host_settings.exists():
+                shutil.copy2(host_settings, linux_claude_dir / "settings.json")
+                print("⚙️  Copied settings from host")
+            
+            # Copy plugins config if it exists
+            host_plugins_config = host_claude_dir / "plugins" / "config.json"
+            if host_plugins_config.exists():
+                dest_plugins_dir = linux_claude_dir / "plugins"
+                dest_plugins_dir.mkdir(exist_ok=True)
+                shutil.copy2(host_plugins_config, dest_plugins_dir / "config.json")
+                print("🔌 Copied plugins config from host")
         
-        # Copy CLAUDE.md if it exists
-        host_claude_md = host_claude_dir / "CLAUDE.md"
-        container_claude_md = container_claude_dir / "CLAUDE.md"
-        if host_claude_md.exists() and not container_claude_md.exists():
-            import shutil
-            shutil.copy2(host_claude_md, container_claude_md)
-            print("📄 Synced CLAUDE.md to container config")
-        
-        # Copy plugins config if it exists
-        host_plugins_config = host_claude_dir / "plugins" / "config.json"
-        container_plugins_config = container_claude_dir / "plugins" / "config.json"
-        if host_plugins_config.exists() and not container_plugins_config.exists():
-            import shutil
-            shutil.copy2(host_plugins_config, container_plugins_config)
-            print("🔌 Synced plugins config to container")
-        
-        # Create or update container-specific .claude.json
-        container_claude_json = container_claude_dir / ".claude.json"
+        # Create or update Linux-specific .claude.json
+        linux_claude_json = linux_claude_dir / ".claude.json"
         config = {}
-        if container_claude_json.exists():
+        if linux_claude_json.exists():
             try:
-                with open(container_claude_json, 'r') as f:
+                with open(linux_claude_json, 'r') as f:
                     config = json.load(f)
             except Exception:
                 config = {}
         
         # Always ensure bypassPermissionsModeAccepted is set
-        if not config.get('bypassPermissionsModeAccepted', False):
-            config['bypassPermissionsModeAccepted'] = True
-            with open(container_claude_json, 'w') as f:
-                json.dump(config, f, indent=2)
+        # Ensure bypass permissions mode is accepted
+        config['bypassPermissionsModeAccepted'] = True
+        with open(linux_claude_json, 'w') as f:
+            json.dump(config, f, indent=2)
         
-        # Check if credentials exist
-        if container_credentials.exists():
-            print(f"✅ Container Claude config ready at {container_claude_dir}")
-            print("🔑 Claude credentials available - no login needed!")
+        # Check if credentials already exist from previous container sessions
+        linux_credentials = linux_claude_dir / ".credentials.json"
+        if linux_credentials.exists():
+            print(f"✅ Linux Claude config ready at {linux_claude_dir}")
+            print("🔑 Found existing Linux credentials - no login needed!")
+            print("📌 Credentials persist across all containers")
         else:
-            print(f"⚠️  No saved credentials at {container_claude_dir}")
-            print("   Authenticate once in container with: claude login")
-            print("   Credentials will persist across all containers")
+            print(f"📋 Linux Claude config initialized at {linux_claude_dir}")
+            print("⚠️  No credentials found. You'll need to authenticate once:")
+            print("   Run 'claude login' inside the container")
+            print("   Credentials will persist for all future containers")
         
-        return container_claude_dir
+        print("📋 macOS Claude config mounted read-only for reference")
+        
+        return linux_claude_dir
     
     def _build_container_image(self, image_name: str, rebuild: bool = False) -> bool:
-        """Build the container image."""
+        """Build the container image with retry logic."""
+        import time
+        
         if rebuild:
             print("🔨 Rebuilding container (forced rebuild)...")
             self._run_command(["docker", "rmi", "-f", image_name])
@@ -366,39 +409,66 @@ RUN /root/.local/bin/uv pip install --system cuti \\
                 return True
             print("🔨 Building container (first time setup)...")
         
-        # Create temporary Dockerfile
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dockerfile_path = Path(tmpdir) / "Dockerfile"
-            dockerfile_content = self._generate_dockerfile("general")
-            dockerfile_path.write_text(dockerfile_content)
-            
-            # For source builds, copy the entire cuti project to build context
-            build_context = tmpdir
-            if (self.working_dir / "src" / "cuti").exists() and (self.working_dir / "pyproject.toml").exists():
-                import shutil
-                # Copy necessary files for cuti installation
-                shutil.copy2(self.working_dir / "pyproject.toml", tmpdir)
-                shutil.copytree(self.working_dir / "src", Path(tmpdir) / "src")
-                if (self.working_dir / "uv.lock").exists():
-                    shutil.copy2(self.working_dir / "uv.lock", tmpdir)
-                if (self.working_dir / "README.md").exists():
-                    shutil.copy2(self.working_dir / "README.md", tmpdir)
-                # Copy docs directory if needed for build
-                if (self.working_dir / "docs").exists():
-                    shutil.copytree(self.working_dir / "docs", Path(tmpdir) / "docs")
-            
-            # Build image
-            build_cmd = ["docker", "build", "-t", image_name, "-f", str(dockerfile_path), build_context]
-            if rebuild:
-                build_cmd.append("--no-cache")
-            
-            result = self._run_command(build_cmd, timeout=1800, show_output=True)
-            if result.returncode == 0:
-                print("✅ Container built successfully")
-                return True
-            else:
-                print(f"❌ Container build failed: {result.stderr}")
-                return False
+        # Retry logic for build
+        max_retries = 3
+        retry_delay = 5
+        
+        for attempt in range(max_retries):
+            try:
+                # Create temporary Dockerfile
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    dockerfile_path = Path(tmpdir) / "Dockerfile"
+                    dockerfile_content = self._generate_dockerfile("general")
+                    dockerfile_path.write_text(dockerfile_content)
+                    
+                    # For source builds, copy the entire cuti project to build context
+                    build_context = tmpdir
+                    if (self.working_dir / "src" / "cuti").exists() and (self.working_dir / "pyproject.toml").exists():
+                        import shutil
+                        # Copy necessary files for cuti installation
+                        shutil.copy2(self.working_dir / "pyproject.toml", tmpdir)
+                        shutil.copytree(self.working_dir / "src", Path(tmpdir) / "src")
+                        if (self.working_dir / "uv.lock").exists():
+                            shutil.copy2(self.working_dir / "uv.lock", tmpdir)
+                        if (self.working_dir / "README.md").exists():
+                            shutil.copy2(self.working_dir / "README.md", tmpdir)
+                        # Copy docs directory if needed for build
+                        if (self.working_dir / "docs").exists():
+                            shutil.copytree(self.working_dir / "docs", Path(tmpdir) / "docs", dirs_exist_ok=True)
+                    
+                    # Build image
+                    build_cmd = ["docker", "build", "-t", image_name, "-f", str(dockerfile_path), build_context]
+                    if rebuild:
+                        build_cmd.append("--no-cache")
+                    
+                    result = self._run_command(build_cmd, timeout=1800, show_output=True)
+                    if result.returncode == 0:
+                        print("✅ Container built successfully")
+                        return True
+                    else:
+                        # Check both stderr and stdout for connection issues
+                        error_output = str(result.stderr or "") + str(result.stdout or "")
+                        if any(err in error_output.lower() for err in ["broken pipe", "closed pipe", "connection", "socket"]):
+                            if attempt < max_retries - 1:
+                                print(f"⚠️  Build failed due to connection issue. Retrying in {retry_delay} seconds... (attempt {attempt + 2}/{max_retries})")
+                                time.sleep(retry_delay)
+                                # Try to restart Docker daemon
+                                print("🔄 Restarting Colima...")
+                                self._run_command(["colima", "restart"], timeout=120)
+                                time.sleep(10)  # Give Docker more time to stabilize
+                                continue
+                        print(f"❌ Container build failed: {result.stderr}")
+                        return False
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"⚠️  Build failed with error: {e}. Retrying... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    print(f"❌ Container build failed after {max_retries} attempts: {e}")
+                    return False
+        
+        return False
     
     def generate_devcontainer(self, project_type: Optional[str] = None) -> bool:
         """Generate dev container configuration."""
@@ -463,8 +533,8 @@ RUN /root/.local/bin/uv pip install --system cuti \\
         if not self._build_container_image(image_name, rebuild):
             return 1
         
-        # Setup Claude configuration on host
-        container_claude_dir = self._setup_claude_host_config()
+        # Setup Linux-specific Claude configuration
+        linux_claude_dir = self._setup_claude_host_config()
         
         # Run container
         print("🚀 Starting container...")
@@ -487,7 +557,9 @@ RUN /root/.local/bin/uv pip install --system cuti \\
             "docker", "run", "--rm", "--privileged", 
             "-v", f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
             "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global", 
-            "-v", f"{container_claude_dir}:/host-claude-config:ro",  # Mount host's container claude dir as read-only
+            "-v", f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",  # Linux-specific config
+            "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude-macos:ro",  # macOS config read-only
+            "-v", "/var/run/docker.sock:/var/run/docker.sock",  # Mount Docker socket for Docker-in-Docker
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
@@ -511,7 +583,7 @@ if touch /workspace/.test_write 2>/dev/null; then
     echo "✅ Workspace is writable - Claude can edit code!"
     # Use workspace directories when writable
     export CLAUDE_QUEUE_STORAGE_DIR=/workspace/.cuti
-    export CLAUDE_CONFIG_DIR=/workspace/.claude
+    export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux
 else
     WORKSPACE_WRITABLE=false
     echo "⚠️  WARNING: Workspace mounted as read-only!"
@@ -528,99 +600,60 @@ else
     echo ""
     # Fall back to home directories when read-only
     export CLAUDE_QUEUE_STORAGE_DIR=/home/cuti/.cuti
-    export CLAUDE_CONFIG_DIR=/home/cuti/.claude
+    export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux
 fi
 
-# Copy mounted claude config to a writable location if needed
-if [ -d /host-claude-config ]; then
-    # Remove existing .claude directory if it's a symlink or directory
-    rm -rf /home/cuti/.claude 2>/dev/null || true
-    
-    # Copy the mounted config to home directory
-    cp -r /host-claude-config /home/cuti/.claude 2>/dev/null || true
-    
-    # Ensure proper ownership
-    sudo chown -R cuti:cuti /home/cuti/.claude 2>/dev/null || true
-    
-    # Create necessary Claude directories if they don't exist
-    mkdir -p /home/cuti/.claude/plugins/repos 2>/dev/null || true
-    mkdir -p /home/cuti/.claude/todos 2>/dev/null || true
-    mkdir -p /home/cuti/.claude/sessions 2>/dev/null || true
-    mkdir -p /home/cuti/.claude/projects 2>/dev/null || true
-    mkdir -p /home/cuti/.claude/statsig 2>/dev/null || true
-    mkdir -p /home/cuti/.claude/shell-snapshots 2>/dev/null || true
-    mkdir -p /home/cuti/.claude/ide 2>/dev/null || true
+# The .claude-linux directory is mounted for Linux-specific credentials
+# Ensure proper ownership for the mounted directories
+if [ -d /home/cuti/.claude-linux ]; then
+    # Fix ownership if needed (container user might have different UID/GID)
+    sudo chown -R cuti:cuti /home/cuti/.claude-linux 2>/dev/null || true
+    echo "🔗 Linux Claude config mounted from host"
+fi
+
+# Copy settings from macOS config if available (read-only mount)
+if [ -d /home/cuti/.claude-macos ] && [ ! -f /home/cuti/.claude-linux/CLAUDE.md ]; then
+    if [ -f /home/cuti/.claude-macos/CLAUDE.md ]; then
+        cp /home/cuti/.claude-macos/CLAUDE.md /home/cuti/.claude-linux/CLAUDE.md 2>/dev/null || true
+        echo "📄 Copied CLAUDE.md from macOS config"
+    fi
 fi
 
 # Handle workspace directories based on writability
 if [ "$WORKSPACE_WRITABLE" = "true" ]; then
     # Create workspace directories if they don't exist
-    mkdir -p /workspace/.claude 2>/dev/null || true
+    mkdir -p /workspace/.claude-linux 2>/dev/null || true
     mkdir -p /workspace/.cuti 2>/dev/null || true
     
     # Ensure proper ownership for workspace directories
-    sudo chown -R cuti:cuti /workspace/.claude 2>/dev/null || true
+    sudo chown -R cuti:cuti /workspace/.claude-linux 2>/dev/null || true
     sudo chown -R cuti:cuti /workspace/.cuti 2>/dev/null || true
     
-    # Copy credentials from host config if not present in workspace
-    if [ ! -f /workspace/.claude/.credentials.json ] && [ -f /home/cuti/.claude/.credentials.json ]; then
-        cp /home/cuti/.claude/.credentials.json /workspace/.claude/.credentials.json 2>/dev/null || true
-    fi
-    
-    echo "📁 Using workspace directories for Claude and cuti"
-else
-    # If read-only, copy workspace config to home if exists
-    if [ -d /workspace/.claude ]; then
-        echo "📁 Copying workspace .claude to home (workspace is read-only)..."
-        cp -rn /workspace/.claude/* /home/cuti/.claude/ 2>/dev/null || true
-        sudo chown -R cuti:cuti /home/cuti/.claude 2>/dev/null || true
-    fi
+    echo "📁 Using workspace directories for Claude queue storage"
 fi
 
-# Copy CLAUDE.md from workspace if it exists and not already present
-if [ -f /workspace/CLAUDE.md ] && [ ! -f /home/cuti/.claude/CLAUDE.md ]; then
-    cp /workspace/CLAUDE.md /home/cuti/.claude/CLAUDE.md 2>/dev/null || true
-fi
-
-# Check for existing credentials in the appropriate location
-if [ "$WORKSPACE_WRITABLE" = "true" ]; then
-    if [ -f /workspace/.claude/.credentials.json ]; then
-        echo "🔑 Found saved Claude credentials in workspace - no login needed!"
-    elif [ -f /home/cuti/.claude/.credentials.json ]; then
-        cp /home/cuti/.claude/.credentials.json /workspace/.claude/.credentials.json 2>/dev/null || true
-        echo "🔑 Copied credentials to workspace"
-    else
-        echo "⚠️  No saved credentials. Authenticate once with: claude login"
-        echo "   Your credentials will be saved in the workspace."
-    fi
+# Check authentication status
+if [ -f /home/cuti/.claude-linux/.credentials.json ]; then
+    echo "🔑 Found Linux Claude credentials - authentication ready!"
 else
-    if [ -f /home/cuti/.claude/.credentials.json ]; then
-        echo "🔑 Found saved Claude credentials - no login needed!"
-    elif [ -f /workspace/.claude/.credentials.json ]; then
-        cp /workspace/.claude/.credentials.json /home/cuti/.claude/.credentials.json 2>/dev/null || true
-        echo "🔑 Copied credentials from workspace"
-    else
-        echo "⚠️  No saved credentials. Authenticate once with: claude login"
-        echo "   Your credentials will be saved for all future containers."
-    fi
-    # Ensure home storage directory exists for read-only mode
-    mkdir -p /home/cuti/.cuti 2>/dev/null || true
+    echo "⚠️  No credentials found. Authenticate once with: claude login"
+    echo "   Your credentials will persist across all containers."
+    echo "   Note: Linux credentials are separate from macOS keychain."
 fi
 
 # Ensure PYTHONPATH includes workspace source for local development
 export PYTHONPATH="/workspace/src:$PYTHONPATH"
 echo "🐍 Python path: $PYTHONPATH"
 
-# Function to sync credentials back to host on exit
-sync_credentials_to_host() {
-    if [ -d /host-claude-config ] && [ -f /home/cuti/.claude/.credentials.json ]; then
-        cp /home/cuti/.claude/.credentials.json /host-claude-config/.credentials.json 2>/dev/null || true
-        echo "📤 Synced credentials back to host"
-    fi
-}
-
-# Trap EXIT to sync credentials
-trap sync_credentials_to_host EXIT
+# Setup Docker socket permissions for Docker-in-Docker
+if [ -S /var/run/docker.sock ]; then
+    echo "🐳 Setting up Docker-in-Docker access..."
+    sudo chgrp docker /var/run/docker.sock 2>/dev/null || true
+    sudo chmod 660 /var/run/docker.sock 2>/dev/null || true
+    echo "✅ Docker socket configured - you can use Docker commands!"
+else
+    echo "⚠️  Docker socket not found - Docker commands won't work in container"
+fi
 """
         
         # Add interactive flags if no specific command
@@ -648,13 +681,13 @@ trap sync_credentials_to_host EXIT
         
         # Optionally remove persistent Claude credentials
         if clean_credentials:
-            container_claude_dir = Path.home() / ".cuti" / "container" / ".claude"
-            if container_claude_dir.exists():
-                shutil.rmtree(container_claude_dir)
-                print(f"✅ Removed container Claude config at {container_claude_dir}")
+            linux_claude_dir = Path.home() / ".cuti" / "claude-linux"
+            if linux_claude_dir.exists():
+                shutil.rmtree(linux_claude_dir)
+                print(f"✅ Removed Linux Claude config at {linux_claude_dir}")
                 print("   Note: You'll need to authenticate again in future containers")
         else:
-            print("💡 Tip: Claude credentials preserved. Use --clean-credentials to remove them.")
+            print("💡 Tip: Linux Claude credentials preserved. Use --clean-credentials to remove them.")
         
         return True
 

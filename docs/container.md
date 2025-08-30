@@ -26,7 +26,7 @@ Launches an interactive development container with your current directory mounte
 **Features:**
 - Automatic Docker/Colima setup
 - Pre-installed tools (Claude CLI, Python, Node.js, uv, etc.)
-- Persistent Claude authentication
+- Persistent Claude authentication (see [Authentication Guide](claude-container-auth.md))
 - Current directory mounted as workspace
 
 ### `cuti container clean`

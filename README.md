@@ -57,13 +57,21 @@ cuti container "python script.py"
 
 Features:
 - Cuti installed and ready (from PyPI via `uv tool install`)
-- Claude CLI installed (note: auth limitations in containers)
+- Claude CLI installed with persistent authentication
 - Custom prompt shows `cuti:~/path $`
 - Works from any project directory
 - Python 3.11, Node.js 20, development tools included
 
-Requires Docker (or Colima on macOS). See `docs/devcontainer.md` for details and Claude authentication notes.
+Requires Docker (or Colima on macOS). See documentation below for details.
 
-### License
+## Documentation
+
+- [Dev Container Guide](docs/devcontainer.md) - Complete container setup and usage
+- [Claude Authentication](docs/claude-container-auth.md) - Container authentication setup
+- [Container Commands](docs/container.md) - Basic container management
+- [Todo System](docs/todo-system.md) - Task management features
+- [Rate Limit Handling](docs/rate-limit-handling.md) - API limit management
+
+## License
 
 MIT. See `LICENSE`.

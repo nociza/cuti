@@ -43,16 +43,32 @@ class ClaudeSettingsManager:
             
         self.settings_file = self.claude_dir / "settings.local.json"
         self.global_settings_file = Path.home() / ".claude" / "settings.json"
+        
+        # Ensure directory and settings exist
+        self.ensure_claude_directory()
     
     def ensure_claude_directory(self) -> bool:
         """Ensure .claude directory exists in the project."""
+        # Create directory if it doesn't exist
         if not self.claude_dir.exists():
             try:
                 self.claude_dir.mkdir(parents=True, exist_ok=True)
-                return True
             except Exception as e:
                 print(f"Error creating .claude directory: {e}")
                 return False
+        
+        # Always check if settings file needs to be created
+        if not self.settings_file.exists():
+            try:
+                # Write settings file directly to avoid recursion
+                import json
+                with open(self.settings_file, 'w') as f:
+                    json.dump(self.DEFAULT_SETTINGS, f, indent=2)
+                print(f"📝 Initialized Claude settings at {self.settings_file}")
+            except Exception as e:
+                print(f"Error creating settings file: {e}")
+                return False
+        
         return True
     
     def get_current_settings(self) -> Dict[str, Any]:
@@ -117,6 +133,13 @@ class ClaudeSettingsManager:
     
     def initialize_project_settings(self) -> Dict[str, Any]:
         """Initialize project with default Claude settings."""
+        # Always ensure the directory exists first
+        if not self.ensure_claude_directory():
+            return {
+                "success": False,
+                "message": "Failed to create .claude directory"
+            }
+        
         if self.settings_file.exists():
             return {
                 "success": False,
@@ -124,7 +147,10 @@ class ClaudeSettingsManager:
                 "path": str(self.settings_file)
             }
         
-        return self.save_settings(self.DEFAULT_SETTINGS)
+        result = self.save_settings(self.DEFAULT_SETTINGS)
+        if result.get("success"):
+            print(f"📝 Initialized project Claude settings at {self.settings_file}")
+        return result
     
     def get_essential_settings(self) -> Dict[str, Any]:
         """Get essential Claude settings for UI display."""

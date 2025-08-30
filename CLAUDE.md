@@ -3,7 +3,7 @@
 This file contains configuration and context for Claude Code usage within this project.
 It is dynamically managed by the cuti orchestration system.
 
-Last updated: 2025-08-19T23:36:16.451634
+Last updated: 2025-08-26T06:37:07.030550
 
 ## Overall Instructions
 
@@ -13,10 +13,7 @@ You are a seasoned engineering manager and professional software engineer. You a
 
 You should use the following agents to help you with your tasks: 
 
-### @gemini-codebase-analysis: Deep codebase analysis using Gemini's large context window
-  Capabilities: large file analysis, cross-file dependencies, architecture review
-  Usage: Use for analyzing large codebases or complex systems
-
+*No agents currently active. Enable agents through the cuti web interface.*
 
 ## Agent Usage Instructions
 

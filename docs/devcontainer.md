@@ -15,11 +15,11 @@ cuti container --command "claude 'Explain this project'"
 
 ## Key Features
 
-### 🔐 Automatic Claude Authentication
-- Claude configuration automatically propagates from your host machine
-- No need to re-authenticate inside the container
-- Uses `--dangerously-skip-permissions` flag for container compatibility
-- Just run `claude` and it works
+### 🔐 Persistent Claude Authentication
+- Separate Linux credentials in `~/.cuti/claude-linux/`
+- No conflicts with macOS Keychain
+- One-time authentication for all containers
+- 📚 [Complete Authentication Guide](claude-container-auth.md)
 
 ### 🎯 Smart Container Selection
 - **Universal Container** (`cuti-dev-universal`): Used when running from any project directory
@@ -37,6 +37,13 @@ cuti container --command "claude 'Explain this project'"
 - Pre-configured with oh-my-zsh for better terminal experience
 - All cuti commands available immediately
 - Python 3.11, Node.js 20, and common development tools pre-installed
+
+### 🐳 Docker-in-Docker Support
+- Docker CLI installed in container
+- Host Docker socket mounted at `/var/run/docker.sock`
+- Run Docker commands that execute on host's Docker daemon
+- Build images, run containers, use docker-compose - all from within the container
+- Perfect for projects that need containerization during development
 
 ## Prerequisites
 
@@ -110,6 +117,26 @@ cuti container --command "npm run dev"
 cuti container --command "python manage.py runserver"
 ```
 
+### Docker-in-Docker Usage
+```bash
+# Build Docker images inside the container
+cuti container --command "docker build -t myapp ."
+
+# Run containers from within the container
+cuti container --command "docker run -d redis:latest"
+cuti container --command "docker ps"
+
+# Use docker-compose
+cuti container --command "docker-compose up -d"
+
+# Interactive container with Docker support
+cuti container
+# Inside container:
+docker images
+docker run hello-world
+docker-compose --version
+```
+
 ## Architecture
 
 ### Container Images
@@ -118,6 +145,7 @@ cuti container --command "python manage.py runserver"
 - Base: `python:3.11-bullseye`
 - Cuti: Installed from PyPI via `uv tool install cuti`
 - Claude CLI: Latest version with auth propagation
+- Docker CLI: Installed for Docker-in-Docker support
 - Tools: git, zsh, ripgrep, fd-find, bat, jq, curl, wget
 - Python: uv package manager, pytest, httpx, fastapi, uvicorn
 - Node.js: v20 with latest npm
@@ -135,18 +163,20 @@ The container automatically mounts:
 | Host Path | Container Path | Purpose |
 |-----------|---------------|---------|
 | Current directory | `/workspace` | Your project files |
-| `~/.claude/` | `/host/.claude` | Claude configuration |
-| `~/.claude.json` | `/host/.claude.json` | Claude settings |
+| `~/.cuti/claude-linux/` | `/home/cuti/.claude-linux` | Linux Claude credentials |
+| `~/.claude/` | `/home/cuti/.claude-macos` | macOS config (read-only) |
 | `~/.cuti/` | `/root/.cuti-global` | Global cuti config |
+| `/var/run/docker.sock` | `/var/run/docker.sock` | Docker socket for Docker-in-Docker |
 
 ### Environment Variables
 
 Automatically set in container:
 - `CUTI_IN_CONTAINER=true` - Indicates running in container
-- `CLAUDE_CONFIG_DIR=/host/.claude` - Claude config location
+- `CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux` - Linux Claude config location
 - `CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true` - Skip permission checks
 - `PYTHONUNBUFFERED=1` - Python unbuffered output
 - `TERM=xterm-256color` - Color terminal support
+- `ANTHROPIC_API_KEY` - Loaded from environment or file if available
 
 ### Network Configuration
 
@@ -197,50 +227,21 @@ colima start
 docker images | grep cuti-dev
 ```
 
-### Claude Authentication Issues
+### Claude Authentication
 
-**Important Note:** Claude Code uses a browser-based authentication system with limitations in containerized environments. Authentication tokens are session-based and not easily transferable to containers.
+**✅ Solved:** Claude authentication persists across all containers using separate Linux credentials.
 
-#### What's Implemented:
-- Claude CLI is installed and available in the container
-- `IS_SANDBOX=1` environment variable enables `--dangerously-skip-permissions` for root users
-- Your `.claude` configuration directory is mounted to the container
-- Commands like `claude --version` and `claude --help` work correctly
+**Quick Setup:**
+1. Run `cuti container`
+2. Inside container, run `claude login` (first time only)
+3. Authentication persists for all future containers
 
-#### Current Limitations:
-- `claude login` requires a browser and won't work in containers
-- Authentication tokens are not stored in mountable config files
-- The `setup-token` command requires an interactive terminal
-- Even with config mounted, authentication doesn't transfer to the container
+**How it works:**
+- Linux credentials stored in `~/.cuti/claude-linux/`
+- macOS credentials remain in Keychain (no conflicts)
+- Settings copied from macOS automatically
 
-#### Technical Details:
-The container uses:
-- `IS_SANDBOX=1` to allow `--dangerously-skip-permissions` as root
-- Mounts `~/.claude` to `/root/.claude` in the container
-- Custom wrapper script at `/usr/local/bin/claude`
-
-#### Workarounds:
-1. **Use Claude on your host machine** for authenticated operations
-2. **Use Claude web interface** at https://claude.ai
-3. **Use Claude API** with API keys for programmatic access
-
-#### Container Claude Status:
-```bash
-# Check Claude installation in container
-cuti container "claude --version"
-
-# Output:
-# ✅ Claude configuration directory found
-# 1.0.80 (Claude Code)
-
-# Try to use Claude (will show auth error)
-cuti container "claude --print 'Hello'"
-
-# Output:
-# Invalid API key · Please run /login
-```
-
-Note: Full Claude authentication in containers is a known limitation of the current Claude Code architecture. The container is prepared for when a solution becomes available.
+📚 **For detailed setup and troubleshooting, see [Claude Container Authentication Guide](claude-container-auth.md)**
 
 ### Cuti Not Found in Container
 
@@ -287,6 +288,24 @@ lsof -i :8000
 # Kill the process or use different port
 cuti container --command "cuti web --port 8001"
 ```
+
+### Docker-in-Docker Issues
+
+**Docker commands fail with "permission denied":**
+```bash
+# The container should automatically set permissions, but if needed:
+cuti container --command "sudo chmod 666 /var/run/docker.sock"
+```
+
+**Docker daemon not accessible:**
+- Ensure Docker is running on your host machine
+- On macOS with Colima: `colima status` and `colima start` if needed
+- On Linux: `sudo systemctl status docker`
+
+**Container can't connect to host Docker:**
+- Check if `/var/run/docker.sock` exists on host
+- Ensure your user has Docker permissions on host
+- Try running with elevated permissions: `sudo cuti container`
 
 ### Colima Specific Issues (macOS)
 
