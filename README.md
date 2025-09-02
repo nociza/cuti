@@ -1,77 +1,75 @@
-## Cuti
+# Cuti
 
-The one stop solution for all your dev tasks for Claude Code and friends. Queue and route prompts, manage agents, monitor usage, and work through a simple CLI or a small web UI (mobile supported). Local-first; no telemetry.
+<div align="center">
 
-### Install
+[![PyPI Version](https://img.shields.io/pypi/v/cuti?color=blue&label=PyPI)](https://pypi.org/project/cuti/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/cuti)](https://pypi.org/project/cuti/)
+[![License](https://img.shields.io/pypi/l/cuti)](https://github.com/nociza/cuti/blob/main/LICENSE)
+[![Downloads](https://img.shields.io/pypi/dm/cuti?color=green&label=Downloads%2FMonth)](https://pypi.org/project/cuti/)
+[![Downloads Total](https://static.pepy.tech/badge/cuti)](https://pepy.tech/project/cuti)
 
-```bash
-# Install uv if needed (recommended)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+**Instant AI development environments with Claude Code and multi-agent orchestration**
 
-# Install cuti
-uv tool install cuti
+[PyPI](https://pypi.org/project/cuti/) • [Documentation](#documentation) • [GitHub](https://github.com/nociza/cuti)
 
-# Verify installation
-cuti --help
+</div>
 
-# Check version
-cuti --version  # or cuti -v
-```
+## 📊 Download Trends
 
-Requires Python 3.9+. Claude Code CLI is required. Google Gemini is optional and would suppliment the agent orchestration if you have a working google gemini cli.
+<div align="center">
 
-### Quick start
+[![Downloads](https://img.shields.io/pypi/dm/cuti?style=for-the-badge&color=blue&label=Monthly)](https://pypi.org/project/cuti/)
+[![Downloads](https://img.shields.io/pypi/dw/cuti?style=for-the-badge&color=green&label=Weekly)](https://pypi.org/project/cuti/)
 
-```bash
-# Start the web UI (http://127.0.0.1:8000)
-cuti web
+</div>
 
-# Or use the CLI directly
-cuti add "Explore this codebase and summarize key modules"
-cuti start
-cuti status
-```
-
-### What it does
-
-- Multi-agent orchestration (Claude, Gemini) with simple routing
-- Command queue with prompt aliases and history
-- Hierarchical todo system with master goals and sub-tasks
-- Automatic rate limit handling with smart retry after reset
-- Web UI (FastAPI) for status, agents, and history
-- Real-time usage monitoring via claude-monitor
-- Per-project workspace under `.cuti/`
-
-### Dev containers
-
-Run your project in a containerized dev environment with cuti and all tools pre-configured:
+## 🚀 Quick Start
 
 ```bash
-# Start interactive container (works from any directory)
+# Install
+pip install cuti  # or: uv tool install cuti
+
+# Launch containerized dev environment
 cuti container
-
-# Run a specific command
-cuti container "cuti web"
-cuti container "python script.py"
 ```
 
-Features:
-- Cuti installed and ready (from PyPI via `uv tool install`)
-- Claude CLI installed with persistent authentication
-- Custom prompt shows `cuti:~/path $`
-- Works from any project directory
-- Python 3.11, Node.js 20, development tools included
+That's it! You now have a fully configured AI development environment with:
+- ✅ Cuti pre-installed and ready
+- ✅ Claude CLI with persistent authentication  
+- ✅ Python 3.11, Node.js 20, and dev tools
+- ✅ Custom prompt showing `cuti:~/path $`
+- ✅ Works from any project directory
 
-Requires Docker (or Colima on macOS). See documentation below for details.
+The container mounts your current directory and preserves Claude authentication between sessions. Perfect for isolated, reproducible AI-assisted development.
 
-## Documentation
+## 🌟 Additional Features
 
-- [Dev Container Guide](docs/devcontainer.md) - Complete container setup and usage
-- [Claude Authentication](docs/claude-container-auth.md) - Container authentication setup
-- [Container Commands](docs/container.md) - Basic container management
-- [Todo System](docs/todo-system.md) - Task management features
-- [Rate Limit Handling](docs/rate-limit-handling.md) - API limit management
+Cuti also provides:
+- **Multi-agent orchestration** (Claude, Gemini)
+- **Command queuing** with priorities
+- **Web UI** at `cuti web`
+- **Rate limit handling** with smart retry
+- **Todo system** for task management
 
-## License
+See [documentation](#documentation) for details.
 
-MIT. See `LICENSE`.
+## 📚 Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Dev Container](docs/devcontainer.md) | Complete container guide |
+| [Claude Auth](docs/claude-container-auth.md) | Container authentication |
+| [Todo System](docs/todo-system.md) | Task management |
+| [Rate Limits](docs/rate-limit-handling.md) | API limit handling |
+
+## 📄 License
+
+Apache 2.0 - See [LICENSE](LICENSE)
+
+---
+
+<div align="center">
+
+**[PyPI](https://pypi.org/project/cuti/)** • **[Issues](https://github.com/nociza/cuti/issues)**
+
+</div>
