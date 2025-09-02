@@ -40,10 +40,13 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \\
         ripgrep fd-find bat \\
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Docker CLI (not daemon) for Docker-in-Docker support
-RUN curl -fsSL https://get.docker.com -o get-docker.sh \\
-    && sh get-docker.sh \\
-    && rm get-docker.sh \\
+# Install Docker CLI only (not daemon) for Docker-in-Docker support
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+    apt-transport-https ca-certificates curl gnupg lsb-release \\
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \\
+    && echo "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list \\
+    && apt-get update \\
+    && apt-get install -y --no-install-recommends docker-ce-cli \\
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure locale
@@ -59,11 +62,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Create non-root user with sudo access and add to docker group
+# Create non-root user with sudo access
 RUN groupadd --gid $USER_GID $USERNAME \\
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME -s /bin/zsh \\
     && echo $USERNAME ALL=\\(root\\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \\
     && chmod 0440 /etc/sudoers.d/$USERNAME \\
+    && (getent group docker || groupadd docker) \\
     && usermod -aG docker $USERNAME
 
 # Install Claude Code CLI (latest version)
@@ -116,7 +120,7 @@ CMD ["/bin/zsh", "-l"]
                 "USER_GID": "1000"
             }
         },
-        "runArgs": ["--init", "--privileged"],
+        "runArgs": ["--init"],
         "containerEnv": {
             "CUTI_IN_CONTAINER": "true",
             "ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS": "1",
@@ -554,7 +558,7 @@ RUN /root/.local/bin/uv pip install --system cuti \\
                 mount_options = "rw,cached"  # Docker Desktop on macOS needs cached mode
         
         docker_args = [
-            "docker", "run", "--rm", "--privileged", 
+            "docker", "run", "--rm", "--init",
             "-v", f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
             "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global", 
             "-v", f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",  # Linux-specific config
@@ -576,6 +580,9 @@ RUN /root/.local/bin/uv pip install --system cuti \\
         
         # Setup initialization command for mounted directory
         init_script = """
+# Set up signal handlers to ensure clean exit
+trap 'echo "Container exiting cleanly..."; exit 0' SIGTERM SIGINT
+
 # Test if workspace is writable
 if touch /workspace/.test_write 2>/dev/null; then
     rm /workspace/.test_write
@@ -645,12 +652,32 @@ fi
 export PYTHONPATH="/workspace/src:$PYTHONPATH"
 echo "🐍 Python path: $PYTHONPATH"
 
-# Setup Docker socket permissions for Docker-in-Docker
+# Setup Docker access in container
 if [ -S /var/run/docker.sock ]; then
-    echo "🐳 Setting up Docker-in-Docker access..."
-    sudo chgrp docker /var/run/docker.sock 2>/dev/null || true
-    sudo chmod 660 /var/run/docker.sock 2>/dev/null || true
-    echo "✅ Docker socket configured - you can use Docker commands!"
+    echo "🐳 Docker socket mounted - setting up access..."
+    
+    # Test if we can access Docker directly
+    if docker version > /dev/null 2>&1; then
+        echo "✅ Docker access confirmed - no sudo needed"
+    else
+        # Create a Docker wrapper that uses sudo
+        cat > /home/cuti/.local/bin/docker << 'EOF'
+#!/bin/bash
+# Docker wrapper to handle permission issues
+exec sudo /usr/bin/docker "$@"
+EOF
+        chmod +x /home/cuti/.local/bin/docker
+        
+        # Ensure our local bin is first in PATH
+        export PATH="/home/cuti/.local/bin:$PATH"
+        
+        if sudo docker version > /dev/null 2>&1; then
+            echo "✅ Docker configured with sudo wrapper"
+            echo "📝 Note: Docker commands will use sudo automatically"
+        else
+            echo "⚠️  Docker socket mounted but not accessible even with sudo"
+        fi
+    fi
 else
     echo "⚠️  Docker socket not found - Docker commands won't work in container"
 fi

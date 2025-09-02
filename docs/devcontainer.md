@@ -39,8 +39,9 @@ cuti container --command "claude 'Explain this project'"
 - Python 3.11, Node.js 20, and common development tools pre-installed
 
 ### 🐳 Docker-in-Docker Support
-- Docker CLI installed in container
+- Docker CLI installed in container (not the daemon)
 - Host Docker socket mounted at `/var/run/docker.sock`
+- Automatic sudo wrapper if needed for permissions
 - Run Docker commands that execute on host's Docker daemon
 - Build images, run containers, use docker-compose - all from within the container
 - Perfect for projects that need containerization during development
@@ -203,6 +204,19 @@ When generating dev containers, cuti automatically detects:
 
 ## Troubleshooting
 
+### Docker Socket Issues After Container Exit (Fixed)
+
+Previous versions had an issue where exiting the container would break the Docker socket connection on macOS with Colima. This has been fixed by:
+- Using `--init` flag for proper signal handling
+- Not modifying Docker socket permissions inside the container
+- Installing only Docker CLI (not the full Docker engine)
+- Adding proper signal traps for clean exit
+
+If you experience this issue with an older version, restart Colima:
+```bash
+colima restart
+```
+
 ### Container Won't Start
 
 1. **Check Docker/Colima is running:**
@@ -289,23 +303,32 @@ lsof -i :8000
 cuti container --command "cuti web --port 8001"
 ```
 
-### Docker-in-Docker Issues
+### Docker-in-Docker Access
 
-**Docker commands fail with "permission denied":**
+**How Docker access works in the container:**
+- The container automatically detects if Docker socket requires sudo
+- If needed, creates a wrapper script that adds sudo automatically
+- You can use `docker` commands normally - sudo is handled transparently
+
+**Docker commands work normally:**
 ```bash
-# The container should automatically set permissions, but if needed:
-cuti container --command "sudo chmod 666 /var/run/docker.sock"
+# Inside container - these all work
+docker ps
+docker build -t myapp .
+docker-compose up -d
 ```
 
+**If Docker still shows "permission denied":**
+1. The container should auto-configure this, but if not:
+   ```bash
+   sudo docker ps  # Test with sudo
+   ```
+2. Exit and restart the container - the wrapper will be created
+
 **Docker daemon not accessible:**
-- Ensure Docker is running on your host machine
+- Ensure Docker/Colima is running on your host machine
 - On macOS with Colima: `colima status` and `colima start` if needed
 - On Linux: `sudo systemctl status docker`
-
-**Container can't connect to host Docker:**
-- Check if `/var/run/docker.sock` exists on host
-- Ensure your user has Docker permissions on host
-- Try running with elevated permissions: `sudo cuti container`
 
 ### Colima Specific Issues (macOS)
 
