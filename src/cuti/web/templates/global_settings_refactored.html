@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% import 'components/ui_library.html' as ui %}
+
+{% block title %}Global Settings - Cuti{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/components.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container p-3">
+    <!-- Page Header -->
+    <div class="text-center mb-4">
+        <h1>Global Settings</h1>
+        <p class="text-secondary">Configure your Cuti experience with advanced settings and preferences</p>
+    </div>
+    
+    <!-- Storage Info Card -->
+    {% call ui.card('Storage Usage', 'Monitor your storage consumption', '💾', 'card-elevated mb-3') %}
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-label">Total Storage</div>
+                <div class="stat-value" id="total-storage">0 MB</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Database Size</div>
+                <div class="stat-value" id="db-size">0 MB</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">File Count</div>
+                <div class="stat-value" id="file-count">0</div>
+            </div>
+        </div>
+        {{ ui.progress_bar(0, 100, 'Storage Usage', 'primary', 'storage-progress') }}
+    {% endcall %}
+    
+    <!-- Settings Grid -->
+    <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 2rem;">
+        
+        <!-- Privacy Settings -->
+        {% call ui.card('Privacy Settings', 'Control your privacy preferences', '🔒') %}
+            {{ ui.toggle_switch('usage-tracking', 'Usage Tracking', 
+                'Track and analyze your Claude usage patterns', false, 'usage-tracking') }}
+            
+            {{ ui.toggle_switch('privacy-mode', 'Privacy Mode', 
+                'Enhanced privacy with local-only data storage', false) }}
+            
+            {{ ui.toggle_switch('favorite-prompts', 'Favorite Prompts', 
+                'Save and reuse your favorite prompts', true) }}
+            
+            {{ ui.form_input('cleanup-days', 'Auto Cleanup (days)', 'number', '90', '', 
+                'Automatically delete old data after specified days') }}
+        {% endcall %}
+        
+        <!-- Subscription Settings -->
+        {% call ui.card('Subscription Settings', 'Manage your subscription', '💳') %}
+            {{ ui.form_select('claude-plan', 'Claude Plan', [
+                {'value': 'pro', 'label': 'Pro'},
+                {'value': 'max5', 'label': 'Max 5'},
+                {'value': 'max20', 'label': 'Max 20'}
+            ], 'pro', 'Select your Claude subscription tier') }}
+            
+            {{ ui.form_input('max-storage', 'Max Storage (MB)', 'number', '500', '', 
+                'Maximum storage limit for your data') }}
+            
+            {{ ui.toggle_switch('notifications', 'Notifications', 
+                'Receive alerts for important updates', true) }}
+            
+            {{ ui.form_select('theme', 'Theme', [
+                {'value': 'auto', 'label': 'Auto'},
+                {'value': 'light', 'label': 'Light'},
+                {'value': 'dark', 'label': 'Dark'}
+            ], 'auto', 'Choose your preferred interface theme') }}
+        {% endcall %}
+        
+        <!-- Advanced Configuration -->
+        {% call ui.card('Advanced Configuration', 'Fine-tune your setup', '⚙️') %}
+            {{ ui.form_textarea('custom-instructions', 'Custom Instructions', '', 
+                'Enter any special instructions or context for Claude...', 
+                'Add custom instructions for Claude to follow in all conversations', 4) }}
+            
+            {{ ui.form_input('api-endpoint', 'API Endpoint', 'text', '', 
+                'https://api.anthropic.com', 
+                'Custom API endpoint for Claude (leave blank for default)') }}
+        {% endcall %}
+        
+        <!-- Integration Settings -->
+        {% call ui.card('Integration Settings', 'Connect external services', '🔗') %}
+            {{ ui.form_input('github-token', 'GitHub Token', 'password', '', 
+                'ghp_xxxxxxxxxxxx', 
+                'Personal access token for GitHub integration') }}
+            
+            {{ ui.form_input('webhook-url', 'Webhook URL', 'url', '', 
+                'https://hooks.example.com/webhook', 
+                'Webhook for external service notifications') }}
+            
+            {{ ui.form_select('export-format', 'Export Format', [
+                {'value': 'json', 'label': 'JSON'},
+                {'value': 'csv', 'label': 'CSV'},
+                {'value': 'markdown', 'label': 'Markdown'}
+            ], 'json', 'Default format for data exports') }}
+        {% endcall %}
+    </div>
+    
+    <!-- Usage Statistics -->
+    {{ ui.stats_card('📊 Usage Statistics', [
+        {'label': 'Today', 'value': '0', 'unit': 'tokens', 'id': 'today-tokens'},
+        {'label': 'This Month', 'value': '0', 'unit': 'tokens', 'id': 'month-tokens'},
+        {'label': 'Total Cost', 'value': '$0.00', 'unit': 'this month', 'id': 'total-cost'}
+    ], [
+        {'text': 'Sync Usage Data', 'icon': '🔄', 'onclick': 'syncUsage()', 'variant': 'primary'},
+        {'text': 'View Details', 'icon': '📈', 'onclick': 'viewDetails()'}
+    ]) }}
+    
+    <!-- Sync Service Status -->
+    {{ ui.stats_card('🔄 Sync Service', [
+        {'label': 'Status', 'value': '🔴 Stopped', 'id': 'sync-status'},
+        {'label': 'Last Sync', 'value': 'Never', 'id': 'last-sync'},
+        {'label': 'Sync Count', 'value': '0', 'id': 'sync-count'}
+    ], [
+        {'text': 'Start Service', 'icon': '▶️', 'onclick': 'startSync()', 'variant': 'success'},
+        {'text': 'Stop Service', 'icon': '⏹️', 'onclick': 'stopSync()', 'variant': 'danger'}
+    ]) }}
+    
+    <!-- Action Buttons -->
+    <div class="actions actions-center mt-4 p-3" style="border-top: 1px solid var(--border);">
+        {{ ui.button('Save Settings', 'primary', '💾', 'saveSettings()') }}
+        {{ ui.button('Reset to Defaults', 'secondary', '🔄', 'resetSettings()') }}
+        {{ ui.button('Cleanup Old Data', 'warning', '🧹', 'cleanupData()') }}
+        {{ ui.button('Create Backup', 'secondary', '📦', 'createBackup()') }}
+        {{ ui.button('Export Data', 'success', '📤', 'exportData()') }}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/cuti-components.js') }}"></script>
+<script>
+// Settings Manager using the new component system
+class SettingsManager {
+    constructor() {
+        this.api = CutiComponents.api;
+        this.toast = CutiComponents.toast;
+        this.currentSettings = {};
+        this.init();
+    }
+
+    async init() {
+        await this.loadSettings();
+        await this.loadUsageStats();
+        await this.loadSyncStatus();
+        
+        // Auto-refresh sync status
+        setInterval(() => this.loadSyncStatus(), 10000);
+        
+        // Initialize toggle switches
+        CutiComponents.init();
+    }
+
+    async loadSettings() {
+        const result = await this.api.get('/global/settings');
+        if (result.success) {
+            this.currentSettings = result.data.settings;
+            this.updateUI(result.data);
+        } else {
+            this.toast.error('Failed to load settings');
+        }
+    }
+
+    updateUI(data) {
+        // Update form values
+        const fields = {
+            'usage-tracking': data.settings.usage_tracking_enabled,
+            'privacy-mode': data.settings.privacy_mode,
+            'favorite-prompts': data.settings.favorite_prompts_enabled,
+            'notifications': data.settings.notifications_enabled,
+            'cleanup-days': data.settings.auto_cleanup_days,
+            'claude-plan': data.settings.claude_plan,
+            'max-storage': data.settings.max_storage_mb,
+            'theme': data.settings.theme
+        };
+
+        Object.entries(fields).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = value;
+                    const toggle = document.getElementById(`${id}-toggle`);
+                    if (toggle) toggle.classList.toggle('active', value);
+                } else {
+                    element.value = value;
+                }
+            }
+        });
+
+        // Update storage info
+        if (data.storage) {
+            document.getElementById('total-storage').textContent = `${data.storage.total_size_mb} MB`;
+            document.getElementById('db-size').textContent = `${data.storage.database_size_mb} MB`;
+            document.getElementById('file-count').textContent = data.storage.file_count;
+            
+            // Update progress bar
+            const progress = document.getElementById('storage-progress');
+            if (progress) {
+                progress.style.width = `${data.storage.usage_percentage}%`;
+            }
+        }
+    }
+
+    async loadUsageStats() {
+        const result = await this.api.get('/global/usage/stats');
+        if (result.success) {
+            const stats = result.data;
+            document.getElementById('today-tokens').textContent = 
+                CutiComponents.utils.formatNumber(stats.today.tokens);
+            document.getElementById('month-tokens').textContent = 
+                CutiComponents.utils.formatNumber(stats.this_month.tokens);
+            document.getElementById('total-cost').textContent = 
+                `$${stats.this_month.cost.toFixed(2)}`;
+        }
+    }
+
+    async loadSyncStatus() {
+        const result = await this.api.get('/global/usage/sync/status');
+        if (result.success) {
+            const status = result.data;
+            document.getElementById('sync-status').textContent = 
+                status.running ? '🟢 Running' : '🔴 Stopped';
+            document.getElementById('last-sync').textContent = 
+                status.last_sync ? new Date(status.last_sync).toLocaleString() : 'Never';
+            document.getElementById('sync-count').textContent = status.sync_count;
+        }
+    }
+
+    async saveSettings() {
+        const settings = {
+            usage_tracking_enabled: document.getElementById('usage-tracking').checked,
+            privacy_mode: document.getElementById('privacy-mode').checked,
+            favorite_prompts_enabled: document.getElementById('favorite-prompts').checked,
+            auto_cleanup_days: parseInt(document.getElementById('cleanup-days').value),
+            claude_plan: document.getElementById('claude-plan').value,
+            max_storage_mb: parseInt(document.getElementById('max-storage').value),
+            notifications_enabled: document.getElementById('notifications').checked,
+            theme: document.getElementById('theme').value,
+            custom_instructions: document.getElementById('custom-instructions').value,
+            api_endpoint: document.getElementById('api-endpoint').value,
+            github_token: document.getElementById('github-token').value,
+            webhook_url: document.getElementById('webhook-url').value,
+            export_format: document.getElementById('export-format').value
+        };
+
+        const result = await this.api.put('/global/settings', settings);
+        if (result.success) {
+            this.toast.success('Settings saved successfully!');
+            await this.loadSettings();
+        } else {
+            this.toast.error('Failed to save settings');
+        }
+    }
+}
+
+// Initialize settings manager
+const settingsManager = new SettingsManager();
+
+// Global functions for onclick handlers
+window.saveSettings = () => settingsManager.saveSettings();
+window.resetSettings = async () => {
+    if (confirm('Reset all settings to defaults?')) {
+        const result = await settingsManager.api.put('/global/settings', {
+            usage_tracking_enabled: true,
+            privacy_mode: false,
+            favorite_prompts_enabled: true,
+            auto_cleanup_days: 90,
+            claude_plan: 'pro',
+            max_storage_mb: 500,
+            notifications_enabled: true,
+            theme: 'auto'
+        });
+        
+        if (result.success) {
+            $toast.success('Settings reset to defaults!');
+            await settingsManager.loadSettings();
+        }
+    }
+};
+
+window.syncUsage = async () => {
+    const result = await $api.post('/global/usage/sync');
+    if (result.success) {
+        $toast.success(`Synced ${result.data.imported} new usage records`);
+        await settingsManager.loadUsageStats();
+    }
+};
+
+window.startSync = async () => {
+    const result = await $api.post('/global/usage/sync/start');
+    if (result.success) {
+        $toast.success('Sync service started');
+        await settingsManager.loadSyncStatus();
+    }
+};
+
+window.stopSync = async () => {
+    const result = await $api.post('/global/usage/sync/stop');
+    if (result.success) {
+        $toast.success('Sync service stopped');
+        await settingsManager.loadSyncStatus();
+    }
+};
+
+window.cleanupData = async () => {
+    const days = document.getElementById('cleanup-days').value;
+    if (confirm(`Delete data older than ${days} days?`)) {
+        const result = await $api.post(`/global/data/cleanup?days=${days}`);
+        if (result.success) {
+            $toast.success('Old data cleaned up successfully');
+            await settingsManager.loadSettings();
+        }
+    }
+};
+
+window.createBackup = async () => {
+    const result = await $api.post('/global/data/backup');
+    if (result.success) {
+        $toast.success(`Backup created: ${result.data.backup_path}`);
+    }
+};
+
+window.exportData = async () => {
+    const result = await $api.post('/global/data/export');
+    if (result.success) {
+        const blob = new Blob([JSON.stringify(result.data, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cuti_export_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        $toast.success('Data exported successfully');
+    }
+};
+
+window.viewDetails = () => {
+    window.location.href = '/statistics';
+};
+</script>
+{% endblock %}

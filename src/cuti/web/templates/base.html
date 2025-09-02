@@ -22,7 +22,7 @@
     {% block head %}{% endblock %}
 </head>
 <body{% if body_class %} class="{{ body_class }}"{% endif %}{% if alpine_data %} x-data="{{ alpine_data }}"{% endif %} x-init="init()">
-    {% include 'components/header.html' %}
+    {% include 'components/header_modern.html' %}
     
     <main class="content-wrapper">
         {% block content %}{% endblock %}

@@ -1,0 +1,1105 @@
+{% extends "base.html" %}
+
+{% block title %}Global Settings - Cuti{% endblock %}
+
+{% set body_class = "dark" %}
+
+{% block head %}
+    
+    <!-- Custom Styles for Settings Page -->
+    <style>
+        /* Settings page specific variables that extend the base theme */
+        .settings-page {
+            --settings-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --settings-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            --settings-shadow-xl: 0 35px 60px -12px rgba(0, 0, 0, 0.8);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Remove body styling - it's handled by main.css */
+
+        .settings-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+            animation: slideInUp 0.6s ease-out;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Page Header Section (renamed to avoid conflict with nav header) */
+        .page-header-section {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .page-header-section::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+
+        .page-header-section h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .page-header-section p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin: 1rem 0 0 0;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Storage Card */
+        .storage-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+            color: white;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        .storage-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .storage-item {
+            text-align: center;
+        }
+
+        .storage-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-bottom: 0.25rem;
+        }
+
+        .storage-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .storage-bar {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .storage-fill {
+            background: linear-gradient(90deg, #10b981, #34d399);
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .storage-text {
+            font-size: 0.9rem;
+            text-align: center;
+            opacity: 0.9;
+        }
+
+        /* Settings Grid */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2.5rem;
+            margin-bottom: 3rem;
+        }
+
+        /* Settings Card */
+        .settings-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            padding: 2.5rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .settings-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .settings-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-secondary);
+            transform: translateY(-2px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        .settings-card:hover::before {
+            opacity: 1;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 0 0 1.5rem 0;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* Form Groups */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.01em;
+        }
+
+        .form-description {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            line-height: 1.4;
+        }
+
+        /* Input Styles */
+        .form-input,
+        .form-textarea,
+        .form-select {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: var(--bg-tertiary);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .form-input::placeholder,
+        .form-textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Toggle Switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-bottom: 1rem;
+        }
+
+        .toggle-container:hover {
+            border-color: var(--border-secondary);
+        }
+
+        .toggle-info {
+            flex: 1;
+        }
+
+        .toggle-title {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .toggle-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            background: var(--border-primary);
+            border-radius: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 1rem;
+        }
+
+        .toggle-switch input {
+            display: none;
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(24px);
+        }
+
+        /* Statistics Card */
+        .stats-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-item {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-unit {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Action Buttons */
+        .actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 140px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--border-secondary);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .settings-container {
+                padding: 1rem;
+            }
+
+            .settings-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .page-header-section h1 {
+                font-size: 2rem;
+            }
+
+            .settings-card {
+                padding: 1.5rem;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 300px;
+            }
+
+            .storage-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .toggle-container {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .toggle-switch {
+                margin-left: 0;
+                align-self: flex-end;
+            }
+        }
+
+        /* Loading Animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Message Toast */
+        .message-toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideInRight 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        .message-toast.success {
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            color: white;
+        }
+
+        .message-toast.error {
+            background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+            color: white;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <style>
+        /* Override main styles for settings page to enable scrolling */
+        body {
+            overflow: visible !important;
+        }
+        
+        .content-wrapper {
+            height: auto !important;
+            min-height: calc(100vh - 72px) !important;
+            overflow-y: auto !important;
+        }
+        
+        .settings-container {
+            padding-top: 3rem;
+            padding-bottom: 5rem;
+        }
+        
+        /* Use existing CSS variables from main.css */
+        .settings-page-vars {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+    </style>
+    <div class="settings-container settings-page-vars">
+        <!-- Page Header -->
+        <div class="page-header-section">
+            <h1>Global Settings</h1>
+            <p>Configure your Cuti experience with advanced settings and preferences</p>
+        </div>
+
+        <!-- Storage Info Card -->
+        <div class="storage-card">
+            <h2 style="margin: 0 0 1.5rem 0; font-size: 1.5rem;">Storage Usage</h2>
+            <div class="storage-grid">
+                <div class="storage-item">
+                    <div class="storage-label">Total Storage</div>
+                    <div class="storage-value" id="total-storage">0 MB</div>
+                </div>
+                <div class="storage-item">
+                    <div class="storage-label">Database Size</div>
+                    <div class="storage-value" id="db-size">0 MB</div>
+                </div>
+                <div class="storage-item">
+                    <div class="storage-label">File Count</div>
+                    <div class="storage-value" id="file-count">0</div>
+                </div>
+            </div>
+            <div class="storage-bar">
+                <div class="storage-fill" id="storage-bar" style="width: 0%"></div>
+            </div>
+            <div class="storage-text" id="storage-text">0 MB / 500 MB (0%)</div>
+        </div>
+
+        <!-- Settings Grid -->
+        <div class="settings-grid">
+            <!-- Privacy Settings -->
+            <div class="settings-card">
+                <h3 class="card-title">🔒 Privacy Settings</h3>
+                
+                <div class="toggle-container">
+                    <div class="toggle-info">
+                        <div class="toggle-title">Usage Tracking</div>
+                        <div class="toggle-desc">Track and analyze your Claude usage patterns</div>
+                    </div>
+                    <div class="toggle-switch" id="usage-tracking-toggle">
+                        <input type="checkbox" id="usage-tracking">
+                    </div>
+                </div>
+                
+                <div class="toggle-container">
+                    <div class="toggle-info">
+                        <div class="toggle-title">Privacy Mode</div>
+                        <div class="toggle-desc">Enhanced privacy with local-only data storage</div>
+                    </div>
+                    <div class="toggle-switch" id="privacy-mode-toggle">
+                        <input type="checkbox" id="privacy-mode">
+                    </div>
+                </div>
+                
+                <div class="toggle-container">
+                    <div class="toggle-info">
+                        <div class="toggle-title">Favorite Prompts</div>
+                        <div class="toggle-desc">Save and reuse your favorite prompts</div>
+                    </div>
+                    <div class="toggle-switch" id="favorite-prompts-toggle">
+                        <input type="checkbox" id="favorite-prompts">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Auto Cleanup (days)</label>
+                    <div class="form-description">Automatically delete old data after specified days</div>
+                    <input type="number" id="cleanup-days" min="1" max="365" class="form-input" value="90">
+                </div>
+            </div>
+
+            <!-- Subscription Settings -->
+            <div class="settings-card">
+                <h3 class="card-title">💳 Subscription Settings</h3>
+                
+                <div class="form-group">
+                    <label class="form-label">Claude Plan</label>
+                    <div class="form-description">Select your Claude subscription tier</div>
+                    <select id="claude-plan" class="form-select">
+                        <option value="pro">Pro</option>
+                        <option value="max5">Max 5</option>
+                        <option value="max20">Max 20</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Max Storage (MB)</label>
+                    <div class="form-description">Maximum storage limit for your data</div>
+                    <input type="number" id="max-storage" min="100" max="10000" class="form-input" value="500">
+                </div>
+                
+                <div class="toggle-container">
+                    <div class="toggle-info">
+                        <div class="toggle-title">Notifications</div>
+                        <div class="toggle-desc">Receive alerts for important updates</div>
+                    </div>
+                    <div class="toggle-switch" id="notifications-toggle">
+                        <input type="checkbox" id="notifications">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Theme</label>
+                    <div class="form-description">Choose your preferred interface theme</div>
+                    <select id="theme" class="form-select">
+                        <option value="auto">Auto</option>
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Advanced Configuration -->
+            <div class="settings-card">
+                <h3 class="card-title">⚙️ Advanced Configuration</h3>
+                
+                <div class="form-group">
+                    <label class="form-label">Custom Instructions</label>
+                    <div class="form-description">Add custom instructions for Claude to follow in all conversations</div>
+                    <textarea id="custom-instructions" class="form-textarea" 
+                              placeholder="Enter any special instructions or context for Claude...&#10;&#10;For example:&#10;- Always use TypeScript instead of JavaScript&#10;- Prefer functional programming patterns&#10;- Include comprehensive error handling"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">API Endpoint</label>
+                    <div class="form-description">Custom API endpoint for Claude (leave blank for default)</div>
+                    <input type="text" id="api-endpoint" class="form-input" placeholder="https://api.anthropic.com">
+                </div>
+            </div>
+
+            <!-- Integration Settings -->
+            <div class="settings-card">
+                <h3 class="card-title">🔗 Integration Settings</h3>
+                
+                <div class="form-group">
+                    <label class="form-label">GitHub Token</label>
+                    <div class="form-description">Personal access token for GitHub integration</div>
+                    <input type="password" id="github-token" class="form-input" placeholder="ghp_xxxxxxxxxxxx">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Webhook URL</label>
+                    <div class="form-description">Webhook for external service notifications</div>
+                    <input type="url" id="webhook-url" class="form-input" placeholder="https://hooks.example.com/webhook">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Export Format</label>
+                    <div class="form-description">Default format for data exports</div>
+                    <select id="export-format" class="form-select">
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                        <option value="markdown">Markdown</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usage Statistics -->
+        <div class="stats-card">
+            <h3 class="card-title">📊 Usage Statistics</h3>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Today</div>
+                    <div class="stat-value" id="today-tokens">0</div>
+                    <div class="stat-unit">tokens</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">This Month</div>
+                    <div class="stat-value" id="month-tokens">0</div>
+                    <div class="stat-unit">tokens</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Total Cost</div>
+                    <div class="stat-value" id="total-cost">$0.00</div>
+                    <div class="stat-unit">this month</div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button onclick="syncUsage()" class="btn btn-primary">
+                    🔄 Sync Usage Data
+                </button>
+                <button onclick="viewDetails()" class="btn btn-secondary">
+                    📈 View Details
+                </button>
+            </div>
+        </div>
+
+        <!-- Sync Service Status -->
+        <div class="stats-card">
+            <h3 class="card-title">🔄 Sync Service</h3>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" id="sync-status" style="font-size: 1.2rem;">🔴 Stopped</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Last Sync</div>
+                    <div class="stat-value" id="last-sync" style="font-size: 1.2rem;">Never</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Sync Count</div>
+                    <div class="stat-value" id="sync-count">0</div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button onclick="startSync()" class="btn btn-success">
+                    ▶️ Start Service
+                </button>
+                <button onclick="stopSync()" class="btn btn-danger">
+                    ⏹️ Stop Service
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="actions" style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-primary);">
+            <button onclick="saveSettings()" class="btn btn-primary">
+                💾 Save Settings
+            </button>
+            <button onclick="resetSettings()" class="btn btn-secondary">
+                🔄 Reset to Defaults
+            </button>
+            <button onclick="cleanupData()" class="btn btn-warning">
+                🧹 Cleanup Old Data
+            </button>
+            <button onclick="createBackup()" class="btn btn-secondary">
+                📦 Create Backup
+            </button>
+            <button onclick="exportData()" class="btn btn-success">
+                📤 Export Data
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSettings = {};
+
+        // Initialize all toggle switches
+        document.querySelectorAll('.toggle-switch').forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                this.classList.toggle('active', checkbox.checked);
+            });
+        });
+
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/global/settings');
+                const data = await response.json();
+                currentSettings = data.settings;
+                
+                // Update toggles
+                updateToggle('usage-tracking', data.settings.usage_tracking_enabled);
+                updateToggle('privacy-mode', data.settings.privacy_mode);
+                updateToggle('favorite-prompts', data.settings.favorite_prompts_enabled);
+                updateToggle('notifications', data.settings.notifications_enabled);
+                
+                // Update inputs
+                document.getElementById('cleanup-days').value = data.settings.auto_cleanup_days;
+                document.getElementById('claude-plan').value = data.settings.claude_plan;
+                document.getElementById('max-storage').value = data.settings.max_storage_mb;
+                document.getElementById('theme').value = data.settings.theme;
+                
+                // Update storage info
+                const storage = data.storage;
+                document.getElementById('total-storage').textContent = `${storage.total_size_mb} MB`;
+                document.getElementById('db-size').textContent = `${storage.database_size_mb} MB`;
+                document.getElementById('file-count').textContent = storage.file_count;
+                document.getElementById('storage-bar').style.width = `${storage.usage_percentage}%`;
+                document.getElementById('storage-text').textContent = 
+                    `${storage.total_size_mb} MB / ${storage.max_storage_mb} MB (${storage.usage_percentage}%)`;
+                
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+                showToast('Failed to load settings', 'error');
+            }
+        }
+
+        function updateToggle(id, checked) {
+            const checkbox = document.getElementById(id);
+            const toggle = document.getElementById(id + '-toggle');
+            if (checkbox && toggle) {
+                checkbox.checked = checked;
+                toggle.classList.toggle('active', checked);
+            }
+        }
+
+        async function loadUsageStats() {
+            try {
+                const response = await fetch('/api/global/usage/stats');
+                const stats = await response.json();
+                
+                document.getElementById('today-tokens').textContent = 
+                    stats.today.tokens.toLocaleString();
+                document.getElementById('month-tokens').textContent = 
+                    stats.this_month.tokens.toLocaleString();
+                document.getElementById('total-cost').textContent = 
+                    `$${stats.this_month.cost.toFixed(2)}`;
+                    
+            } catch (error) {
+                console.error('Failed to load usage stats:', error);
+            }
+        }
+
+        async function loadSyncStatus() {
+            try {
+                const response = await fetch('/api/global/usage/sync/status');
+                const status = await response.json();
+                
+                document.getElementById('sync-status').textContent = 
+                    status.running ? '🟢 Running' : '🔴 Stopped';
+                document.getElementById('last-sync').textContent = 
+                    status.last_sync ? new Date(status.last_sync).toLocaleString() : 'Never';
+                document.getElementById('sync-count').textContent = status.sync_count;
+                
+            } catch (error) {
+                console.error('Failed to load sync status:', error);
+            }
+        }
+
+        async function saveSettings() {
+            const settings = {
+                usage_tracking_enabled: document.getElementById('usage-tracking').checked,
+                privacy_mode: document.getElementById('privacy-mode').checked,
+                favorite_prompts_enabled: document.getElementById('favorite-prompts').checked,
+                auto_cleanup_days: parseInt(document.getElementById('cleanup-days').value),
+                claude_plan: document.getElementById('claude-plan').value,
+                max_storage_mb: parseInt(document.getElementById('max-storage').value),
+                notifications_enabled: document.getElementById('notifications').checked,
+                theme: document.getElementById('theme').value,
+                custom_instructions: document.getElementById('custom-instructions').value,
+                api_endpoint: document.getElementById('api-endpoint').value,
+                github_token: document.getElementById('github-token').value,
+                webhook_url: document.getElementById('webhook-url').value,
+                export_format: document.getElementById('export-format').value
+            };
+            
+            try {
+                const response = await fetch('/api/global/settings', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(settings)
+                });
+                
+                if (response.ok) {
+                    showToast('Settings saved successfully!', 'success');
+                    loadSettings();
+                } else {
+                    showToast('Failed to save settings', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+                showToast('Error saving settings', 'error');
+            }
+        }
+
+        async function resetSettings() {
+            if (!confirm('Reset all settings to defaults?')) return;
+            
+            const defaults = {
+                usage_tracking_enabled: true,
+                privacy_mode: false,
+                favorite_prompts_enabled: true,
+                auto_cleanup_days: 90,
+                claude_plan: 'pro',
+                max_storage_mb: 500,
+                notifications_enabled: true,
+                theme: 'auto'
+            };
+            
+            try {
+                const response = await fetch('/api/global/settings', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(defaults)
+                });
+                
+                if (response.ok) {
+                    showToast('Settings reset to defaults!', 'success');
+                    loadSettings();
+                }
+            } catch (error) {
+                console.error('Failed to reset settings:', error);
+                showToast('Failed to reset settings', 'error');
+            }
+        }
+
+        async function syncUsage() {
+            try {
+                const response = await fetch('/api/global/usage/sync', {method: 'POST'});
+                const result = await response.json();
+                showToast(`Synced ${result.imported} new usage records`, 'success');
+                loadUsageStats();
+            } catch (error) {
+                console.error('Failed to sync usage:', error);
+                showToast('Failed to sync usage', 'error');
+            }
+        }
+
+        async function startSync() {
+            try {
+                await fetch('/api/global/usage/sync/start', {method: 'POST'});
+                showToast('Sync service started', 'success');
+                loadSyncStatus();
+            } catch (error) {
+                console.error('Failed to start sync:', error);
+                showToast('Failed to start sync service', 'error');
+            }
+        }
+
+        async function stopSync() {
+            try {
+                await fetch('/api/global/usage/sync/stop', {method: 'POST'});
+                showToast('Sync service stopped', 'success');
+                loadSyncStatus();
+            } catch (error) {
+                console.error('Failed to stop sync:', error);
+                showToast('Failed to stop sync service', 'error');
+            }
+        }
+
+        async function cleanupData() {
+            const days = document.getElementById('cleanup-days').value;
+            if (!confirm(`Delete data older than ${days} days?`)) return;
+            
+            try {
+                await fetch(`/api/global/data/cleanup?days=${days}`, {method: 'POST'});
+                showToast('Old data cleaned up successfully', 'success');
+                loadSettings();
+            } catch (error) {
+                console.error('Failed to cleanup data:', error);
+                showToast('Failed to cleanup data', 'error');
+            }
+        }
+
+        async function createBackup() {
+            try {
+                const response = await fetch('/api/global/data/backup', {method: 'POST'});
+                const result = await response.json();
+                showToast(`Backup created: ${result.backup_path}`, 'success');
+            } catch (error) {
+                console.error('Failed to create backup:', error);
+                showToast('Failed to create backup', 'error');
+            }
+        }
+
+        async function exportData() {
+            try {
+                const response = await fetch('/api/global/data/export', {method: 'POST'});
+                const data = await response.json();
+                
+                // Create download link
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cuti_export_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showToast('Data exported successfully', 'success');
+            } catch (error) {
+                console.error('Failed to export data:', error);
+                showToast('Failed to export data', 'error');
+            }
+        }
+
+        function viewDetails() {
+            window.location.href = '/statistics';
+        }
+
+        function showToast(message, type = 'success') {
+            const existing = document.querySelector('.message-toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = `message-toast ${type}`;
+            toast.innerHTML = `
+                <span>${type === 'success' ? '✓' : '⚠'}</span>
+                <span>${message}</span>
+            `;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 5000);
+        }
+
+        // Load everything on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            loadUsageStats();
+            loadSyncStatus();
+            
+            // Refresh sync status every 10 seconds
+            setInterval(loadSyncStatus, 10000);
+        });
+    </script>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Initialize Alpine.js component
+        function init() {
+            // Any initialization code if needed
+        }
+        
+        // Claude status component
+        function claudeStatus() {
+            return {
+                claude: { installed: false, authorized: false, version: null, subscription_plan: null },
+                statusText: 'Checking...',
+                statusClass: 'warning',
+                statusDetails: false,
+                showDetails: false,
+                async checkStatus() {
+                    try {
+                        const response = await fetch('/api/claude/status');
+                        const data = await response.json();
+                        this.claude = data.claude || {};
+                        
+                        if (this.claude.installed && this.claude.authorized) {
+                            this.statusText = 'Claude Active';
+                            this.statusClass = 'success';
+                        } else if (this.claude.installed) {
+                            this.statusText = 'Claude Not Authorized';
+                            this.statusClass = 'warning';
+                        } else {
+                            this.statusText = 'Claude Not Found';
+                            this.statusClass = 'error';
+                        }
+                        this.statusDetails = true;
+                    } catch (error) {
+                        this.statusText = 'Status Check Failed';
+                        this.statusClass = 'error';
+                    }
+                }
+            }
+        }
+    </script>
+{% endblock %}

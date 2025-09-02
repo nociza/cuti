@@ -1,0 +1,255 @@
+{# UI Component Library - Reusable Jinja2 Macros #}
+
+{# Button Component #}
+{% macro button(text, variant='primary', icon=None, onclick=None, id=None, class='', disabled=False) %}
+<button 
+    class="btn btn-{{ variant }} {{ class }}"
+    {% if onclick %}onclick="{{ onclick }}"{% endif %}
+    {% if id %}id="{{ id }}"{% endif %}
+    {% if disabled %}disabled{% endif %}
+>
+    {% if icon %}<span class="btn-icon">{{ icon }}</span>{% endif %}
+    <span>{{ text }}</span>
+</button>
+{% endmacro %}
+
+{# Card Component #}
+{% macro card(title, subtitle=None, icon=None, class='', id=None) %}
+<div class="card {{ class }}" {% if id %}id="{{ id }}"{% endif %}>
+    <div class="card-header">
+        {% if icon %}<span class="card-icon">{{ icon }}</span>{% endif %}
+        <div class="card-header-content">
+            <h3 class="card-title">{{ title }}</h3>
+            {% if subtitle %}<p class="card-subtitle">{{ subtitle }}</p>{% endif %}
+        </div>
+    </div>
+    <div class="card-content">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{# Stats Card Component #}
+{% macro stats_card(title, stats=[], actions=[]) %}
+<div class="stats-card">
+    <h3 class="card-title">{{ title }}</h3>
+    
+    {% if stats %}
+    <div class="stats-grid">
+        {% for stat in stats %}
+        <div class="stat-item">
+            <div class="stat-label">{{ stat.label }}</div>
+            <div class="stat-value" {% if stat.id %}id="{{ stat.id }}"{% endif %}>
+                {{ stat.value }}
+            </div>
+            {% if stat.unit %}<div class="stat-unit">{{ stat.unit }}</div>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if actions %}
+    <div class="actions">
+        {% for action in actions %}
+        {{ button(action.text, action.variant|default('secondary'), action.icon, action.onclick) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Form Input Component #}
+{% macro form_input(name, label, type='text', value='', placeholder='', description=None, required=False, id=None) %}
+<div class="form-group">
+    <label class="form-label" for="{{ id or name }}">
+        {{ label }}
+        {% if required %}<span class="required">*</span>{% endif %}
+    </label>
+    {% if description %}
+    <div class="form-description">{{ description }}</div>
+    {% endif %}
+    <input 
+        type="{{ type }}"
+        name="{{ name }}"
+        id="{{ id or name }}"
+        class="form-input"
+        value="{{ value }}"
+        placeholder="{{ placeholder }}"
+        {% if required %}required{% endif %}
+    >
+</div>
+{% endmacro %}
+
+{# Form Select Component #}
+{% macro form_select(name, label, options=[], value='', description=None, required=False, id=None) %}
+<div class="form-group">
+    <label class="form-label" for="{{ id or name }}">
+        {{ label }}
+        {% if required %}<span class="required">*</span>{% endif %}
+    </label>
+    {% if description %}
+    <div class="form-description">{{ description }}</div>
+    {% endif %}
+    <select name="{{ name }}" id="{{ id or name }}" class="form-select" {% if required %}required{% endif %}>
+        {% for option in options %}
+        <option value="{{ option.value }}" {% if option.value == value %}selected{% endif %}>
+            {{ option.label }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+{% endmacro %}
+
+{# Form Textarea Component #}
+{% macro form_textarea(name, label, value='', placeholder='', description=None, rows=4, required=False, id=None) %}
+<div class="form-group">
+    <label class="form-label" for="{{ id or name }}">
+        {{ label }}
+        {% if required %}<span class="required">*</span>{% endif %}
+    </label>
+    {% if description %}
+    <div class="form-description">{{ description }}</div>
+    {% endif %}
+    <textarea 
+        name="{{ name }}"
+        id="{{ id or name }}"
+        class="form-textarea"
+        rows="{{ rows }}"
+        placeholder="{{ placeholder }}"
+        {% if required %}required{% endif %}
+    >{{ value }}</textarea>
+</div>
+{% endmacro %}
+
+{# Toggle Switch Component #}
+{% macro toggle_switch(name, label, description=None, checked=False, id=None) %}
+<div class="toggle-container">
+    <div class="toggle-info">
+        <div class="toggle-title">{{ label }}</div>
+        {% if description %}
+        <div class="toggle-desc">{{ description }}</div>
+        {% endif %}
+    </div>
+    <div class="toggle-switch {% if checked %}active{% endif %}" id="{{ id or name }}-toggle">
+        <input type="checkbox" name="{{ name }}" id="{{ id or name }}" {% if checked %}checked{% endif %}>
+    </div>
+</div>
+{% endmacro %}
+
+{# Alert/Toast Component #}
+{% macro alert(message, type='info', dismissible=True) %}
+<div class="alert alert-{{ type }} {% if dismissible %}alert-dismissible{% endif %}">
+    <span class="alert-icon">
+        {% if type == 'success' %}✓{% elif type == 'error' %}⚠{% elif type == 'warning' %}⚠{% else %}ℹ{% endif %}
+    </span>
+    <span class="alert-message">{{ message }}</span>
+    {% if dismissible %}
+    <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Progress Bar Component #}
+{% macro progress_bar(value, max=100, label=None, color='primary', id=None) %}
+<div class="progress-container" {% if id %}id="{{ id }}-container"{% endif %}>
+    {% if label %}
+    <div class="progress-label">{{ label }}</div>
+    {% endif %}
+    <div class="progress-bar">
+        <div 
+            class="progress-fill progress-{{ color }}"
+            {% if id %}id="{{ id }}"{% endif %}
+            style="width: {{ (value / max * 100) }}%"
+        ></div>
+    </div>
+    <div class="progress-text">{{ value }} / {{ max }}</div>
+</div>
+{% endmacro %}
+
+{# Modal Component #}
+{% macro modal(id, title, size='medium') %}
+<div class="modal" id="{{ id }}">
+    <div class="modal-backdrop" onclick="closeModal('{{ id }}')"></div>
+    <div class="modal-content modal-{{ size }}">
+        <div class="modal-header">
+            <h2 class="modal-title">{{ title }}</h2>
+            <button class="modal-close" onclick="closeModal('{{ id }}')">×</button>
+        </div>
+        <div class="modal-body">
+            {{ caller() }}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# Table Component #}
+{% macro table(headers=[], rows=[], id=None, class='') %}
+<div class="table-container">
+    <table class="table {{ class }}" {% if id %}id="{{ id }}"{% endif %}>
+        <thead>
+            <tr>
+                {% for header in headers %}
+                <th>{{ header }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for cell in row %}
+                <td>{{ cell }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{# Empty State Component #}
+{% macro empty_state(icon='📭', title='No Data', message='', action=None) %}
+<div class="empty-state">
+    <div class="empty-state-icon">{{ icon }}</div>
+    <h3 class="empty-state-title">{{ title }}</h3>
+    {% if message %}
+    <p class="empty-state-message">{{ message }}</p>
+    {% endif %}
+    {% if action %}
+    <div class="empty-state-action">
+        {{ button(action.text, action.variant|default('primary'), action.icon, action.onclick) }}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Loading Spinner Component #}
+{% macro loading_spinner(text='Loading...', size='medium') %}
+<div class="loading-container loading-{{ size }}">
+    <div class="loading-spinner"></div>
+    {% if text %}
+    <div class="loading-text">{{ text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Badge Component #}
+{% macro badge(text, variant='default', size='medium') %}
+<span class="badge badge-{{ variant }} badge-{{ size }}">{{ text }}</span>
+{% endmacro %}
+
+{# Navigation Tab Component #}
+{% macro nav_tabs(tabs=[], active_tab=None) %}
+<div class="nav-tabs">
+    {% for tab in tabs %}
+    <a 
+        href="{{ tab.href }}"
+        class="nav-tab {% if tab.id == active_tab %}active{% endif %}"
+        {% if tab.onclick %}onclick="{{ tab.onclick }}"{% endif %}
+    >
+        {% if tab.icon %}<span class="tab-icon">{{ tab.icon }}</span>{% endif %}
+        <span>{{ tab.label }}</span>
+        {% if tab.badge %}{{ badge(tab.badge, 'primary', 'small') }}{% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% endmacro %}

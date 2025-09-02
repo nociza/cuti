@@ -62,6 +62,16 @@ See [documentation](#documentation) for details.
 | [Todo System](docs/todo-system.md) | Task management |
 | [Rate Limits](docs/rate-limit-handling.md) | API limit handling |
 
+## 🤝 Contributing
+
+> **Note:** This project is under active development. Contributions welcome!
+
+```bash
+uv install -e .
+```
+
+Submit PRs to [GitHub](https://github.com/nociza/cuti) | Report issues in [Issues](https://github.com/nociza/cuti/issues)
+
 ## 📄 License
 
 Apache 2.0 - See [LICENSE](LICENSE)
@@ -70,6 +80,6 @@ Apache 2.0 - See [LICENSE](LICENSE)
 
 <div align="center">
 
-**[PyPI](https://pypi.org/project/cuti/)** • **[Issues](https://github.com/nociza/cuti/issues)**
+**[PyPI](https://pypi.org/project/cuti/)** • **[Issues](https://github.com/nociza/cuti/issues)** • **[Contribute](https://github.com/nociza/cuti)**
 
 </div>

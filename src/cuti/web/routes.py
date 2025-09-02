@@ -182,5 +182,6 @@ async def global_settings(request: Request):
     
     return templates.TemplateResponse("global_settings.html", {
         "request": request,
+        "working_directory": str(request.app.state.working_directory),
         "nav_items": nav_items
     })

@@ -39,9 +39,24 @@ async def get_claude_status() -> Dict[str, Any]:
                 "error": "Claude Code not installed"
             }
         
-        # Check if .claude config exists
-        claude_config = Path.home() / ".claude"
-        config_exists = claude_config.exists()
+        # Check if .claude config exists - handle multiple possible locations
+        config_dirs = [
+            Path.home() / ".claude-linux",
+            Path.home() / ".claude-macos", 
+            Path.home() / ".claude"
+        ]
+        
+        claude_config = None
+        for dir_path in config_dirs:
+            # Prioritize directories with credentials
+            if dir_path.exists() and (dir_path / ".credentials.json").exists():
+                claude_config = dir_path
+                break
+            # Otherwise just take the first existing directory
+            elif dir_path.exists() and claude_config is None:
+                claude_config = dir_path
+        
+        config_exists = claude_config is not None
         
         # Try to check authorization status
         # Claude Code stores auth in various possible locations
@@ -49,25 +64,52 @@ async def get_claude_status() -> Dict[str, Any]:
         subscription_plan = None
         
         if config_exists:
-            # Check multiple possible config locations
-            config_locations = [
-                claude_config / "config.json",
-                claude_config / "config" / "claude_config.json",
-                claude_config / "config" / "index.json"
-            ]
-            
-            for config_file in config_locations:
-                if config_file.exists():
-                    try:
-                        with open(config_file, 'r') as f:
-                            config = json.load(f)
-                            # Check for auth token or API key
-                            if config.get("apiKey") or config.get("token") or config.get("accessToken"):
+            # Check for credentials file first (most reliable)
+            credentials_file = claude_config / ".credentials.json"
+            if credentials_file.exists():
+                try:
+                    with open(credentials_file, 'r') as f:
+                        creds = json.load(f)
+                        # Check for claudeAiOauth structure (modern format)
+                        if "claudeAiOauth" in creds:
+                            oauth = creds["claudeAiOauth"]
+                            if oauth.get("accessToken"):
                                 authorized = True
-                                subscription_plan = config.get("plan", config.get("subscription", "Unknown"))
-                                break
-                    except Exception:
-                        pass
+                                subscription_plan = oauth.get("subscriptionType", "Pro").capitalize()
+                        # Check various token fields (legacy formats)
+                        elif creds.get("accessToken") or creds.get("token") or creds.get("access_token"):
+                            authorized = True
+                            subscription_plan = creds.get("subscription_plan", "Pro")
+                        # Even if no specific token field, if file exists with content, assume authorized
+                        elif creds:
+                            authorized = True
+                            subscription_plan = "Pro"
+                except Exception:
+                    # If credentials file exists but can't be read, still consider authorized
+                    authorized = True
+                    subscription_plan = "Pro"
+            
+            # If not found in credentials, check other config locations
+            if not authorized:
+                config_locations = [
+                    claude_config / "config.json",
+                    claude_config / "config" / "claude_config.json",
+                    claude_config / "config" / "index.json",
+                    claude_config / ".claude.json"
+                ]
+                
+                for config_file in config_locations:
+                    if config_file.exists():
+                        try:
+                            with open(config_file, 'r') as f:
+                                config = json.load(f)
+                                # Check for auth token or API key
+                                if config.get("apiKey") or config.get("token") or config.get("accessToken"):
+                                    authorized = True
+                                    subscription_plan = config.get("plan", config.get("subscription", "Pro"))
+                                    break
+                        except Exception:
+                            pass
             
             # Additional check: if claude can run without login prompt, it's authorized
             if not authorized:

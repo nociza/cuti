@@ -1,0 +1,402 @@
+<!-- Modern Minimal Header -->
+<header class="header-modern">
+    <div class="header-content">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <a href="/" class="logo-link">
+                <div class="logo">
+                    <i class="fas fa-terminal"></i>
+                </div>
+                <div class="logo-text">
+                    <div class="app-title">cuti</div>
+                    <div class="app-subtitle">orchestration</div>
+                </div>
+            </a>
+        </div>
+        
+        <!-- Navigation -->
+        <nav class="nav-modern">
+            {% for nav_item in nav_items %}
+            <a href="{{ nav_item.url }}" 
+               class="nav-link{% if nav_item.active %} active{% endif %}"
+               {% if nav_item.target %}target="{{ nav_item.target }}"{% endif %}>
+                <span class="nav-icon">
+                    {% if nav_item.label == "Chat" %}
+                    <i class="fas fa-comments"></i>
+                    {% elif nav_item.label == "Todos" %}
+                    <i class="fas fa-tasks"></i>
+                    {% elif nav_item.label == "Agent Manager" %}
+                    <i class="fas fa-robot"></i>
+                    {% elif nav_item.label == "Statistics" %}
+                    <i class="fas fa-chart-line"></i>
+                    {% elif nav_item.label == "Global Settings" %}
+                    <i class="fas fa-cog"></i>
+                    {% endif %}
+                </span>
+                <span class="nav-label">{{ nav_item.label }}</span>
+            </a>
+            {% endfor %}
+        </nav>
+        
+        <!-- Status Section -->
+        <div class="header-status">
+            <!-- Minimal Claude Status -->
+            <div class="claude-indicator" x-data="claudeStatusMinimal()" x-init="checkStatus()">
+                <div class="indicator-dot" 
+                     :class="statusClass"
+                     @click="showDetails = !showDetails"
+                     :title="statusTooltip"></div>
+                
+                <!-- Minimal popup -->
+                <div class="status-popup" 
+                     x-show="showDetails" 
+                     @click.away="showDetails = false"
+                     x-transition>
+                    <div class="popup-row">
+                        <span class="popup-label">Claude</span>
+                        <span class="popup-value" x-text="statusText"></span>
+                    </div>
+                    <div class="popup-row" x-show="claude.subscription_plan">
+                        <span class="popup-label">Plan</span>
+                        <span class="popup-value" x-text="claude.subscription_plan"></span>
+                    </div>
+                    <div class="popup-row" x-show="claude.version">
+                        <span class="popup-label">Version</span>
+                        <span class="popup-value" x-text="claude.version"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Working Directory -->
+            <div class="working-dir-minimal">
+                <i class="fas fa-folder-open"></i>
+                <span>{{ working_directory.split('/')[-1] if '/' in working_directory else working_directory }}</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<style>
+/* Modern Header Styles */
+.header-modern {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(20, 30, 38, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+}
+
+.header-modern .header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+/* Logo */
+.header-modern .logo-section {
+    display: flex;
+    align-items: center;
+}
+
+.header-modern .logo-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    transition: transform 0.2s ease;
+}
+
+.header-modern .logo-link:hover {
+    transform: scale(1.02);
+}
+
+.header-modern .logo {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #10b981 0%, #60a5fa 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
+.header-modern .logo i {
+    color: white;
+    font-size: 18px;
+}
+
+.header-modern .logo-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.header-modern .app-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.header-modern .app-subtitle {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+}
+
+/* Navigation */
+.header-modern .nav-modern {
+    display: flex;
+    gap: 0.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.header-modern .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 8px 16px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.header-modern .nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.header-modern .nav-link.active {
+    color: white;
+    background: rgba(16, 185, 129, 0.15);
+}
+
+.header-modern .nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2px;
+    background: var(--primary);
+    border-radius: 2px;
+}
+
+.header-modern .nav-icon {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.header-modern .nav-label {
+    white-space: nowrap;
+}
+
+/* Status Section */
+.header-modern .header-status {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Minimal Claude Indicator */
+.claude-indicator {
+    position: relative;
+}
+
+.indicator-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.indicator-dot:hover {
+    transform: scale(1.2);
+}
+
+.indicator-dot.success {
+    background: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2),
+                0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.indicator-dot.warning {
+    background: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2),
+                0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+.indicator-dot.error {
+    background: #ef4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2),
+                0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* Subtle pulse animation for active state */
+@keyframes subtle-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.indicator-dot.success {
+    animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+/* Status Popup */
+.status-popup {
+    position: absolute;
+    top: 100%;
+    right: -50px;
+    margin-top: 12px;
+    background: rgba(30, 40, 50, 0.98);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+}
+
+.status-popup::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 54px;
+    width: 12px;
+    height: 12px;
+    background: rgba(30, 40, 50, 0.98);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    transform: rotate(45deg);
+}
+
+.popup-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 0.85rem;
+}
+
+.popup-label {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.popup-value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Working Directory */
+.working-dir-minimal {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.working-dir-minimal i {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .header-modern .nav-label {
+        display: none;
+    }
+    
+    .header-modern .nav-link {
+        padding: 8px 12px;
+    }
+    
+    .header-modern .nav-icon {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .header-modern .app-subtitle {
+        display: none;
+    }
+    
+    .working-dir-minimal {
+        display: none;
+    }
+    
+    .header-modern .header-content {
+        padding: 0 1rem;
+    }
+}
+</style>
+
+<script>
+// Minimal Claude Status Component
+function claudeStatusMinimal() {
+    return {
+        claude: { installed: false, authorized: false, version: null, subscription_plan: null },
+        statusClass: 'warning',
+        statusText: 'Checking...',
+        statusTooltip: 'Click for details',
+        showDetails: false,
+        
+        async checkStatus() {
+            try {
+                const response = await fetch('/api/claude-status');
+                const data = await response.json();
+                this.claude = data;
+                
+                if (data.installed && data.authorized) {
+                    this.statusClass = 'success';
+                    this.statusText = 'Active';
+                    this.statusTooltip = 'Claude is active and authorized';
+                } else if (data.installed) {
+                    this.statusClass = 'warning';
+                    this.statusText = 'Not Authorized';
+                    this.statusTooltip = 'Claude installed but not authorized';
+                } else {
+                    this.statusClass = 'error';
+                    this.statusText = 'Not Installed';
+                    this.statusTooltip = 'Claude not found';
+                }
+            } catch (error) {
+                this.statusClass = 'error';
+                this.statusText = 'Error';
+                this.statusTooltip = 'Failed to check Claude status';
+            }
+        }
+    }
+}
+</script>

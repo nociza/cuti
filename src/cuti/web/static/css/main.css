@@ -387,9 +387,10 @@ body::after {
 .content-wrapper {
     display: flex;
     flex: 1;
-    margin-top: 72px;
-    height: calc(100vh - 72px); /* Account for header (72px) */
-    min-height: calc(100vh - 72px);
+    margin-top: 60px; /* Updated for new header height */
+    height: calc(100vh - 60px); /* Account for header (60px) */
+    min-height: calc(100vh - 60px);
+    overflow-y: auto; /* Allow scrolling */
 }
 
 /* Main Content */
