@@ -118,6 +118,33 @@ cuti container --command "npm run dev"
 cuti container --command "python manage.py runserver"
 ```
 
+### Claude CLI Configuration
+
+The container comes with Claude CLI pre-configured for optimal usage:
+
+#### Automatic Permissions Bypass
+- **Built-in Alias**: `claude` automatically includes `--dangerously-skip-permissions`
+- No need to manually add the flag for every command
+- Works seamlessly in the containerized environment
+
+```bash
+# These commands are equivalent in the container:
+claude "Explain this code"                              # Uses alias (recommended)
+claude --dangerously-skip-permissions "Explain this code"  # Explicit flag (not needed)
+```
+
+#### Why This Matters
+- The `--dangerously-skip-permissions` flag is required in containers
+- Without it, Claude may fail with permission errors
+- The alias ensures Claude always works correctly
+- Simplifies usage and prevents common errors
+
+#### Rebuild to Apply Updates
+If you're using an older container image, rebuild to get the alias:
+```bash
+cuti container --rebuild
+```
+
 ### Docker-in-Docker Usage
 ```bash
 # Build Docker images inside the container
@@ -455,7 +482,7 @@ docker exec -it [container-name] bash
 ### Security Considerations
 
 - Containers run with `--privileged` for full functionality
-- Claude uses `--dangerously-skip-permissions` only in containers
+- Claude automatically uses `--dangerously-skip-permissions` via alias (see [Claude CLI Configuration](#claude-cli-configuration))
 - Config directories mounted with appropriate permissions
 - No telemetry or external connections
 - Local-first approach
