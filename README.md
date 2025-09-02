@@ -27,7 +27,7 @@
 
 ```bash
 # Install
-pip install cuti  # or: uv tool install cuti
+uv tool install cuti
 
 # Launch containerized dev environment
 cuti container
