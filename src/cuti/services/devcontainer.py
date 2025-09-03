@@ -313,7 +313,23 @@ RUN /root/.local/bin/uv pip install --system cuti \\
     && cuti --help > /dev/null && echo "✅ cuti installed from PyPI"
 '''
         
-        return self.DOCKERFILE_TEMPLATE.replace("{CUTI_INSTALL}", cuti_install)
+        # Add tools installation if the setup script exists
+        tools_setup = ""
+        container_tools_path = Path("/workspace/.cuti/container_tools.sh")
+        if container_tools_path.exists():
+            tools_setup = f'''
+# Install additional CLI tools
+COPY .cuti/container_tools.sh /tmp/container_tools.sh
+RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
+'''
+        
+        dockerfile = self.DOCKERFILE_TEMPLATE.replace("{CUTI_INSTALL}", cuti_install)
+        
+        # Insert tools setup before the final CMD if it exists
+        if tools_setup:
+            dockerfile = dockerfile.replace("# Set the default command", tools_setup + "\n# Set the default command")
+        
+        return dockerfile
     
     def _setup_claude_host_config(self):
         """Setup Claude configuration on host for container usage."""

@@ -38,7 +38,22 @@ async def get_token_usage(
     """Get token usage statistics using claude_monitor."""
     try:
         # Use claude_monitor integration for real usage data
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         
         # Check if data is available
         if not claude_monitor.is_data_available():
@@ -107,7 +122,22 @@ async def get_usage_trends(
 ) -> Dict[str, Any]:
     """Get usage trends and patterns."""
     try:
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         trends = claude_monitor.get_usage_trends(days=days)
         return trends
     except Exception as e:
@@ -121,7 +151,22 @@ async def get_recent_usage(
 ) -> List[Dict[str, Any]]:
     """Get recent usage entries."""
     try:
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         recent = claude_monitor.get_recent_usage(hours=hours)
         return recent
     except Exception as e:
@@ -132,7 +177,22 @@ async def get_recent_usage(
 async def get_data_info(request: Request) -> Dict[str, Any]:
     """Get information about available Claude usage data."""
     try:
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         info = claude_monitor.get_data_info()
         return info
     except Exception as e:
@@ -189,7 +249,22 @@ async def get_performance_metrics(request: Request) -> Dict[str, Any]:
                 queue_performance = {"status": "unavailable"}
         
         # Get Claude usage performance
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         usage_trends = claude_monitor.get_usage_trends(days=7)
         
         return {
@@ -268,7 +343,22 @@ async def health_check(request: Request) -> Dict[str, Any]:
     
     # Check claude_monitor integration
     try:
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         data_available = claude_monitor.is_data_available()
         health_status["components"]["claude_monitor"] = {
             "status": "healthy" if data_available else "warning",
@@ -298,7 +388,22 @@ async def get_metrics_for_dashboard(
 ) -> Dict[str, Any]:
     """Get metrics for the statistics dashboard."""
     try:
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         
         # Determine days based on range
         days_map = {
@@ -414,7 +519,22 @@ async def get_usage_predictions(request: Request) -> Dict[str, Any]:
 async def get_available_plans(request: Request) -> List[Dict[str, Any]]:
     """Get available Claude subscription plans."""
     try:
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         plans = claude_monitor.get_available_plans()
         
         # Get current plan from settings
@@ -438,7 +558,22 @@ class PlanUpdate(BaseModel):
 async def update_plan(request: Request, plan_update: PlanUpdate) -> Dict[str, Any]:
     """Update the current Claude subscription plan."""
     try:
-        claude_monitor = ClaudeMonitorIntegration()
+        # Check for different Claude config locations
+        from pathlib import Path
+        claude_paths = [
+            "~/.claude-linux/projects",
+            "~/.claude-macos/projects", 
+            "~/.claude/projects"
+        ]
+        
+        claude_data_path = None
+        for path in claude_paths:
+            expanded_path = Path(path).expanduser()
+            if expanded_path.exists():
+                claude_data_path = path
+                break
+        
+        claude_monitor = ClaudeMonitorIntegration(claude_data_path=claude_data_path)
         
         # Validate and set plan
         if not claude_monitor.set_plan(plan_update.plan):

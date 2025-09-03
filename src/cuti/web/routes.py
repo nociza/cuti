@@ -15,7 +15,7 @@ def get_nav_items(current_page: str = "chat"):
         {"url": "/todos", "label": "Todos", "active": current_page == "todos"},
         {"url": "/agents", "label": "Agent Manager", "active": current_page == "agents"},
         {"url": "/statistics", "label": "Statistics", "active": current_page == "statistics"},
-        {"url": "/global-settings", "label": "Global Settings", "active": current_page == "settings"}
+        {"url": "/global-settings", "label": "Settings", "active": current_page == "settings"}
     ]
     return nav_items
 
@@ -51,6 +51,20 @@ async def agents_dashboard(request: Request):
     nav_items = get_nav_items("agents")
     
     return templates.TemplateResponse("agents.html", {
+        "request": request,
+        "working_directory": str(request.app.state.working_directory),
+        "nav_items": nav_items
+    })
+
+
+@main_router.get("/tools", response_class=HTMLResponse)
+async def tools_dashboard(request: Request):
+    """CLI Tools management page."""
+    templates = request.app.state.templates
+    
+    nav_items = get_nav_items("agents")  # Use agents nav since tools is a subpage
+    
+    return templates.TemplateResponse("tools.html", {
         "request": request,
         "working_directory": str(request.app.state.working_directory),
         "nav_items": nav_items

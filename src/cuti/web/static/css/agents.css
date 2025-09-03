@@ -14,6 +14,55 @@
     overflow: hidden;
 }
 
+/* Sub Navigation - Consistent with app design */
+.sub-nav {
+    background: rgba(10, 15, 20, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 3px;
+    border-radius: 8px;
+}
+
+.nav-tab {
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+}
+
+.nav-tab:hover {
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.nav-tab.active {
+    color: var(--text-primary);
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.2);
+}
+
+.nav-tab i {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
 /* Page Header - Clean and minimal */
 .page-header {
     display: flex;

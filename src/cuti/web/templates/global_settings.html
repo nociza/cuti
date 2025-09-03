@@ -4,6 +4,17 @@
 
 {% block head %}
 <style>
+    /* Fix scrolling for this page */
+    body {
+        overflow: visible !important;
+        height: auto !important;
+    }
+    
+    .content-wrapper {
+        overflow-y: auto !important;
+        height: calc(100vh - 60px) !important;
+    }
+    
     /* Global Settings Page Specific Styles */
     .settings-wrapper {
         padding: 2rem;

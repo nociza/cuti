@@ -53,8 +53,12 @@
 .status-indicator {
     width: 10px;
     height: 10px;
+    min-width: 10px;
+    min-height: 10px;
     border-radius: 50%;
     background: #4ade80;
+    flex-shrink: 0;
+    flex-grow: 0;
     animation: pulse 2s infinite;
 }
 
@@ -266,6 +270,8 @@
     content: "";
     height: 24px;
     width: 24px;
+    min-height: 24px;
+    min-width: 24px;
     left: 3px;
     bottom: 3px;
     background-color: white;
@@ -424,10 +430,13 @@
 .loading-spinner {
     width: 50px;
     height: 50px;
+    min-width: 50px;
+    min-height: 50px;
     border: 4px solid rgba(102, 126, 234, 0.3);
     border-top-color: #667eea;
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    flex-shrink: 0;
 }
 
 @keyframes spin {

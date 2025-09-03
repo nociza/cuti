@@ -1,0 +1,790 @@
+{% extends "base.html" %}
+
+{% block title %}cuti - Tools Manager{% endblock %}
+
+{% block head %}
+<style>
+/* Page Layout - Consistent with app design */
+.tools-page {
+    padding: 0;
+    width: 100%;
+    height: calc(100vh - 60px);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Terminal-style Sub Navigation */
+.sub-nav {
+    background: rgba(10, 15, 20, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 3px;
+    border-radius: 8px;
+}
+
+.nav-tab {
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+}
+
+.nav-tab:hover {
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.nav-tab.active {
+    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.2);
+}
+
+.nav-tab i {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* Page Header - Consistent with agents page */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    background: rgba(10, 15, 20, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    flex-shrink: 0;
+}
+
+.page-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.03em;
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.page-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.tools-count {
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Tools Container - Scrollable */
+.tools-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+}
+
+/* Category Sections */
+.tools-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.category-section {
+    margin-bottom: 2rem;
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.category-icon {
+    color: var(--text-muted);
+    font-size: 1rem;
+    opacity: 0.6;
+}
+
+.category-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Tools Grid */
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.tool-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.tool-card:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.tool-card.enabled {
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.15);
+}
+
+.tool-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.tool-info {
+    flex: 1;
+}
+
+.tool-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+    font-size: 0.95rem;
+}
+
+.tool-description {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    opacity: 0.8;
+}
+
+.tool-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-badge.installed {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.status-badge.not-installed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.tool-toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+}
+
+.tool-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    transition: all 0.3s ease;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.tool-toggle input:checked + .toggle-slider {
+    background: #3b82f6;
+}
+
+.tool-toggle input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.tool-toggle input:disabled + .toggle-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Install Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-dark);
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.install-info {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.install-info-icon {
+    color: #3b82f6;
+    margin-right: 0.5rem;
+}
+
+.install-command {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 1rem 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.auto-install-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.auto-install-option input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.auto-install-label {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+    flex: 1;
+}
+
+.auto-install-description {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Loading State */
+.installing {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.05);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 8px;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .tools-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .sub-nav {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% set body_class = "" %}
+{% set alpine_data = "toolsManager()" %}
+
+{% block content %}
+<div class="tools-page">
+    <!-- Sub Navigation -->
+    <div class="sub-nav">
+        <div class="nav-tabs">
+            <a href="/agents" class="nav-tab">
+                <i class="fas fa-robot"></i>
+                <span>Agents</span>
+            </a>
+            <a href="/tools" class="nav-tab active">
+                <i class="fas fa-wrench"></i>
+                <span>Tools</span>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">CLI Tools Manager</h1>
+            <p class="page-subtitle">Manage command-line tools available to all agents</p>
+        </div>
+        <div class="page-actions">
+            <span class="tools-count" x-text="`${tools.filter(t => t.enabled).length} / ${tools.length} tools enabled`"></span>
+        </div>
+    </div>
+    
+    <!-- Tools Container -->
+    <div class="tools-container">
+        <!-- Tools Categories -->
+        <div class="tools-categories">
+        <template x-for="category in categories" :key="category.name">
+            <div class="category-section" x-show="category.tools.length > 0">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i :class="getCategoryIcon(category.name)"></i>
+                    </div>
+                    <h2 class="category-title" x-text="category.name"></h2>
+                </div>
+                
+                <div class="tools-grid">
+                    <template x-for="tool in category.tools" :key="tool.name">
+                        <div class="tool-card" :class="{ 'enabled': tool.enabled }">
+                            <div class="tool-header">
+                                <div class="tool-info">
+                                    <h3 class="tool-name" x-text="tool.display_name"></h3>
+                                    <p class="tool-description" x-text="tool.description"></p>
+                                </div>
+                                <div class="tool-status">
+                                    <span class="status-badge" 
+                                          :class="tool.installed ? 'installed' : 'not-installed'"
+                                          x-text="tool.installed ? 'Installed' : 'Not Installed'">
+                                    </span>
+                                    <label class="tool-toggle">
+                                        <input type="checkbox" 
+                                               :checked="tool.enabled"
+                                               @change="toggleTool(tool, $event)"
+                                               :disabled="isProcessing">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+        </div>
+    </div>
+    
+    <!-- Install Modal -->
+    <div class="modal" :class="{ 'show': showInstallModal }" @click.self="showInstallModal = false">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Install <span x-text="selectedTool?.display_name"></span></h2>
+                <button class="modal-close" @click="showInstallModal = false">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="install-info">
+                    <i class="fas fa-info-circle install-info-icon"></i>
+                    <span x-text="selectedTool?.display_name"></span> is not installed in the container.
+                </div>
+                
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    The following command will be executed to install this tool:
+                </p>
+                
+                <div class="install-command" x-text="selectedTool?.install_command"></div>
+                
+                <div class="auto-install-option">
+                    <input type="checkbox" id="autoInstall" x-model="autoInstall">
+                    <label for="autoInstall" class="auto-install-label">
+                        Remember this choice and auto-install on container rebuild
+                        <div class="auto-install-description">
+                            This will add the installation command to the container setup script
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="installing" x-show="isInstalling">
+                    <div class="spinner"></div>
+                    <span>Installing <span x-text="selectedTool?.display_name"></span>...</span>
+                </div>
+            </div>
+            <div class="modal-footer" x-show="!isInstalling">
+                <button class="btn btn-secondary" @click="cancelInstall()">Cancel</button>
+                <button class="btn btn-primary" @click="installTool()">
+                    <i class="fas fa-download"></i>
+                    Install Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toolsManager() {
+    return {
+        tools: [],
+        categories: [],
+        selectedTool: null,
+        showInstallModal: false,
+        autoInstall: false,
+        isInstalling: false,
+        isProcessing: false,
+        
+        async init() {
+            await this.loadTools();
+        },
+        
+        async loadTools() {
+            try {
+                const response = await fetch('/api/tools/list');
+                if (response.ok) {
+                    this.tools = await response.json();
+                    this.organizeByCategory();
+                }
+            } catch (error) {
+                console.error('Error loading tools:', error);
+            }
+        },
+        
+        organizeByCategory() {
+            const categoryMap = {};
+            
+            this.tools.forEach(tool => {
+                if (!categoryMap[tool.category]) {
+                    categoryMap[tool.category] = [];
+                }
+                categoryMap[tool.category].push(tool);
+            });
+            
+            this.categories = Object.keys(categoryMap).map(name => ({
+                name,
+                tools: categoryMap[name]
+            }));
+        },
+        
+        getCategoryIcon(category) {
+            const icons = {
+                'Code Analysis': 'fas fa-code',
+                'Search': 'fas fa-search',
+                'File Management': 'fas fa-folder',
+                'Data Processing': 'fas fa-database',
+                'File Viewing': 'fas fa-eye',
+                'Network': 'fas fa-network-wired',
+                'Version Control': 'fas fa-code-branch',
+                'Documentation': 'fas fa-book',
+                'System': 'fas fa-server'
+            };
+            return icons[category] || 'fas fa-tools';
+        },
+        
+        async toggleTool(tool, event) {
+            const enabled = event.target.checked;
+            this.isProcessing = true;
+            
+            try {
+                const response = await fetch('/api/tools/toggle', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: tool.name,
+                        enabled: enabled,
+                        auto_install: false
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success && result.needs_install) {
+                    // Tool needs to be installed
+                    event.target.checked = false;
+                    this.selectedTool = result.tool;
+                    this.showInstallModal = true;
+                    this.autoInstall = false;
+                } else if (result.success) {
+                    // Update tool status
+                    const toolIndex = this.tools.findIndex(t => t.name === tool.name);
+                    if (toolIndex !== -1) {
+                        this.tools[toolIndex].enabled = enabled;
+                    }
+                    this.showToast(enabled ? 
+                        `${tool.display_name} enabled` : 
+                        `${tool.display_name} disabled`
+                    );
+                }
+            } catch (error) {
+                console.error('Error toggling tool:', error);
+                event.target.checked = !enabled;
+                this.showToast('Failed to toggle tool', 'error');
+            } finally {
+                this.isProcessing = false;
+            }
+        },
+        
+        async installTool() {
+            if (!this.selectedTool) return;
+            
+            this.isInstalling = true;
+            
+            try {
+                const response = await fetch(`/api/tools/install?tool_name=${this.selectedTool.name}&auto_install=${this.autoInstall}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update tool status
+                    const toolIndex = this.tools.findIndex(t => t.name === this.selectedTool.name);
+                    if (toolIndex !== -1) {
+                        this.tools[toolIndex].installed = true;
+                        this.tools[toolIndex].enabled = true;
+                        if (this.autoInstall) {
+                            this.tools[toolIndex].auto_install = true;
+                        }
+                    }
+                    
+                    this.showToast(result.message, 'success');
+                    this.showInstallModal = false;
+                    
+                    // Refresh tools list
+                    await this.loadTools();
+                } else {
+                    this.showToast(result.message || 'Installation failed', 'error');
+                }
+            } catch (error) {
+                console.error('Error installing tool:', error);
+                this.showToast('Installation failed', 'error');
+            } finally {
+                this.isInstalling = false;
+            }
+        },
+        
+        cancelInstall() {
+            this.showInstallModal = false;
+            this.selectedTool = null;
+            this.autoInstall = false;
+        },
+        
+        showToast(message, type = 'info') {
+            // Simple toast notification
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                padding: 12px 20px;
+                background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
+                color: white;
+                border-radius: 8px;
+                font-size: 0.9rem;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    }
+}
+
+// Add toast animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

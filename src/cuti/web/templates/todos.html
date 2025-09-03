@@ -4,127 +4,261 @@
 
 {% block head %}
 <style>
+/* Page Layout */
 .todos-page {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 2rem;
 }
 
-.page-header {
-    margin-bottom: 30px;
-    border-bottom: 1px solid #e5e7eb;
-    padding-bottom: 20px;
+/* Page Header */
+.page-header-section {
+    margin-bottom: 2.5rem;
 }
 
 .page-title {
-    font-size: 2rem;
-    font-weight: 600;
-    color: #1f2937;
-    margin: 0 0 8px 0;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-title-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+.page-title-icon i {
+    color: white;
+    font-size: 20px;
 }
 
 .page-subtitle {
-    color: #6b7280;
+    color: var(--text-muted);
     margin: 0;
+    font-size: 0.95rem;
+    margin-left: 52px;
 }
 
-.todos-container {
+/* Stats Bar */
+.stats-bar {
     display: grid;
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
 }
 
-.todo-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 20px;
+.stat-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.25rem;
     transition: all 0.2s ease;
 }
 
+.stat-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stat-value.pending { color: #f59e0b; }
+.stat-value.progress { color: #3b82f6; }
+.stat-value.completed { color: #10b981; }
+
+/* Todos Grid */
+.todos-container {
+    display: grid;
+    gap: 1rem;
+}
+
+.todo-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.todo-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: currentColor;
+}
+
+.todo-card.status-pending::before { background: #f59e0b; }
+.todo-card.status-in_progress::before { background: #3b82f6; }
+.todo-card.status-completed::before { background: #10b981; }
+
 .todo-card:hover {
-    border-color: #d1d5db;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px);
 }
 
 .todo-header {
     display: flex;
-    justify-content: between;
-    align-items: center;
-    margin-bottom: 12px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 
 .todo-title {
     font-weight: 600;
-    color: #1f2937;
+    font-size: 1.1rem;
+    color: var(--text-primary);
     margin: 0;
+    flex: 1;
 }
 
 .todo-status {
-    padding: 4px 12px;
+    padding: 0.25rem 0.75rem;
     border-radius: 20px;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
 }
 
 .status-pending {
-    background: #fef3c7;
-    color: #92400e;
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
 }
 
 .status-in_progress {
-    background: #dbeafe;
-    color: #1e40af;
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
 }
 
 .status-completed {
-    background: #d1fae5;
-    color: #065f46;
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
 }
 
 .todo-content {
-    color: #4b5563;
-    margin-bottom: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+    font-size: 0.95rem;
 }
 
 .todo-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.875rem;
-    color: #6b7280;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    opacity: 0.7;
 }
 
+.todo-meta i {
+    margin-right: 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* Empty State */
 .empty-state {
     text-align: center;
-    padding: 60px 20px;
-    color: #6b7280;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
 }
 
 .empty-state-icon {
-    font-size: 3rem;
-    margin-bottom: 16px;
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+}
+
+.empty-state-icon i {
+    font-size: 2.5rem;
+    color: #f59e0b;
 }
 
 .empty-state-title {
     font-size: 1.5rem;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 8px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
 }
 
 .btn-primary {
-    background: #3b82f6;
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
     color: white;
     border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .btn-primary:hover {
-    background: #2563eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-primary i {
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stats-bar {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-title {
+        font-size: 1.5rem;
+    }
+    
+    .todo-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 </style>
 {% endblock %}
@@ -134,23 +268,54 @@
 
 {% block content %}
 <div class="todos-page">
-    <div class="page-header">
-        <h1 class="page-title">Todo Manager</h1>
+    <div class="page-header-section">
+        <h1 class="page-title">
+            <div class="page-title-icon">
+                <i class="fas fa-tasks"></i>
+            </div>
+            Todo Manager
+        </h1>
         <p class="page-subtitle">Track your tasks and project goals</p>
+    </div>
+    
+    <!-- Stats Bar -->
+    <div class="stats-bar" x-show="todos.length > 0">
+        <div class="stat-card">
+            <div class="stat-label">Pending</div>
+            <div class="stat-value pending" x-text="todos.filter(t => t.status === 'pending').length"></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">In Progress</div>
+            <div class="stat-value progress" x-text="todos.filter(t => t.status === 'in_progress').length"></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Completed</div>
+            <div class="stat-value completed" x-text="todos.filter(t => t.status === 'completed').length"></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Tasks</div>
+            <div class="stat-value" x-text="todos.length"></div>
+        </div>
     </div>
     
     <!-- Todos Container -->
     <div class="todos-container" x-show="todos.length > 0">
         <template x-for="todo in todos" :key="todo.id">
-            <div class="todo-card">
+            <div class="todo-card" :class="`status-${todo.status}`">
                 <div class="todo-header">
                     <h3 class="todo-title" x-text="todo.content"></h3>
                     <span class="todo-status" :class="`status-${todo.status}`" x-text="formatStatus(todo.status)"></span>
                 </div>
                 <div class="todo-content" x-show="todo.description" x-text="todo.description"></div>
                 <div class="todo-meta">
-                    <span x-text="formatDate(todo.created_at)"></span>
-                    <span x-show="todo.updated_at && todo.updated_at !== todo.created_at" x-text="`Updated ${formatDate(todo.updated_at)}`"></span>
+                    <span>
+                        <i class="far fa-clock"></i>
+                        <span x-text="formatDate(todo.created_at)"></span>
+                    </span>
+                    <span x-show="todo.updated_at && todo.updated_at !== todo.created_at">
+                        <i class="fas fa-sync-alt"></i>
+                        <span x-text="`Updated ${formatDate(todo.updated_at)}`"></span>
+                    </span>
                 </div>
             </div>
         </template>
@@ -158,12 +323,15 @@
     
     <!-- Empty State -->
     <div x-show="todos.length === 0" class="empty-state">
-        <div class="empty-state-icon">📝</div>
+        <div class="empty-state-icon">
+            <i class="fas fa-clipboard-list"></i>
+        </div>
         <div class="empty-state-title">No Todos Yet</div>
         <div class="empty-state-description">
             Start organizing your tasks and goals with the todo system
         </div>
-        <button @click="openCLI()" class="btn-primary" style="margin-top: 20px;">
+        <button @click="openCLI()" class="btn-primary">
+            <i class="fas fa-terminal"></i>
             Open CLI to Add Todos
         </button>
     </div>

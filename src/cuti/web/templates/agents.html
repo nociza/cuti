@@ -3,7 +3,7 @@
 {% block title %}cuti - Agent Manager{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', path='css/agents.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', path='css/agents.css') }}?v=4">
 <link rel="stylesheet" href="{{ url_for('static', path='css/agent-cards.css') }}?v=1">
 {% endblock %}
 
@@ -12,6 +12,20 @@
 
 {% block content %}
 <div class="agents-page" :class="{ 'compact-mode': agents.length > 15 }">
+    <!-- Sub Navigation -->
+    <div class="sub-nav">
+        <div class="nav-tabs">
+            <a href="/agents" class="nav-tab active">
+                <i class="fas fa-robot"></i>
+                <span>Agents</span>
+            </a>
+            <a href="/tools" class="nav-tab">
+                <i class="fas fa-wrench"></i>
+                <span>Tools</span>
+            </a>
+        </div>
+    </div>
+    
     <!-- Sticky Page Header -->
     <div class="page-header">
         <div>
