@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Dict, Optional, List
 from pydantic import BaseModel
 
+from cuti.utils.constants import PROMPT_PREFIXES_DIR
+
 
 class PromptPrefix(BaseModel):
     """Model for a prompt prefix configuration."""
@@ -19,86 +21,16 @@ class PromptPrefix(BaseModel):
 class PromptPrefixManager:
     """Manages prompt prefixes and templates."""
     
-    # Built-in templates
-    TEMPLATES = [
-        {
-            "name": "Software Engineer",
-            "description": "Professional software engineering assistant",
-            "prompt": "You are an expert software engineer. Write clean, efficient, well-tested code following best practices.",
-            "tools": [
-                "Use version control (git) for all changes",
-                "Write comprehensive tests for new features", 
-                "Follow existing code style and conventions",
-                "Document complex logic with clear comments",
-                "Consider performance and scalability"
-            ]
-        },
-        {
-            "name": "Code Reviewer",
-            "description": "Thorough code review and quality assurance",
-            "prompt": "You are a senior code reviewer. Analyze code for bugs, security issues, and improvements.",
-            "tools": [
-                "Check for potential bugs and edge cases",
-                "Identify security vulnerabilities",
-                "Suggest performance optimizations",
-                "Ensure code follows best practices",
-                "Verify test coverage is adequate"
-            ]
-        },
-        {
-            "name": "DevOps Engineer",
-            "description": "Infrastructure and deployment specialist",
-            "prompt": "You are a DevOps expert. Focus on automation, CI/CD, monitoring, and infrastructure as code.",
-            "tools": [
-                "Automate repetitive tasks with scripts",
-                "Set up CI/CD pipelines",
-                "Configure monitoring and alerting",
-                "Use containerization (Docker/Kubernetes)",
-                "Apply infrastructure as code principles"
-            ]
-        },
-        {
-            "name": "Data Scientist",
-            "description": "Data analysis and machine learning expert",
-            "prompt": "You are a data scientist. Analyze data, build models, and provide insights.",
-            "tools": [
-                "Perform exploratory data analysis",
-                "Build and evaluate ML models",
-                "Create clear visualizations",
-                "Document findings and methodology",
-                "Use appropriate statistical methods"
-            ]
-        },
-        {
-            "name": "Debugger",
-            "description": "Expert at finding and fixing bugs",
-            "prompt": "You are a debugging specialist. Systematically identify and resolve issues.",
-            "tools": [
-                "Reproduce issues consistently",
-                "Use debugging tools and logs",
-                "Add diagnostic output",
-                "Test fixes thoroughly",
-                "Document root cause and solution"
-            ]
-        },
-        {
-            "name": "Minimal",
-            "description": "Simple, no-frills assistant",
-            "prompt": "Be concise and direct. Focus on solving the task efficiently.",
-            "tools": [
-                "Get to the point quickly",
-                "Avoid unnecessary explanations",
-                "Focus on the requested task"
-            ]
-        }
-    ]
-    
     def __init__(self, config_dir: Path = None):
         """Initialize the prompt prefix manager."""
         self.config_dir = config_dir or Path.home() / ".cuti"
         self.config_dir.mkdir(exist_ok=True)
         self.prefix_file = self.config_dir / "prompt_prefix.json"
         self.custom_prefixes_file = self.config_dir / "custom_prefixes.json"
+        
+        # Path to templates directory
+        self.templates_dir = PROMPT_PREFIXES_DIR
+        
         self._ensure_files()
     
     def _ensure_files(self):
@@ -113,8 +45,23 @@ class PromptPrefixManager:
                 json.dump([], f)
     
     def get_templates(self) -> List[Dict]:
-        """Get all available templates."""
-        return self.TEMPLATES
+        """Get all available templates by loading from JSON files."""
+        templates = []
+        
+        if self.templates_dir.exists():
+            for template_file in self.templates_dir.glob("*.json"):
+                try:
+                    with open(template_file, 'r') as f:
+                        template = json.load(f)
+                        template['is_template'] = True
+                        templates.append(template)
+                except Exception as e:
+                    print(f"Error loading template {template_file}: {e}")
+        
+        # Sort templates by name for consistency
+        templates.sort(key=lambda x: x.get('name', ''))
+        
+        return templates
     
     def get_custom_prefixes(self) -> List[Dict]:
         """Get all custom prefixes."""

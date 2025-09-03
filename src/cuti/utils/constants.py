@@ -37,5 +37,7 @@ RATE_LIMIT_COOLDOWN_MINUTES = 5
 WEB_STATIC_DIR = "static"
 WEB_TEMPLATES_DIR = "templates"
 
-# Agent directories
-BUILTIN_AGENTS_DIR = Path(__file__).parent.parent / "builtin_agents"
+# Agent and prompt directories
+PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
+BUILTIN_AGENTS_DIR = PROMPTS_DIR / "builtin_agents"
+PROMPT_PREFIXES_DIR = PROMPTS_DIR / "prompt_prefixes"
