@@ -119,6 +119,12 @@ function terminalInterface() {
         todos: [],
         nextTodoId: 1,
         
+        // Prompt prefix functionality
+        promptPrefixEnabled: JSON.parse(localStorage.getItem('promptPrefixEnabled') || 'false'),
+        promptPrefix: localStorage.getItem('promptPrefix') || '',
+        defaultPrefix: '',
+        showPrefixEditor: false,
+        
         // Token counting
         tokenCount: 0,
         inputTokens: 0,
@@ -184,6 +190,7 @@ function terminalInterface() {
             this.loadSettings();
             this.loadClaudeSettings();
             this.loadGroundTruthData();
+            this.loadDefaultPrefix();
             
             // Initialize Symphony Mode state
             const symphonyToggle = document.getElementById('symphonyModeToggle');
@@ -388,9 +395,53 @@ function terminalInterface() {
         },
         
         sendChatMessage() {
-            if (!this.chatInput.trim() || this.isStreaming || !this.chatWs) return;
+            console.log('sendChatMessage called, input:', this.chatInput);
+            if (!this.chatInput.trim() || this.isStreaming) return;
             
-            const messageContent = this.chatInput;
+            let messageContent = this.chatInput.trim();
+            
+            // Handle /clear command locally without sending to server
+            if (messageContent === '/clear') {
+                console.log('Handling /clear command');
+                try {
+                    this.clearTerminal();
+                    this.chatInput = '';
+                    // Force UI update and re-enable textarea
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                        // Ensure textarea is re-focused and enabled
+                        if (this.$refs.promptInput) {
+                            this.$refs.promptInput.focus();
+                        }
+                    });
+                    console.log('/clear completed successfully');
+                } catch (error) {
+                    console.error('Error in /clear command:', error);
+                }
+                return;
+            }
+            
+            // Check WebSocket after handling local commands
+            if (!this.chatWs) {
+                console.error('WebSocket not connected');
+                return;
+            }
+            
+            // Handle ^ macro for prefix
+            if (messageContent === '^') {
+                this.showPrefixEditor = true;
+                this.chatInput = '';
+                this.$nextTick(() => {
+                    const editor = document.getElementById('prefixEditor');
+                    if (editor) editor.focus();
+                });
+                return;
+            }
+            
+            // Apply prompt prefix if enabled
+            if (this.promptPrefixEnabled && this.promptPrefix) {
+                messageContent = this.promptPrefix + '\n\n' + messageContent;
+            }
             
             // Add user message
             this.chatMessages.push({
@@ -423,10 +474,101 @@ function terminalInterface() {
         },
         
         clearTerminal() {
+            console.log('clearTerminal called');
+            // Clear messages and todos
             this.chatMessages = [];
             this.todos = [];
-            this.chatInput = '';
-            localStorage.removeItem('cuti_chat_messages');
+            
+            // Clear localStorage
+            try {
+                localStorage.removeItem('cuti_chat_messages');
+            } catch (e) {
+                console.error('Failed to clear localStorage:', e);
+            }
+            
+            // Add a system message that screen was cleared
+            this.chatMessages.push({
+                id: Date.now(),
+                role: 'system',
+                content: '✨ Screen cleared',
+                timestamp: new Date()
+            });
+            
+            console.log('clearTerminal completed, messages:', this.chatMessages.length);
+            // Don't call persistChatMessages here to avoid conflicts
+            // The message will persist on the next regular message
+        },
+        
+        togglePromptPrefix() {
+            this.promptPrefixEnabled = !this.promptPrefixEnabled;
+            localStorage.setItem('promptPrefixEnabled', JSON.stringify(this.promptPrefixEnabled));
+        },
+        
+        savePromptPrefix() {
+            localStorage.setItem('promptPrefix', this.promptPrefix);
+            this.showPrefixEditor = false;
+        },
+        
+        async loadDefaultPrefix() {
+            try {
+                // First try to load from prompt prefix API
+                const prefixResponse = await fetch('/api/prompt-prefix/active');
+                if (prefixResponse.ok) {
+                    const prefixData = await prefixResponse.json();
+                    if (prefixData.active && prefixData.formatted) {
+                        // Use the active prompt prefix
+                        this.promptPrefix = prefixData.formatted;
+                        this.promptPrefixEnabled = true;
+                        console.log('Loaded active prompt prefix:', prefixData.active.name);
+                        return;
+                    }
+                }
+                
+                // Fallback: Load from CLAUDE.md if it exists
+                const response = await fetch('/api/workspace/read-file?path=CLAUDE.md');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.content) {
+                        // Extract key instructions from CLAUDE.md
+                        const lines = data.content.split('\n');
+                        const importantSections = [];
+                        let inInstructionSection = false;
+                        
+                        for (const line of lines) {
+                            if (line.includes('## Overall Instructions') || line.includes('## Agents To Use')) {
+                                inInstructionSection = true;
+                                continue;
+                            }
+                            if (inInstructionSection && line.startsWith('##')) {
+                                inInstructionSection = false;
+                            }
+                            if (inInstructionSection && line.trim()) {
+                                importantSections.push(line);
+                            }
+                        }
+                        
+                        this.defaultPrefix = importantSections.join('\n').trim();
+                        
+                        // Set as prefix if none exists
+                        if (!this.promptPrefix) {
+                            this.promptPrefix = this.defaultPrefix;
+                            localStorage.setItem('promptPrefix', this.promptPrefix);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load default prefix:', error);
+                // Set a reasonable default
+                this.defaultPrefix = 'You are a helpful AI assistant working in this codebase.';
+                if (!this.promptPrefix) {
+                    this.promptPrefix = this.defaultPrefix;
+                }
+            }
+        },
+        
+        resetPromptPrefix() {
+            this.promptPrefix = this.defaultPrefix;
+            localStorage.setItem('promptPrefix', this.promptPrefix);
         },
         
         extractTodosFromContent(content) {
@@ -460,6 +602,14 @@ function terminalInterface() {
             if (todo) {
                 todo.completed = !todo.completed;
             }
+        },
+        
+        adjustTextareaHeight(textarea) {
+            // Reset height to auto to get the correct scrollHeight
+            textarea.style.height = 'auto';
+            // Set the height to the scrollHeight to fit content
+            const newHeight = Math.min(textarea.scrollHeight, 200); // Max 200px
+            textarea.style.height = newHeight + 'px';
         },
         
         formatTerminalMessage(content, role) {
@@ -1065,9 +1215,6 @@ function dashboard() {
             });
         },
         
-        clearTerminal() {
-            this.chatMessages = [];
-        },
         
         // Settings methods
         loadSettings() {

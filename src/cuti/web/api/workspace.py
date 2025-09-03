@@ -3,6 +3,7 @@ API endpoints for workspace management and synchronization.
 """
 
 from typing import Dict, Any
+from pathlib import Path
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 
@@ -37,6 +38,29 @@ async def sync_now(request: Request, sync_request: SyncRequest) -> Dict[str, Any
         return {
             "success": True,
             "results": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@workspace_router.get("/read-file")
+async def read_file(request: Request, path: str) -> Dict[str, Any]:
+    """Read a file from the workspace."""
+    try:
+        working_dir = request.app.state.working_directory
+        file_path = working_dir / path
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        if not file_path.is_file():
+            raise HTTPException(status_code=400, detail="Path is not a file")
+        
+        content = file_path.read_text()
+        return {
+            "success": True,
+            "path": str(file_path),
+            "content": content
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

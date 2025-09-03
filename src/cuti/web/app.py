@@ -36,6 +36,7 @@ from .api.claude_logs import claude_logs_router
 from .api.workspace import workspace_router
 from .api.claude_status import router as claude_status_router
 from .api.tools import router as tools_router
+from .api.prompt_prefix import router as prompt_prefix_router
 try:
     from .api.enhanced_chat import enhanced_chat_router
 except ImportError:
@@ -186,6 +187,7 @@ def create_app(
     app.include_router(workspace_router, prefix="/api")
     app.include_router(claude_status_router)
     app.include_router(tools_router)
+    app.include_router(prompt_prefix_router)
     app.include_router(websocket_router)
     
     # Include enhanced chat router if available

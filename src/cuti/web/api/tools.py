@@ -145,6 +145,15 @@ AVAILABLE_TOOLS = [
         "check_command": "ncdu --version",
         "usage_instructions": "Use `ncdu` to analyze disk usage. Example: `ncdu /workspace`",
         "category": "System"
+    },
+    {
+        "name": "playwright",
+        "display_name": "Playwright",
+        "description": "Browser automation and testing framework for headless browser testing",
+        "install_command": "sudo pip install playwright && sudo playwright install chromium && sudo apt-get update && sudo apt-get install -y libnspr4 libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2",
+        "check_command": "playwright --version",
+        "usage_instructions": "Use `playwright` for browser automation and testing. Example: Create a Python script using `from playwright.async_api import async_playwright` to automate browser tasks.",
+        "category": "Testing"
     }
 ]
 

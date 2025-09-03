@@ -158,7 +158,7 @@
             <!-- Current Streaming Message -->
             <div x-show="isStreaming && currentStreamingMessage" class="terminal-message">
                 <div class="assistant-output">
-                    <span x-html="formatTerminalMessage(currentStreamingMessage.content)"></span>
+                    <span x-html="currentStreamingMessage && currentStreamingMessage.content ? formatTerminalMessage(currentStreamingMessage.content) : ''"></span>
                     <span class="streaming-cursor"></span>
                 </div>
             </div>
@@ -166,28 +166,79 @@
         
         <!-- Modern Input Area -->
         <div class="input-container">
-            <div class="input-wrapper">
+            <!-- Prompt Prefix Editor Modal -->
+            <div x-show="showPrefixEditor" 
+                 class="prefix-editor-modal"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform translate-y-4"
+                 x-transition:enter-end="opacity-100 transform translate-y-0"
+                 @click.away="showPrefixEditor = false"
+                 style="position: absolute; bottom: 100%; left: 0; right: 0; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 8px; z-index: 1000;">
+                <div style="margin-bottom: 8px;">
+                    <label style="color: #94a3b8; font-size: 12px; display: block; margin-bottom: 4px;">Prompt Prefix (Applied to all messages when enabled)</label>
+                    <textarea 
+                        x-model="promptPrefix"
+                        id="prefixEditor"
+                        rows="6"
+                        style="width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: vertical;"
+                        placeholder="Enter your prompt prefix here..."></textarea>
+                </div>
+                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button @click="resetPromptPrefix()" 
+                            style="padding: 6px 12px; background: #475569; color: #e2e8f0; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        Reset to Default
+                    </button>
+                    <button @click="showPrefixEditor = false" 
+                            style="padding: 6px 12px; background: #475569; color: #e2e8f0; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        Cancel
+                    </button>
+                    <button @click="savePromptPrefix()" 
+                            style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        Save
+                    </button>
+                </div>
+            </div>
+            
+            <div class="input-wrapper" style="position: relative;">
                 <span class="prompt-symbol">$</span>
-                <div style="flex: 1; position: relative;">
-                    <input
+                <div style="flex: 1; position: relative; display: flex; align-items: flex-end;">
+                    <textarea
                         x-model="chatInput"
-                        @input="checkForAgentSuggestion()"
-                        @keydown.enter="sendChatMessage()"
+                        @input="checkForAgentSuggestion(); adjustTextareaHeight($event.target)"
+                        @keydown.enter.prevent="if (!$event.shiftKey) { sendChatMessage(); $event.target.style.height = 'auto'; }"
+                        @keydown.shift.enter="$event.stopPropagation()"
                         @keydown.ctrl.c="clearTerminal()"
                         @keydown.tab.prevent="acceptSuggestion()"
                         @keydown.escape="closeSuggestions()"
-                        @keydown.arrow-up.prevent="navigateSuggestions(-1)"
-                        @keydown.arrow-down.prevent="navigateSuggestions(1)"
-                        placeholder="Type your message or @agent-name..."
+                        @keydown.arrow-up.prevent="if (!chatInput.includes('\n') || $event.target.selectionStart === 0) navigateSuggestions(-1)"
+                        @keydown.arrow-down.prevent="if (!chatInput.includes('\n') || $event.target.selectionStart === chatInput.length) navigateSuggestions(1)"
+                        placeholder="Type message... (Shift+Enter for new line, ^ for prefix, /clear to clear)"
                         class="prompt-input"
                         :disabled="isStreaming"
                         x-ref="promptInput"
-                        style="width: 100%;">
+                        x-init="$el.style.height = 'auto'"
+                        style="width: 100%; resize: none; min-height: 24px; max-height: 200px; overflow-y: auto; padding: 2px 8px; line-height: 1.4;"
+                        rows="1"></textarea>
+                    
+                    <!-- Prefix Indicator -->
+                    <div x-show="promptPrefixEnabled" 
+                         @click="togglePromptPrefix()"
+                         style="position: absolute; top: 4px; right: 8px; background: #22c55e; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer; user-select: none;"
+                         title="Click to toggle prefix (Currently ON)">
+                        PREFIX
+                    </div>
+                    <div x-show="!promptPrefixEnabled && promptPrefix" 
+                         @click="togglePromptPrefix()"
+                         style="position: absolute; top: 4px; right: 8px; background: #64748b; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer; user-select: none;"
+                         title="Click to enable prefix (Currently OFF)">
+                        PREFIX
+                    </div>
                     
                     <!-- Agent Suggestions Dropdown -->
                     <div x-show="showAgentSuggestions && agentSuggestions.length > 0" 
                          class="agent-suggestions"
-                         @click.away="closeSuggestions()">
+                         @click.away="closeSuggestions()"
+                         style="position: absolute; bottom: 100%; left: 0; margin-bottom: 4px;">
                         <template x-for="(suggestion, index) in agentSuggestions" :key="suggestion.name">
                             <div class="agent-suggestion-item"
                                  :class="{'active': selectedSuggestionIndex === index}"

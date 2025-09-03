@@ -543,6 +543,51 @@
                 </select>
             </div>
         </div>
+        
+        <!-- Prompt Prefix Settings -->
+        <div class="settings-card">
+            <h3 class="card-title">💬 Prompt Prefix</h3>
+            
+            <div class="form-group">
+                <label class="form-label">Active Prefix</label>
+                <div class="form-description">Select a template or custom prefix to use in all chat conversations</div>
+                <select id="active-prefix" class="form-select" onchange="loadPrefixDetails()">
+                    <option value="">No prefix (default)</option>
+                    <optgroup label="Templates" id="template-options">
+                        <!-- Templates will be loaded here -->
+                    </optgroup>
+                    <optgroup label="Custom Prefixes" id="custom-options">
+                        <!-- Custom prefixes will be loaded here -->
+                    </optgroup>
+                </select>
+            </div>
+            
+            <div id="prefix-preview" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Preview</label>
+                    <div class="code-block" id="prefix-preview-content" style="max-height: 200px; overflow-y: auto;">
+                        <!-- Preview will be shown here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Create Custom Prefix</label>
+                <div class="form-description">Create your own prompt prefix with specific instructions and tools</div>
+                <button onclick="openPrefixEditor()" class="btn btn-secondary">
+                    ✏️ Open Prefix Editor
+                </button>
+            </div>
+            
+            <div class="actions" style="margin-top: 1rem;">
+                <button onclick="activatePrefix()" class="btn btn-primary">
+                    ✅ Activate Selected
+                </button>
+                <button onclick="deactivatePrefix()" class="btn btn-secondary">
+                    ❌ Deactivate Prefix
+                </button>
+            </div>
+        </div>
     </div>
     
     <!-- Usage Statistics -->
@@ -918,11 +963,253 @@
         }
     }
     
+    // Prompt Prefix Functions
+    let currentPrefixes = { templates: [], custom: [], active: null };
+    
+    async function loadPrefixes() {
+        try {
+            const response = await fetch('/api/prompt-prefix/all');
+            currentPrefixes = await response.json();
+            
+            // Populate template options
+            const templateOptions = document.getElementById('template-options');
+            templateOptions.innerHTML = '';
+            currentPrefixes.templates.forEach(template => {
+                const option = document.createElement('option');
+                option.value = `template:${template.name}`;
+                option.textContent = `${template.name} - ${template.description}`;
+                templateOptions.appendChild(option);
+            });
+            
+            // Populate custom options
+            const customOptions = document.getElementById('custom-options');
+            customOptions.innerHTML = '';
+            currentPrefixes.custom.forEach(custom => {
+                const option = document.createElement('option');
+                option.value = `custom:${custom.name}`;
+                option.textContent = `${custom.name} - ${custom.description}`;
+                customOptions.appendChild(option);
+            });
+            
+            // Set active selection
+            if (currentPrefixes.active) {
+                const activeValue = currentPrefixes.active.is_template ? 
+                    `template:${currentPrefixes.active.name}` : 
+                    `custom:${currentPrefixes.active.name}`;
+                document.getElementById('active-prefix').value = activeValue;
+                loadPrefixDetails();
+            }
+        } catch (error) {
+            console.error('Failed to load prefixes:', error);
+        }
+    }
+    
+    function loadPrefixDetails() {
+        const select = document.getElementById('active-prefix');
+        const preview = document.getElementById('prefix-preview');
+        const content = document.getElementById('prefix-preview-content');
+        
+        if (!select.value) {
+            preview.style.display = 'none';
+            return;
+        }
+        
+        const [type, ...nameParts] = select.value.split(':');
+        const name = nameParts.join(':');
+        
+        let prefix;
+        if (type === 'template') {
+            prefix = currentPrefixes.templates.find(t => t.name === name);
+        } else {
+            prefix = currentPrefixes.custom.find(c => c.name === name);
+        }
+        
+        if (prefix) {
+            let html = `<div style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace;">`;
+            html += `<strong>${prefix.prompt}</strong>\n\n`;
+            if (prefix.tools && prefix.tools.length > 0) {
+                html += `<strong>Key guidelines:</strong>\n`;
+                prefix.tools.forEach(tool => {
+                    html += `• ${tool}\n`;
+                });
+            }
+            html += `</div>`;
+            content.innerHTML = html;
+            preview.style.display = 'block';
+        }
+    }
+    
+    async function activatePrefix() {
+        const select = document.getElementById('active-prefix');
+        if (!select.value) {
+            showToast('Please select a prefix to activate', 'warning');
+            return;
+        }
+        
+        const [type, ...nameParts] = select.value.split(':');
+        const name = nameParts.join(':');
+        
+        try {
+            let response;
+            if (type === 'template') {
+                response = await fetch(`/api/prompt-prefix/activate-template/${encodeURIComponent(name)}`, {
+                    method: 'POST'
+                });
+            } else {
+                response = await fetch(`/api/prompt-prefix/activate-custom/${encodeURIComponent(name)}`, {
+                    method: 'POST'
+                });
+            }
+            
+            if (response.ok) {
+                showToast('Prefix activated successfully', 'success');
+                await loadPrefixes();
+            } else {
+                showToast('Failed to activate prefix', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to activate prefix:', error);
+            showToast('Failed to activate prefix', 'error');
+        }
+    }
+    
+    async function deactivatePrefix() {
+        try {
+            const response = await fetch('/api/prompt-prefix/deactivate', {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                showToast('Prefix deactivated', 'success');
+                document.getElementById('active-prefix').value = '';
+                document.getElementById('prefix-preview').style.display = 'none';
+                await loadPrefixes();
+            } else {
+                showToast('Failed to deactivate prefix', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to deactivate prefix:', error);
+            showToast('Failed to deactivate prefix', 'error');
+        }
+    }
+    
+    function openPrefixEditor() {
+        // Create modal for prefix editor
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="
+                background: var(--bg-card);
+                border-radius: var(--radius-lg);
+                padding: 2rem;
+                width: 90%;
+                max-width: 800px;
+                max-height: 90vh;
+                overflow-y: auto;
+            ">
+                <h2 style="margin-bottom: 1.5rem;">Create Custom Prompt Prefix</h2>
+                
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" id="prefix-name" class="form-input" placeholder="My Custom Prefix">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="prefix-description" class="form-input" placeholder="Brief description of this prefix">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Prompt</label>
+                    <textarea id="prefix-prompt" class="form-input" rows="4" 
+                        placeholder="You are an expert software engineer. Write clean, efficient code..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Tools/Guidelines (one per line)</label>
+                    <textarea id="prefix-tools" class="form-input" rows="5" 
+                        placeholder="Use version control for all changes
+Write comprehensive tests
+Follow existing code conventions"></textarea>
+                </div>
+                
+                <div class="actions" style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button onclick="closePrefixEditor()" class="btn btn-secondary">Cancel</button>
+                    <button onclick="savePrefixFromEditor()" class="btn btn-primary">Save Prefix</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        modal.onclick = (e) => {
+            if (e.target === modal) closePrefixEditor();
+        };
+    }
+    
+    function closePrefixEditor() {
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) modal.remove();
+    }
+    
+    async function savePrefixFromEditor() {
+        const name = document.getElementById('prefix-name').value.trim();
+        const description = document.getElementById('prefix-description').value.trim();
+        const prompt = document.getElementById('prefix-prompt').value.trim();
+        const toolsText = document.getElementById('prefix-tools').value.trim();
+        
+        if (!name || !prompt) {
+            showToast('Name and prompt are required', 'warning');
+            return;
+        }
+        
+        const tools = toolsText ? toolsText.split('\n').map(t => t.trim()).filter(t => t) : [];
+        
+        try {
+            const response = await fetch('/api/prompt-prefix/custom', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name,
+                    description: description || name,
+                    prompt,
+                    tools
+                })
+            });
+            
+            if (response.ok) {
+                showToast('Custom prefix saved successfully', 'success');
+                closePrefixEditor();
+                await loadPrefixes();
+            } else {
+                showToast('Failed to save custom prefix', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to save prefix:', error);
+            showToast('Failed to save custom prefix', 'error');
+        }
+    }
+    
     // Load everything on page load
     document.addEventListener('DOMContentLoaded', () => {
         loadSettings();
         loadUsageStats();
         loadSyncStatus();
+        loadPrefixes();
         
         // Refresh sync status every 10 seconds
         setInterval(loadSyncStatus, 10000);

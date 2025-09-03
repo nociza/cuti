@@ -16,8 +16,13 @@ from ...core.claude_stream_interface import (
     StreamEvent,
     StreamEventType
 )
-from ...core.mock_stream_interface import MockStreamInterface
+try:
+    from ...core.mock_stream_interface import MockStreamInterface
+except ImportError:
+    MockStreamInterface = None
 from ...core.token_counter import TokenCounter, TokenMetrics
+import subprocess
+import os
 
 streaming_chat_router = APIRouter()
 
@@ -77,7 +82,7 @@ class StreamingChatManager:
 streaming_manager = StreamingChatManager()
 
 
-async def stream_claude_response(session: StreamingSession, prompt: str, working_dir: str):
+async def stream_claude_response(session: StreamingSession, prompt: str, working_dir: str, claude_interface=None):
     """Stream Claude's response with all intermediate steps and token counting."""
     
     session.is_streaming = True
@@ -114,7 +119,82 @@ async def stream_claude_response(session: StreamingSession, prompt: str, working
         text_buffer = []
         stream_start_time = datetime.now()
         
-        # Use mock interface for demonstration (replace with real Claude when available)
+        # Use real Claude CLI if available, otherwise fall back to mock
+        if claude_interface:
+            # Stream from real Claude CLI
+            async for chunk in claude_interface.stream_prompt(prompt, working_dir):
+                # Check if cancelled
+                if session.is_cancelled:
+                    await session.send({
+                        "type": "stream_cancelled",
+                        "message": "Stream cancelled by user"
+                    })
+                    break
+                
+                # Send text chunk
+                await session.send({
+                    "type": "text",
+                    "content": chunk,
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                # Update token count (approximate)
+                text_buffer.append(chunk)
+                if len(text_buffer) % 10 == 0:  # Update every 10 chunks
+                    output_text = "".join(text_buffer)
+                    output_tokens = session.token_counter.count_response_tokens(output_text)
+                    await session.send({
+                        "type": "token_update",
+                        "output_tokens": output_tokens,
+                        "total_tokens": input_tokens + output_tokens
+                    })
+            
+            # Final token count
+            full_response = "".join(text_buffer)
+            output_tokens = session.token_counter.count_response_tokens(full_response) if text_buffer else 0
+            
+            # Send completion
+            await session.send({
+                "type": "stream_complete",
+                "session_id": session.session_id,
+                "duration": (datetime.now() - stream_start_time).total_seconds(),
+                "total_tokens": input_tokens + output_tokens,
+                "output_tokens": output_tokens,
+                "total_cost": session.token_counter.format_cost(
+                    input_tokens * session.token_counter.pricing["input"] +
+                    output_tokens * session.token_counter.pricing["output"]
+                )
+            })
+            return  # Exit after real Claude response
+        
+        # Fall back to mock interface if available
+        if not MockStreamInterface:
+            # No mock available, send demo message
+            await session.send({
+                "type": "text",
+                "content": "[Demo Mode] Claude CLI is not available. This is a simple response.\n\n",
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            demo_response = f"I received your prompt: '{prompt}'\n\nIn production, this would execute via Claude Code CLI."
+            for word in demo_response.split():
+                if session.is_cancelled:
+                    break
+                await session.send({
+                    "type": "text",
+                    "content": word + " ",
+                    "timestamp": datetime.now().isoformat()
+                })
+                await asyncio.sleep(0.05)
+            
+            await session.send({
+                "type": "stream_complete",
+                "session_id": session.session_id,
+                "duration": (datetime.now() - stream_start_time).total_seconds()
+            })
+            return
+        
+        # Use mock interface for demonstration
         mock_interface = MockStreamInterface()
         
         # Stream the response with all steps
@@ -359,9 +439,10 @@ async def streaming_chat_websocket(websocket: WebSocket):
         "timestamp": datetime.now().isoformat()
     })
     
-    # Get working directory
+    # Get working directory and Claude interface
     app = websocket.scope.get("app")
     working_dir = str(app.state.working_directory) if app else "."
+    claude_interface = app.state.claude_interface if app else None
     
     try:
         while True:
@@ -382,9 +463,9 @@ async def streaming_chat_websocket(websocket: WebSocket):
                     "timestamp": datetime.now().isoformat()
                 })
                 
-                # Start streaming task
+                # Start streaming task with Claude interface
                 session.current_task = asyncio.create_task(
-                    stream_claude_response(session, prompt, working_dir)
+                    stream_claude_response(session, prompt, working_dir, claude_interface)
                 )
                 
             elif msg_type == "cancel":
