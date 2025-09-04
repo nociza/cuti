@@ -279,32 +279,32 @@
     </div>
     
     <!-- Stats Bar -->
-    <div class="stats-bar" x-show="todos.length > 0">
+    <div class="stats-bar" x-show="todos && todos.length > 0">
         <div class="stat-card">
             <div class="stat-label">Pending</div>
-            <div class="stat-value pending" x-text="todos.filter(t => t.status === 'pending').length"></div>
+            <div class="stat-value pending" x-text="todos && todos.filter ? todos.filter(t => t.status === 'pending').length : 0"></div>
         </div>
         <div class="stat-card">
             <div class="stat-label">In Progress</div>
-            <div class="stat-value progress" x-text="todos.filter(t => t.status === 'in_progress').length"></div>
+            <div class="stat-value progress" x-text="todos && todos.filter ? todos.filter(t => t.status === 'in_progress').length : 0"></div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Completed</div>
-            <div class="stat-value completed" x-text="todos.filter(t => t.status === 'completed').length"></div>
+            <div class="stat-value completed" x-text="todos && todos.filter ? todos.filter(t => t.status === 'completed').length : 0"></div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Total Tasks</div>
-            <div class="stat-value" x-text="todos.length"></div>
+            <div class="stat-value" x-text="todos ? todos.length : 0"></div>
         </div>
     </div>
     
     <!-- Todos Container -->
-    <div class="todos-container" x-show="todos.length > 0">
-        <template x-for="todo in todos" :key="todo.id">
-            <div class="todo-card" :class="`status-${todo.status}`">
+    <div id="todo-list" class="todos-container" x-show="todos && todos.length > 0">
+        <template x-for="todo in (todos || [])" :key="todo && todo.id ? todo.id : Math.random()">
+            <div class="todo-card" :class="todo && todo.status ? `status-${todo.status}` : ''">
                 <div class="todo-header">
-                    <h3 class="todo-title" x-text="todo.content"></h3>
-                    <span class="todo-status" :class="`status-${todo.status}`" x-text="formatStatus(todo.status)"></span>
+                    <h3 class="todo-title" x-text="todo && todo.content ? todo.content : ''"></h3>
+                    <span class="todo-status" :class="todo && todo.status ? `status-${todo.status}` : ''" x-text="todo && todo.status ? formatStatus(todo.status) : ''"></span>
                 </div>
                 <div class="todo-content" x-show="todo.description" x-text="todo.description"></div>
                 <div class="todo-meta">
@@ -321,8 +321,30 @@
         </template>
     </div>
     
+    <!-- Add Todo Form -->
+    <div class="add-todo-form" style="margin-bottom: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <input 
+                id="new-todo"
+                type="text" 
+                x-model="newTodo"
+                @keydown.enter="addTodo()"
+                placeholder="Add a new todo..." 
+                style="flex: 1; padding: 0.75rem; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: white; font-size: 1rem;"
+                aria-label="New todo input">
+            <button 
+                @click="addTodo()" 
+                class="add-todo btn-primary"
+                style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;"
+                :disabled="!newTodo || newTodo.trim() === ''"
+                aria-label="Add todo">
+                <i class="fas fa-plus"></i> Add Todo
+            </button>
+        </div>
+    </div>
+    
     <!-- Empty State -->
-    <div x-show="todos.length === 0" class="empty-state">
+    <div x-show="!todos || todos.length === 0" class="empty-state">
         <div class="empty-state-icon">
             <i class="fas fa-clipboard-list"></i>
         </div>
@@ -343,6 +365,7 @@
 function todoManager() {
     return {
         todos: [],
+        newTodo: '',
         
         async init() {
             await this.loadTodos();
@@ -352,10 +375,39 @@ function todoManager() {
             try {
                 const response = await fetch('/api/claude-logs/todos');
                 if (response.ok) {
-                    this.todos = await response.json();
+                    const data = await response.json();
+                    this.todos = Array.isArray(data) ? data : [];
+                } else {
+                    this.todos = [];
                 }
             } catch (error) {
                 console.error('Error loading todos:', error);
+                this.todos = [];
+            }
+        },
+        
+        async addTodo() {
+            if (!this.newTodo || this.newTodo.trim() === '') return;
+            
+            const todo = {
+                id: Date.now(),
+                content: this.newTodo,
+                status: 'pending',
+                created_at: new Date().toISOString()
+            };
+            
+            this.todos.unshift(todo);
+            this.newTodo = '';
+            
+            // Save to backend if API is available
+            try {
+                await fetch('/api/todos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(todo)
+                });
+            } catch (error) {
+                console.log('Todo saved locally only');
             }
         },
         

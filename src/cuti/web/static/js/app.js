@@ -251,6 +251,7 @@ function terminalInterface() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             // Use the streaming WebSocket for token tracking
             this.chatWs = new WebSocket(`${protocol}//${window.location.host}/streaming-chat-ws`);
+            window.ws = this.chatWs; // Expose to window for testing
             
             this.chatWs.onmessage = (event) => {
                 const data = JSON.parse(event.data);

@@ -69,11 +69,11 @@
     </div>
     
     <!-- Scrollable Container -->
-    <div class="agents-container" x-show="filteredAgents.length > 0" @scroll="handleScroll">
+    <div id="agents-container" class="agents-container agent-list" data-agents x-show="filteredAgents.length > 0" @scroll="handleScroll">
         <!-- Multi-Column Grid -->
         <div class="agents-grid">
             <template x-for="agent in filteredAgents" :key="agent.name">
-            <div class="agent-card" 
+            <div class="agent-card agent-item" 
                  :class="{
                      'agent-disabled': agent.agent_type === 'gemini' && !geminiAvailable,
                      'agent-active': activeAgents.has(agent.name),
@@ -83,6 +83,16 @@
                  :title="activeAgents.has(agent.name) ? 'Click to deactivate' : 'Click to activate'">
                 <!-- State Indicator - minimal dot -->
                 <div class="agent-state-indicator"></div>
+                
+                <!-- Toggle Switch -->
+                <div class="agent-toggle" @click.stop>
+                    <input type="checkbox" 
+                           class="toggle-switch"
+                           :id="'toggle-' + agent.name"
+                           :checked="activeAgents.has(agent.name)"
+                           @change="toggleAgent(agent)">
+                    <label :for="'toggle-' + agent.name" class="toggle-label"></label>
+                </div>
                 
                 <div class="agent-card-header">
                     <div class="agent-name">

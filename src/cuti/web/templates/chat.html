@@ -114,7 +114,7 @@
         </div>
         
         <!-- Terminal Output -->
-        <div id="terminalOutput" class="terminal-output">
+        <div id="terminal-display" class="terminal-output" role="log" aria-label="Chat messages" aria-live="polite">
             <!-- Welcome Message -->
             <div class="system-message" x-show="chatMessages.length === 0 && !isStreaming">
                 <div class="timestamp">System</div>
@@ -203,6 +203,7 @@
                 <span class="prompt-symbol">$</span>
                 <div style="flex: 1; position: relative; display: flex; align-items: flex-end;">
                     <textarea
+                        id="message-input"
                         x-model="chatInput"
                         @input="checkForAgentSuggestion(); adjustTextareaHeight($event.target)"
                         @keydown.enter.prevent="if (!$event.shiftKey) { sendChatMessage(); $event.target.style.height = 'auto'; }"
@@ -218,7 +219,10 @@
                         x-ref="promptInput"
                         x-init="$el.style.height = 'auto'"
                         style="width: 100%; resize: none; min-height: 24px; max-height: 200px; overflow-y: auto; padding: 2px 8px; line-height: 1.4;"
-                        rows="1"></textarea>
+                        rows="1"
+                        aria-label="Message input"
+                        role="textbox"
+                        aria-multiline="true"></textarea>
                     
                     <!-- Prefix Indicator -->
                     <div x-show="promptPrefixEnabled" 
@@ -250,6 +254,17 @@
                         </template>
                     </div>
                 </div>
+                <button id="send-button" 
+                        @click="sendChatMessage()" 
+                        :disabled="isStreaming || !chatInput.trim()"
+                        class="send-button"
+                        style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 8px;"
+                        :style="(isStreaming || !chatInput.trim()) ? 'opacity: 0.5; cursor: not-allowed;' : ''"
+                        aria-label="Send message"
+                        type="submit">
+                    <span x-show="!isStreaming">Send</span>
+                    <span x-show="isStreaming">Processing...</span>
+                </button>
                 <div x-show="isStreaming" class="processing-indicator">
                     <div class="token-counter" x-show="tokenCount > 0">
                         <span class="token-arrow">↑</span>
