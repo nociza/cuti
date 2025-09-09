@@ -263,41 +263,71 @@ class TodoService:
             return True
         return False
     
+    def get_all_todos(self, limit: int = None) -> List[TodoItem]:
+        """Get all todos from database."""
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        try:
+            query = 'SELECT * FROM todo_items ORDER BY created_at DESC'
+            if limit:
+                query += f' LIMIT {limit}'
+            
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            
+            todos = []
+            for row in rows:
+                data = dict(row)
+                data['metadata'] = json.loads(data['metadata']) if data['metadata'] else {}
+                # Remove list_id as it's not part of TodoItem
+                data.pop('list_id', None)
+                todos.append(TodoItem.from_dict(data))
+            
+            return todos
+        finally:
+            conn.close()
+    
     # CRUD operations for TodoList
     
     def save_list(self, todo_list: TodoList) -> str:
         """Save a todo list to database."""
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
-        cursor = conn.cursor()
-        
         try:
-            cursor.execute('''
-                INSERT OR REPLACE INTO todo_lists (
-                    id, name, description, parent_list_id, session_id,
-                    created_at, updated_at, created_by, is_master, metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                todo_list.id, todo_list.name, todo_list.description,
-                todo_list.parent_list_id, todo_list.session_id,
-                todo_list.created_at.isoformat() if todo_list.created_at else None,
-                todo_list.updated_at.isoformat() if todo_list.updated_at else None,
-                todo_list.created_by, todo_list.is_master,
-                json.dumps(todo_list.metadata)
-            ))
-            
-            # Save todos (pass connection to avoid locking)
-            for todo in todo_list.todos:
-                self.save_todo(todo, todo_list.id, conn)
-            
-            conn.commit()
-            
-            # Update GOAL.md if this is the master list (disabled for now due to locking)
-            # if todo_list.is_master:
-            #     self.save_goal_file(todo_list)
-            
-            return todo_list.id
+            return self._save_list_with_conn(todo_list, conn)
         finally:
             conn.close()
+    
+    def _save_list_with_conn(self, todo_list: TodoList, conn) -> str:
+        """Save a todo list using existing connection."""
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO todo_lists (
+                id, name, description, parent_list_id, session_id,
+                created_at, updated_at, created_by, is_master, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            todo_list.id, todo_list.name, todo_list.description,
+            todo_list.parent_list_id, todo_list.session_id,
+            todo_list.created_at.isoformat() if todo_list.created_at else None,
+            todo_list.updated_at.isoformat() if todo_list.updated_at else None,
+            todo_list.created_by, todo_list.is_master,
+            json.dumps(todo_list.metadata)
+        ))
+        
+        # Save todos (pass connection to avoid locking)
+        for todo in todo_list.todos:
+            self.save_todo(todo, todo_list.id, conn)
+        
+        conn.commit()
+        
+        # Update GOAL.md if this is the master list (disabled for now due to locking)
+        # if todo_list.is_master:
+        #     self.save_goal_file(todo_list)
+        
+        return todo_list.id
     
     def get_list(self, list_id: str) -> Optional[TodoList]:
         """Get a todo list by ID."""
@@ -330,6 +360,110 @@ class TodoService:
             return None
         finally:
             conn.close()
+    
+    def save_session(self, session: TodoSession) -> None:
+        """Save a todo session to database."""
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT OR REPLACE INTO todo_sessions 
+                (id, name, master_list_id, created_at, updated_at, active, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                session.id,
+                session.name,
+                session.master_list.id if session.master_list else None,
+                session.created_at.isoformat() if session.created_at else None,
+                session.updated_at.isoformat() if session.updated_at else None,
+                session.active,
+                json.dumps(session.metadata)
+            ))
+            
+            # Save associated lists using same connection
+            if session.master_list:
+                self._save_list_with_conn(session.master_list, conn)
+            
+            for sub_list in session.sub_lists:
+                sub_list.session_id = session.id
+                self._save_list_with_conn(sub_list, conn)
+            
+            conn.commit()
+        finally:
+            conn.close()
+    
+    def get_active_sessions(self) -> List[TodoSession]:
+        """Get all active sessions."""
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT * FROM todo_sessions WHERE active = 1
+                ORDER BY created_at DESC
+            ''')
+            
+            sessions = []
+            for row in cursor.fetchall():
+                session = self._row_to_session(row, cursor)
+                if session:
+                    sessions.append(session)
+            
+            return sessions
+        finally:
+            conn.close()
+    
+    def _row_to_list(self, row, cursor) -> TodoList:
+        """Convert a database row to TodoList using existing cursor."""
+        data = dict(row)
+        data['metadata'] = json.loads(data['metadata']) if data['metadata'] else {}
+        
+        # Get todos for this list
+        cursor.execute('SELECT * FROM todo_items WHERE list_id = ?', (data['id'],))
+        todo_rows = cursor.fetchall()
+        
+        todos = []
+        for todo_row in todo_rows:
+            todo_data = dict(todo_row)
+            todo_data['metadata'] = json.loads(todo_data['metadata']) if todo_data['metadata'] else {}
+            # Remove list_id as it's not part of TodoItem
+            todo_data.pop('list_id', None)
+            todos.append(TodoItem.from_dict(todo_data))
+        
+        data['todos'] = todos
+        return TodoList.from_dict(data)
+    
+    def _row_to_session(self, row, cursor) -> Optional[TodoSession]:
+        """Convert database row to TodoSession."""
+        if not row:
+            return None
+        
+        session = TodoSession(
+            id=row['id'],
+            name=row['name'],
+            created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
+            updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else None,
+            active=bool(row['active']),
+            metadata=json.loads(row['metadata']) if row['metadata'] else {}
+        )
+        
+        # Load master list
+        if row['master_list_id']:
+            cursor.execute('SELECT * FROM todo_lists WHERE id = ?', (row['master_list_id'],))
+            master_row = cursor.fetchone()
+            if master_row:
+                session.master_list = self._row_to_list(master_row, cursor)
+        
+        # Load sub-lists
+        cursor.execute('SELECT * FROM todo_lists WHERE session_id = ?', (row['id'],))
+        for list_row in cursor.fetchall():
+            sub_list = self._row_to_list(list_row, cursor)
+            if sub_list and sub_list.id != session.master_list.id if session.master_list else True:
+                session.sub_lists.append(sub_list)
+        
+        return session
     
     def get_master_list(self) -> Optional[TodoList]:
         """Get the master todo list."""
@@ -388,14 +522,14 @@ class TodoService:
                 json.dumps(session.metadata)
             ))
             
-            # Save master list if present
+            # Save master list if present using same connection
             if session.master_list:
-                self.save_list(session.master_list)
+                self._save_list_with_conn(session.master_list, conn)
             
-            # Save sub-lists
+            # Save sub-lists using same connection
             for sub_list in session.sub_lists:
                 sub_list.session_id = session.id
-                self.save_list(sub_list)
+                self._save_list_with_conn(sub_list, conn)
             
             conn.commit()
             return session.id

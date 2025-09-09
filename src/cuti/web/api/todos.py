@@ -8,9 +8,22 @@ from datetime import datetime
 import os
 
 from ...services.todo_service import TodoService
+from ...services.claude_todo_sync import ClaudeTodoSync
+from ...services.goal_parser import GoalParser
 from ...core.todo_models import TodoItem, TodoList, TodoSession, TodoStatus, TodoPriority
 
 router = APIRouter(prefix="/api/todos", tags=["todos"])
+
+# Global sync service instance
+claude_sync = None
+
+def get_claude_sync() -> ClaudeTodoSync:
+    """Get or create Claude sync service."""
+    global claude_sync
+    if not claude_sync:
+        storage_dir = os.environ.get("CUTI_STORAGE_DIR", ".cuti")
+        claude_sync = ClaudeTodoSync(storage_dir)
+    return claude_sync
 
 
 def get_todo_service() -> TodoService:
@@ -233,3 +246,86 @@ async def convert_to_prompt(
             
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/claude/capture")
+async def capture_claude_todos(
+    todos_data: Dict[str, Any],
+    claude_sync: ClaudeTodoSync = Depends(get_claude_sync)
+) -> Dict[str, Any]:
+    """Capture todos from Claude's TodoWrite tool."""
+    try:
+        todos = todos_data.get("todos", [])
+        agent_name = todos_data.get("agent_name", None)
+        
+        # Capture the todos
+        sub_list = claude_sync.capture_todo_write(todos, agent_name)
+        
+        return {
+            "success": True,
+            "list_id": sub_list.id,
+            "todos_created": len(sub_list.todos),
+            "session_id": sub_list.session_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/master")
+async def get_master_goals(
+    claude_sync: ClaudeTodoSync = Depends(get_claude_sync)
+) -> Dict[str, Any]:
+    """Get master goals from GOAL.md."""
+    try:
+        # Ensure master list is synced
+        goal_parser = claude_sync.goal_parser
+        master_list = goal_parser.parse_goal_file()
+        master_list = goal_parser.sync_with_database(
+            claude_sync.todo_service, master_list
+        )
+        
+        return {
+            "master_goals": master_list.to_dict(),
+            "progress": master_list.get_progress()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/session/current")
+async def get_current_session(
+    claude_sync: ClaudeTodoSync = Depends(get_claude_sync)
+) -> Dict[str, Any]:
+    """Get current work session with hierarchical todos."""
+    try:
+        session = claude_sync.current_session
+        if not session:
+            return {"error": "No active session"}
+        
+        return {
+            "session": session.to_dict(),
+            "next_todo": claude_sync.suggest_next_todo().to_dict() if claude_sync.suggest_next_todo() else None,
+            "current_todos": claude_sync.get_current_todos()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sync-goal")
+async def sync_goal_file(
+    claude_sync: ClaudeTodoSync = Depends(get_claude_sync)
+) -> Dict[str, Any]:
+    """Sync GOAL.md with master todo list."""
+    try:
+        goal_parser = claude_sync.goal_parser
+        master_list = goal_parser.parse_goal_file()
+        master_list = goal_parser.sync_with_database(
+            claude_sync.todo_service, master_list
+        )
+        
+        return {
+            "success": True,
+            "todos_synced": len(master_list.todos),
+            "master_list_id": master_list.id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

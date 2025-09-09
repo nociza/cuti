@@ -40,14 +40,17 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \\
         ripgrep fd-find bat \\
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Docker CLI only (not daemon) for Docker-in-Docker support
+# Install Docker CLI and docker-compose for Docker-in-Docker support
 RUN apt-get update && apt-get install -y --no-install-recommends \\
     apt-transport-https ca-certificates curl gnupg lsb-release \\
     && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \\
     && echo "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list \\
     && apt-get update \\
-    && apt-get install -y --no-install-recommends docker-ce-cli \\
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \\
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \\
+    && echo '#!/bin/bash' > /usr/local/bin/docker-compose \\
+    && echo 'exec docker compose "$@"' >> /usr/local/bin/docker-compose \\
+    && chmod +x /usr/local/bin/docker-compose
 
 # Configure locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
@@ -673,17 +676,39 @@ echo "🐍 Python path: $PYTHONPATH"
 if [ -S /var/run/docker.sock ]; then
     echo "🐳 Docker socket mounted - setting up access..."
     
+    # Ensure Docker socket permissions are accessible
+    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+    
     # Test if we can access Docker directly
     if docker version > /dev/null 2>&1; then
-        echo "✅ Docker access confirmed - no sudo needed"
+        echo "✅ Docker access confirmed - direct access enabled"
     else
-        # Create a Docker wrapper that uses sudo
-        cat > /home/cuti/.local/bin/docker << 'EOF'
+        # Fallback: Create wrappers that use sudo
+        cat > /home/cuti/.local/bin/docker << 'DOCKER_EOF'
 #!/bin/bash
 # Docker wrapper to handle permission issues
+if [ -S /var/run/docker.sock ]; then
+    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+fi
 exec sudo /usr/bin/docker "$@"
-EOF
+DOCKER_EOF
         chmod +x /home/cuti/.local/bin/docker
+        
+        # Also create docker-compose wrapper with proper permissions
+        cat > /home/cuti/.local/bin/docker-compose << 'COMPOSE_EOF'
+#!/bin/bash
+# Docker-compose wrapper for compatibility
+if [ -S /var/run/docker.sock ]; then
+    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+fi
+# Try docker compose v2 first, fallback to docker-compose
+if command -v docker >/dev/null 2>&1; then
+    exec sudo docker compose "$@"
+else
+    exec sudo /usr/bin/docker-compose "$@"
+fi
+COMPOSE_EOF
+        chmod +x /home/cuti/.local/bin/docker-compose
         
         # Ensure our local bin is first in PATH
         export PATH="/home/cuti/.local/bin:$PATH"
@@ -694,6 +719,13 @@ EOF
         else
             echo "⚠️  Docker socket mounted but not accessible even with sudo"
         fi
+    fi
+    
+    # Verify docker-compose is working
+    if docker-compose version > /dev/null 2>&1 || docker compose version > /dev/null 2>&1; then
+        echo "✅ docker-compose command available"
+    else
+        echo "⚠️  docker-compose not working properly"
     fi
 else
     echo "⚠️  Docker socket not found - Docker commands won't work in container"
