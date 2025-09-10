@@ -47,10 +47,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
     && echo "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list \\
     && apt-get update \\
     && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \\
-    && apt-get clean && rm -rf /var/lib/apt/lists/* \\
-    && echo '#!/bin/bash' > /usr/local/bin/docker-compose \\
-    && echo 'exec docker compose "$@"' >> /usr/local/bin/docker-compose \\
-    && chmod +x /usr/local/bin/docker-compose
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create enhanced docker-compose wrapper
+RUN cat > /usr/local/bin/docker-compose << 'EOF'
+#!/bin/bash
+# Enhanced docker-compose wrapper for cuti containers
+# Ensures proper permissions and compatibility
+
+# First check if we can access Docker
+if ! docker version &>/dev/null 2>&1; then
+    # Try with sudo if available
+    if command -v sudo &>/dev/null && sudo -n docker version &>/dev/null 2>&1; then
+        # sudo works without password, use it
+        if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+            exec sudo docker compose version
+        else
+            exec sudo docker compose "$@"
+        fi
+    else
+        # Docker not accessible, show helpful error
+        echo "Error: Cannot access Docker. Please check:" >&2
+        echo "  1. Docker socket is mounted: -v /var/run/docker.sock:/var/run/docker.sock" >&2
+        echo "  2. User is in docker group: groups | grep docker" >&2
+        echo "  3. Socket permissions: ls -la /var/run/docker.sock" >&2
+        exit 1
+    fi
+fi
+
+# Docker is accessible, use docker compose directly
+if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+    exec docker compose version
+else
+    exec docker compose "$@"
+fi
+EOF
+RUN chmod +x /usr/local/bin/docker-compose
 
 # Configure locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
@@ -65,13 +97,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Create non-root user with sudo access
+# Create non-root user with sudo access and Docker permissions
 RUN groupadd --gid $USER_GID $USERNAME \\
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME -s /bin/zsh \\
     && echo $USERNAME ALL=\\(root\\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \\
     && chmod 0440 /etc/sudoers.d/$USERNAME \\
-    && (getent group docker || groupadd docker) \\
-    && usermod -aG docker $USERNAME
+    && (getent group docker || groupadd -g 991 docker) \\
+    && usermod -aG docker $USERNAME \\
+    && chmod 755 /usr/local/bin/docker-compose \\
+    && chown root:docker /usr/local/bin/docker-compose
 
 # Install Claude Code CLI (latest version)
 RUN npm install -g @anthropic-ai/claude-code@latest \\
@@ -632,6 +666,37 @@ fi
 
 # The .claude-linux directory is mounted for Linux-specific credentials
 # Ensure proper ownership for the mounted directories
+
+# Fix Docker socket permissions if needed
+if [ -e /var/run/docker.sock ]; then
+    # Get the GID of the docker socket
+    DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+    
+    # Check if we need to update the docker group GID
+    CURRENT_DOCKER_GID=$(getent group docker | cut -d: -f3)
+    if [ "$DOCKER_GID" != "$CURRENT_DOCKER_GID" ]; then
+        echo "📦 Updating docker group GID to match socket ($DOCKER_GID)..."
+        sudo groupmod -g $DOCKER_GID docker
+    fi
+    
+    # Ensure user is in docker group
+    if ! groups | grep -q docker; then
+        echo "📦 Adding user to docker group..."
+        sudo usermod -aG docker $USER
+        # Apply group changes in current session
+        newgrp docker
+    fi
+    
+    # Test Docker access
+    if docker version &>/dev/null; then
+        echo "✅ Docker is accessible"
+    else
+        echo "⚠️  Docker socket mounted but not accessible"
+        echo "   You may need to restart the container"
+    fi
+else
+    echo "⚠️  Docker socket not mounted - Docker-in-Docker features unavailable"
+fi
 if [ -d /home/cuti/.claude-linux ]; then
     # Fix ownership if needed (container user might have different UID/GID)
     sudo chown -R cuti:cuti /home/cuti/.claude-linux 2>/dev/null || true

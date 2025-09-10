@@ -167,12 +167,50 @@ to remove all stored data. Run `cuti settings` to manage preferences.
                 )
             ''')
             
+            # Chat history tables
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    session_id TEXT PRIMARY KEY,
+                    project_path TEXT NOT NULL,
+                    start_time DATETIME NOT NULL,
+                    last_activity DATETIME NOT NULL,
+                    prompt_count INTEGER DEFAULT 0,
+                    response_count INTEGER DEFAULT 0,
+                    total_tokens INTEGER DEFAULT 0,
+                    git_branch TEXT,
+                    metadata TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    message_type TEXT NOT NULL,  -- 'user' or 'assistant'
+                    content TEXT NOT NULL,
+                    timestamp DATETIME NOT NULL,
+                    parent_uuid TEXT,
+                    model TEXT,
+                    input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    cost REAL,
+                    git_branch TEXT,
+                    cwd TEXT,
+                    metadata TEXT,
+                    FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id)
+                )
+            ''')
+            
             # Create indexes
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_records(timestamp)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_project ON usage_records(project_path)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_project ON favorite_prompts(project_path)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_used ON favorite_prompts(last_used)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_sessions_project ON chat_sessions(project_path)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_sessions_time ON chat_sessions(last_activity)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_timestamp ON chat_messages(timestamp)')
             
             conn.commit()
     
@@ -569,6 +607,282 @@ to remove all stored data. Run `cuti settings` to manage preferences.
             
             conn.commit()
     
+    def sync_chat_history(self, project_path: Optional[str] = None) -> int:
+        """
+        Sync chat history from Claude logs to database.
+        
+        Args:
+            project_path: Project path to sync (defaults to current directory)
+            
+        Returns:
+            Number of messages synced
+        """
+        try:
+            from .claude_logs_reader import ClaudeLogsReader
+            
+            # Use current directory if not specified
+            if project_path is None:
+                project_path = os.getcwd()
+            
+            reader = ClaudeLogsReader(project_path)
+            
+            # Get all sessions for the project
+            sessions = reader.get_all_sessions()
+            
+            if not sessions:
+                logger.info("No chat sessions found to sync")
+                return 0
+            
+            synced_messages = 0
+            
+            with sqlite3.connect(str(self.db_path), timeout=30.0) as conn:
+                cursor = conn.cursor()
+                
+                for session_info in sessions:
+                    session_id = session_info['session_id']
+                    
+                    # Check if session already exists
+                    cursor.execute('SELECT session_id FROM chat_sessions WHERE session_id = ?', (session_id,))
+                    session_exists = cursor.fetchone() is not None
+                    
+                    # Get full history for this session
+                    history = reader.get_prompt_history(session_id, limit=10000)
+                    
+                    if not history:
+                        continue
+                    
+                    # Extract session metadata
+                    first_msg = min(history, key=lambda x: x.get('timestamp', ''))
+                    last_msg = max(history, key=lambda x: x.get('timestamp', ''))
+                    
+                    user_msgs = [h for h in history if h['type'] == 'user']
+                    assistant_msgs = [h for h in history if h['type'] == 'assistant']
+                    
+                    total_tokens = sum(
+                        msg.get('usage', {}).get('input_tokens', 0) + 
+                        msg.get('usage', {}).get('output_tokens', 0)
+                        for msg in assistant_msgs
+                    )
+                    
+                    # Insert or update session
+                    if not session_exists:
+                        cursor.execute('''
+                            INSERT INTO chat_sessions (
+                                session_id, project_path, start_time, last_activity,
+                                prompt_count, response_count, total_tokens, git_branch, metadata
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            session_id,
+                            project_path,
+                            first_msg.get('timestamp'),
+                            last_msg.get('timestamp'),
+                            len(user_msgs),
+                            len(assistant_msgs),
+                            total_tokens,
+                            first_msg.get('git_branch'),
+                            json.dumps({
+                                'file_size': session_info.get('file_size', 0),
+                                'synced_at': datetime.now().isoformat()
+                            })
+                        ))
+                    else:
+                        cursor.execute('''
+                            UPDATE chat_sessions
+                            SET last_activity = ?, prompt_count = ?, response_count = ?, 
+                                total_tokens = ?
+                            WHERE session_id = ?
+                        ''', (
+                            last_msg.get('timestamp'),
+                            len(user_msgs),
+                            len(assistant_msgs),
+                            total_tokens,
+                            session_id
+                        ))
+                    
+                    # Insert messages
+                    for msg in history:
+                        msg_id = msg.get('id')
+                        
+                        # Check if message already exists
+                        cursor.execute('SELECT id FROM chat_messages WHERE id = ?', (msg_id,))
+                        if cursor.fetchone():
+                            continue
+                        
+                        # Calculate costs if assistant message
+                        cost = None
+                        input_tokens = None
+                        output_tokens = None
+                        
+                        if msg['type'] == 'assistant' and 'usage' in msg:
+                            usage = msg['usage']
+                            input_tokens = usage.get('input_tokens', 0)
+                            output_tokens = usage.get('output_tokens', 0)
+                            
+                            # Simple cost calculation (adjust rates as needed)
+                            # Assuming Claude 3 rates
+                            input_cost = input_tokens * 0.000015  # $15 per million
+                            output_cost = output_tokens * 0.000075  # $75 per million
+                            cost = input_cost + output_cost
+                        
+                        cursor.execute('''
+                            INSERT INTO chat_messages (
+                                id, session_id, message_type, content, timestamp,
+                                parent_uuid, model, input_tokens, output_tokens, cost,
+                                git_branch, cwd, metadata
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            msg_id,
+                            session_id,
+                            msg['type'],
+                            msg.get('content', ''),
+                            msg.get('timestamp'),
+                            msg.get('parent_uuid'),
+                            msg.get('model'),
+                            input_tokens,
+                            output_tokens,
+                            cost,
+                            msg.get('git_branch'),
+                            msg.get('cwd'),
+                            json.dumps({'synced_at': datetime.now().isoformat()})
+                        ))
+                        
+                        synced_messages += 1
+                
+                conn.commit()
+            
+            logger.info(f"Synced {synced_messages} chat messages from {len(sessions)} sessions")
+            return synced_messages
+            
+        except Exception as e:
+            logger.error(f"Failed to sync chat history: {e}")
+            return 0
+    
+    def get_chat_history(self, 
+                        session_id: Optional[str] = None,
+                        project_path: Optional[str] = None,
+                        days: int = 30,
+                        limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get chat history from database.
+        
+        Args:
+            session_id: Specific session to retrieve
+            project_path: Filter by project
+            days: Number of days to look back
+            limit: Maximum messages to return
+            
+        Returns:
+            List of chat messages with metadata
+        """
+        with sqlite3.connect(str(self.db_path), timeout=30.0) as conn:
+            cursor = conn.cursor()
+            
+            conditions = []
+            params = []
+            
+            if session_id:
+                conditions.append("m.session_id = ?")
+                params.append(session_id)
+            
+            if project_path:
+                conditions.append("s.project_path = ?")
+                params.append(project_path)
+            
+            if days:
+                cutoff = datetime.now() - timedelta(days=days)
+                conditions.append("m.timestamp >= ?")
+                params.append(cutoff.isoformat())
+            
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+            
+            cursor.execute(f'''
+                SELECT 
+                    m.id, m.session_id, m.message_type, m.content,
+                    m.timestamp, m.parent_uuid, m.model,
+                    m.input_tokens, m.output_tokens, m.cost,
+                    m.git_branch, m.cwd,
+                    s.project_path
+                FROM chat_messages m
+                JOIN chat_sessions s ON m.session_id = s.session_id
+                WHERE {where_clause}
+                ORDER BY m.timestamp DESC
+                LIMIT ?
+            ''', params + [limit])
+            
+            messages = []
+            for row in cursor.fetchall():
+                messages.append({
+                    'id': row[0],
+                    'session_id': row[1],
+                    'type': row[2],
+                    'content': row[3],
+                    'timestamp': row[4],
+                    'parent_uuid': row[5],
+                    'model': row[6],
+                    'input_tokens': row[7],
+                    'output_tokens': row[8],
+                    'cost': row[9],
+                    'git_branch': row[10],
+                    'cwd': row[11],
+                    'project_path': row[12]
+                })
+            
+            return messages
+    
+    def get_chat_sessions(self,
+                         project_path: Optional[str] = None,
+                         days: int = 30) -> List[Dict[str, Any]]:
+        """
+        Get chat sessions from database.
+        
+        Args:
+            project_path: Filter by project
+            days: Number of days to look back
+            
+        Returns:
+            List of chat sessions with metadata
+        """
+        with sqlite3.connect(str(self.db_path), timeout=30.0) as conn:
+            cursor = conn.cursor()
+            
+            conditions = []
+            params = []
+            
+            if project_path:
+                conditions.append("project_path = ?")
+                params.append(project_path)
+            
+            if days:
+                cutoff = datetime.now() - timedelta(days=days)
+                conditions.append("last_activity >= ?")
+                params.append(cutoff.isoformat())
+            
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+            
+            cursor.execute(f'''
+                SELECT 
+                    session_id, project_path, start_time, last_activity,
+                    prompt_count, response_count, total_tokens, git_branch
+                FROM chat_sessions
+                WHERE {where_clause}
+                ORDER BY last_activity DESC
+            ''', params)
+            
+            sessions = []
+            for row in cursor.fetchall():
+                sessions.append({
+                    'session_id': row[0],
+                    'project_path': row[1],
+                    'start_time': row[2],
+                    'last_activity': row[3],
+                    'prompt_count': row[4],
+                    'response_count': row[5],
+                    'total_tokens': row[6],
+                    'git_branch': row[7]
+                })
+            
+            return sessions
+    
     def cleanup_old_data(self, days: Optional[int] = None):
         """
         Clean up old usage data.
@@ -591,13 +905,31 @@ to remove all stored data. Run `cuti settings` to manage preferences.
                 WHERE timestamp < ?
             ''', (cutoff_date,))
             
-            deleted = cursor.rowcount
+            deleted_usage = cursor.rowcount
+            
+            # Delete old chat messages
+            cursor.execute('''
+                DELETE FROM chat_messages
+                WHERE timestamp < ?
+            ''', (cutoff_date.isoformat(),))
+            
+            deleted_messages = cursor.rowcount
+            
+            # Delete orphaned chat sessions
+            cursor.execute('''
+                DELETE FROM chat_sessions
+                WHERE session_id NOT IN (
+                    SELECT DISTINCT session_id FROM chat_messages
+                )
+            ''')
+            
+            deleted_sessions = cursor.rowcount
             
             # Vacuum to reclaim space
             conn.execute("VACUUM")
             conn.commit()
         
-        logger.info(f"Cleaned up {deleted} old usage records")
+        logger.info(f"Cleaned up {deleted_usage} usage records, {deleted_messages} chat messages, {deleted_sessions} sessions")
     
     def backup_database(self) -> Optional[str]:
         """

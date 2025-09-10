@@ -171,5 +171,168 @@ def stats():
         console.print(model_table)
 
 
+@app.command()
+def chat(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
+    project_path: Optional[str] = typer.Option(None, "--project", "-p", help="Project path to sync")
+):
+    """Sync chat history from Claude logs to database."""
+    
+    console.print("[cyan]Syncing chat history from Claude logs...[/cyan]")
+    
+    manager = GlobalDataManager()
+    
+    # Sync chat history
+    synced = manager.sync_chat_history(project_path)
+    
+    if synced > 0:
+        console.print(f"✅ Synced {synced} chat messages to database")
+    else:
+        console.print("ℹ️  No new chat messages to sync")
+    
+    if verbose:
+        # Show session summary
+        sessions = manager.get_chat_sessions(project_path, days=30)
+        
+        if sessions:
+            console.print(f"\n[bold]Chat Sessions (Last 30 Days):[/bold]")
+            session_table = Table()
+            session_table.add_column("Session ID", style="cyan", max_width=20)
+            session_table.add_column("Start Time", style="yellow")
+            session_table.add_column("Messages", style="green")
+            session_table.add_column("Tokens", style="magenta")
+            
+            for session in sessions[:10]:  # Show first 10
+                session_table.add_row(
+                    session['session_id'][:12] + "...",
+                    session['start_time'][:19],
+                    f"{session['prompt_count'] + session['response_count']}",
+                    f"{session['total_tokens']:,}"
+                )
+            
+            console.print(session_table)
+            
+            if len(sessions) > 10:
+                console.print(f"[dim]... and {len(sessions) - 10} more sessions[/dim]")
+
+
+@app.command()
+def history(
+    limit: int = typer.Option(20, "--limit", "-l", help="Number of messages to show"),
+    session_id: Optional[str] = typer.Option(None, "--session", "-s", help="Specific session ID"),
+    days: int = typer.Option(7, "--days", "-d", help="Number of days to look back")
+):
+    """Display chat history from the database."""
+    
+    manager = GlobalDataManager()
+    
+    # Get chat history
+    messages = manager.get_chat_history(
+        session_id=session_id,
+        days=days,
+        limit=limit
+    )
+    
+    if not messages:
+        console.print("ℹ️  No chat history found")
+        return
+    
+    console.print(f"[bold]Chat History (Last {days} days):[/bold]\n")
+    
+    current_session = None
+    for msg in reversed(messages):  # Show in chronological order
+        # Show session separator
+        if msg['session_id'] != current_session:
+            current_session = msg['session_id']
+            console.print(f"\n[dim]──── Session: {current_session[:12]}... ────[/dim]\n")
+        
+        # Format message
+        timestamp = msg['timestamp'][:19]
+        
+        if msg['type'] == 'user':
+            console.print(f"[cyan]👤 User ({timestamp}):[/cyan]")
+            # Truncate long messages
+            content = msg['content']
+            if len(content) > 200:
+                content = content[:200] + "..."
+            console.print(f"   {content}\n")
+        else:
+            console.print(f"[green]🤖 Assistant ({timestamp}):[/green]")
+            # Show just first line for assistant responses
+            content = msg['content'].split('\n')[0]
+            if len(content) > 100:
+                content = content[:100] + "..."
+            console.print(f"   {content}")
+            
+            # Show token usage if available
+            if msg['input_tokens'] or msg['output_tokens']:
+                tokens = []
+                if msg['input_tokens']:
+                    tokens.append(f"in: {msg['input_tokens']:,}")
+                if msg['output_tokens']:
+                    tokens.append(f"out: {msg['output_tokens']:,}")
+                console.print(f"   [dim]Tokens: {', '.join(tokens)}[/dim]\n")
+            else:
+                console.print()
+
+
+@app.command()
+def sessions(
+    days: int = typer.Option(30, "--days", "-d", help="Number of days to look back"),
+    project_path: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project")
+):
+    """List chat sessions from the database."""
+    
+    manager = GlobalDataManager()
+    
+    # Get sessions
+    sessions = manager.get_chat_sessions(project_path, days)
+    
+    if not sessions:
+        console.print("ℹ️  No chat sessions found")
+        return
+    
+    # Create sessions table
+    table = Table(title=f"Chat Sessions (Last {days} Days)")
+    table.add_column("Session ID", style="cyan")
+    table.add_column("Project", style="yellow", max_width=30)
+    table.add_column("Start Time", style="green")
+    table.add_column("Duration", style="magenta")
+    table.add_column("Messages", style="blue")
+    table.add_column("Tokens", style="red")
+    
+    for session in sessions:
+        # Calculate duration
+        from datetime import datetime
+        start = datetime.fromisoformat(session['start_time'])
+        end = datetime.fromisoformat(session['last_activity'])
+        duration = end - start
+        
+        # Format duration
+        hours = int(duration.total_seconds() // 3600)
+        minutes = int((duration.total_seconds() % 3600) // 60)
+        if hours > 0:
+            duration_str = f"{hours}h {minutes}m"
+        else:
+            duration_str = f"{minutes}m"
+        
+        # Format project path
+        project = session['project_path']
+        if len(project) > 30:
+            project = "..." + project[-27:]
+        
+        table.add_row(
+            session['session_id'][:12] + "...",
+            project,
+            session['start_time'][:16],
+            duration_str,
+            f"{session['prompt_count'] + session['response_count']}",
+            f"{session['total_tokens']:,}"
+        )
+    
+    console.print(table)
+    console.print(f"\n[dim]Total sessions: {len(sessions)}[/dim]")
+
+
 if __name__ == "__main__":
     app()
