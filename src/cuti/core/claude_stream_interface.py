@@ -62,6 +62,13 @@ class ClaudeStreamInterface:
     """Streaming interface that captures all Claude's intermediate steps."""
     
     def __init__(self, claude_command: str = "claude"):
+        # Check if running in container and adjust path if needed
+        import os
+        if os.environ.get("CUTI_IN_CONTAINER") == "true":
+            # In container, use the full path to claude wrapper
+            if claude_command == "claude" and os.path.exists("/usr/local/bin/claude"):
+                claude_command = "/usr/local/bin/claude"
+        
         self.claude_command = claude_command
         self.current_tool = None
         self.tool_depth = 0

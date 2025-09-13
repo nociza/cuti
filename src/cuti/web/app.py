@@ -2,6 +2,7 @@
 FastAPI web application for cuti.
 """
 
+import os
 import threading
 from pathlib import Path
 from typing import Optional
@@ -93,8 +94,12 @@ def create_app(
         claude_interface = ClaudeCodeInterface()
     except RuntimeError as e:
         # Handle case where Claude CLI is not available
-        print(f"Warning: {e}")
-        print("Web interface will start in demo mode.")
+        print(f"⚠️  Warning: {e}")
+        print("📝 Web interface will start with limited functionality.")
+        print("   Chat features will not work without Claude CLI.")
+        print("   To fix: Ensure 'claude' command is available in PATH")
+        if os.environ.get("CUTI_IN_CONTAINER") == "true":
+            print("   In container: Check /usr/local/bin/claude exists and is executable")
         queue_manager = None
         claude_interface = None
     
@@ -138,7 +143,6 @@ def create_app(
     )
     
     # Initialize project settings if needed (skip in containers with CLAUDE_CONFIG_DIR)
-    import os
     if not os.getenv("CLAUDE_CONFIG_DIR"):
         if not (Path(working_directory or Path.cwd()) / ".claude").exists():
             claude_settings_manager.initialize_project_settings()

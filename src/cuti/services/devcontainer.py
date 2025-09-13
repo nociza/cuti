@@ -115,7 +115,12 @@ RUN npm install -g @anthropic-ai/claude-code@latest \\
     && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/claude \\
     && echo '# Use Linux-specific config directory to avoid macOS conflicts' >> /usr/local/bin/claude \\
     && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> /usr/local/bin/claude \\
-    && echo 'exec node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js "$@"' >> /usr/local/bin/claude \\
+    && echo '# Check if claude CLI exists and is executable' >> /usr/local/bin/claude \\
+    && echo 'CLAUDE_CLI="/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
+    && echo 'if [ ! -f "$CLAUDE_CLI" ]; then' >> /usr/local/bin/claude \\
+    && echo '    CLAUDE_CLI="/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
+    && echo 'fi' >> /usr/local/bin/claude \\
+    && echo 'exec node "$CLAUDE_CLI" "$@"' >> /usr/local/bin/claude \\
     && chmod +x /usr/local/bin/claude
 
 {CUTI_INSTALL}
@@ -628,6 +633,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--env", "PYTHONPATH=/workspace/src",
             "--env", "TERM=xterm-256color",
             "--env", "PATH=/usr/local/bin:/home/cuti/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
             "--network", "host",
             image_name
         ]
@@ -731,6 +737,22 @@ else
     echo "⚠️  No credentials found. Authenticate once with: claude login"
     echo "   Your credentials will persist across all containers."
     echo "   Note: Linux credentials are separate from macOS keychain."
+fi
+
+# Verify Claude CLI is accessible
+if command -v claude > /dev/null 2>&1; then
+    echo "✅ Claude CLI is available at: $(which claude)"
+    # Test that it can run
+    if claude --version > /dev/null 2>&1; then
+        echo "✅ Claude CLI verified: $(claude --version 2>&1 | head -n1)"
+    else
+        echo "⚠️  Claude CLI found but cannot execute --version"
+        echo "   This may cause issues with cuti web chat functionality"
+    fi
+else
+    echo "❌ Claude CLI not found in PATH!"
+    echo "   Expected at /usr/local/bin/claude"
+    echo "   This will prevent cuti web chat from working"
 fi
 
 # Ensure PYTHONPATH includes workspace source for local development
