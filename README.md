@@ -1,4 +1,4 @@
-# Cuti
+# Cuti - AI Development Environment & Multi-Agent Orchestration
 
 <div align="center">
 
@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/pypi/dm/cuti?color=green&label=Downloads%2FMonth)](https://pypi.org/project/cuti/)
 [![Downloads Total](https://static.pepy.tech/badge/cuti)](https://pepy.tech/project/cuti)
 
-**Instant AI development environments with Claude Code and multi-agent orchestration**
+**Instant containerized development with Claude Code, Anthropic API integration, and intelligent agent orchestration**
 
 [PyPI](https://pypi.org/project/cuti/) • [Documentation](#documentation) • [GitHub](https://github.com/nociza/cuti)
 
@@ -23,44 +23,45 @@
 
 </div>
 
-## 🚀 Quick Start
+## 🚀 Quick Start - Docker Container with Claude Code CLI
 
 ```bash
-# Install
+# Install Python package from PyPI
 uv tool install cuti
 
-# Launch containerized dev environment
+# Launch Docker development environment with Claude
 cuti container
 ```
 
-That's it! You now have a fully configured AI development environment with:
-- ✅ Cuti pre-installed and ready
-- ✅ Claude CLI with persistent authentication  
-- ✅ Python 3.11, Node.js 20, and dev tools
-- ✅ Custom prompt showing `cuti:~/path $`
-- ✅ Works from any project directory
+That's it! You now have a fully configured AI-powered coding environment with:
+- ✅ **Claude Code CLI** pre-configured with Anthropic integration
+- ✅ **Persistent authentication** for Claude API across sessions  
+- ✅ **Python 3.11**, **Node.js 20**, and essential dev tools
+- ✅ **Custom prompt** showing `cuti:~/path $`
+- ✅ **Auto-mounts** current directory for seamless workflow
 
-The container mounts your current directory and preserves Claude authentication between sessions. Perfect for isolated, reproducible AI-assisted development.
+The Docker container provides isolated, reproducible AI-assisted development with Claude Code terminal integration.
 
-## 🌟 Additional Features
+## 🌟 Key Features - AI Agent Orchestration & Automation
 
-Cuti also provides:
-- **Multi-agent orchestration** (Claude, Gemini)
-- **Command queuing** with priorities
-- **Web UI** at `cuti web`
-- **Rate limit handling** with smart retry
-- **Todo system** for task management
+Build with multiple AI models and intelligent task management:
+- **Multi-agent orchestration** - Claude API, Gemini integration
+- **Command queuing system** with priority execution
+- **Web UI dashboard** - Launch with `cuti web`
+- **Smart rate limiting** - Automatic retry & backoff
+- **Task automation** - Built-in todo system for AI agents
+- **Claude version switching** - Easy CLI version management
 
-See [documentation](#documentation) for details.
+Perfect for AI-powered development, automation workflows, and LLM orchestration.
 
 ## 📚 Documentation
 
 | Guide | Description |
 |-------|-------------|
-| [Dev Container](docs/devcontainer.md) | Complete container guide |
-| [Claude Auth](docs/claude-container-auth.md) | Container authentication |
-| [Todo System](docs/todo-system.md) | Task management |
-| [Rate Limits](docs/rate-limit-handling.md) | API limit handling |
+| [Docker Container Setup](docs/devcontainer.md) | Complete containerized environment guide |
+| [Claude Authentication](docs/claude-container-auth.md) | Anthropic API & Claude CLI setup |
+| [Task Management](docs/todo-system.md) | AI agent todo system |
+| [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
 
 ## 🤝 Contributing
 
