@@ -29,6 +29,10 @@ try:
 except ImportError:
     devcontainer_app = None
 try:
+    from .commands.container import app as container_app
+except ImportError:
+    container_app = None
+try:
     from .commands.settings import settings as settings_app
 except ImportError:
     settings_app = None
@@ -130,6 +134,8 @@ app.add_typer(agent_app, name="agent", help="Agent system commands")
 app.add_typer(todo_app, name="todo", help="Todo list management commands")
 if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
+if container_app:
+    app.add_typer(container_app, name="containers", help="Container management commands")
 if settings_app:
     # Convert Click group to Typer app
     settings_typer = typer.Typer()
@@ -160,10 +166,17 @@ def container(
     init: bool = typer.Option(False, "--init", help="Initialize devcontainer"),
     rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild the container image"),
     command: Optional[str] = typer.Argument(None, help="Command to run in container (or 'start' for interactive shell)"),
-    skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-setup")
+    skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-setup"),
+    status: bool = typer.Option(False, "--status", help="Show status of all containers")
 ):
     """Run cuti in a dev container with automatic setup."""
     from ..services.devcontainer import DevContainerService, is_running_in_container
+    
+    # Handle status flag
+    if status:
+        from .commands.container import status as show_container_status
+        show_container_status(verbose=False, json_output=False)
+        return
     
     # Handle 'start' as a special case - treat it as no command (interactive mode)
     if command == "start":
