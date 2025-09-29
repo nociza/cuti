@@ -33,6 +33,10 @@ try:
 except ImportError:
     container_app = None
 try:
+    from .commands.tools import app as tools_app
+except ImportError:
+    tools_app = None
+try:
     from .commands.settings import settings as settings_app
 except ImportError:
     settings_app = None
@@ -136,6 +140,8 @@ if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
 if container_app:
     app.add_typer(container_app, name="containers", help="Container management commands")
+if tools_app:
+    app.add_typer(tools_app, name="tools", help="CLI tools management")
 if settings_app:
     # Convert Click group to Typer app
     settings_typer = typer.Typer()
