@@ -2,6 +2,7 @@
 CLI Tools management commands for cuti.
 """
 
+import os
 import subprocess
 import json
 from pathlib import Path
@@ -323,9 +324,13 @@ def list_tools(
 def install_tool(
     tool_name: str = typer.Argument(..., help="Name of the tool to install"),
     enable: bool = typer.Option(True, "--enable/--no-enable", help="Enable the tool after installation"),
-    auto: bool = typer.Option(False, "--auto", help="Auto-install on container start")
+    auto: bool = typer.Option(False, "--auto", help="Auto-install on container start"),
+    scope: str = typer.Option("container", "--scope", "-s", help="Installation scope: workspace|container|system")
 ):
-    """Install a CLI tool in the container."""
+    """Install a CLI tool with specified scope (workspace, container, or system)."""
+    # Import workspace tools manager
+    from ...services.workspace_tools import WorkspaceToolsManager
+    
     # Find the tool
     tool = None
     for t in AVAILABLE_TOOLS:
@@ -336,6 +341,43 @@ def install_tool(
     if not tool:
         console.print(f"[red]Tool '{tool_name}' not found[/red]")
         console.print("[yellow]Use 'cuti tools list' to see available tools[/yellow]")
+        raise typer.Exit(1)
+    
+    # Handle workspace-specific installation
+    if scope == "workspace":
+        manager = WorkspaceToolsManager()
+        console.print(f"[cyan]Installing {tool['display_name']} for workspace: {manager.workspace_path}[/cyan]")
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"Installing {tool['display_name']} to workspace...", total=None)
+            
+            result = manager.install_tool_for_workspace(tool["name"], tool, scope="workspace")
+            progress.update(task, completed=True)
+            
+            if result["success"]:
+                console.print(f"[green]✓ {result['message']}[/green]")
+                console.print(f"[cyan]Tool available in: {manager.workspace_tools_bin}[/cyan]")
+                
+                # Automatically activate workspace tools
+                activation_script = manager.activate_workspace_tools()
+                
+                # Update current process environment
+                env = manager.get_environment()
+                for key, value in env.items():
+                    os.environ[key] = value
+                
+                console.print(f"[green]✓ Workspace tools activated for current session[/green]")
+                console.print(f"[yellow]For new shells, run: eval $(cuti tools activate)[/yellow]")
+            else:
+                console.print(f"[red]✗ {result['message']}[/red]")
+                raise typer.Exit(1)
+        return
+    elif scope not in ["container", "system"]:
+        console.print(f"[red]Invalid scope: {scope}. Use workspace, container, or system[/red]")
         raise typer.Exit(1)
     
     # Check if already installed
@@ -578,6 +620,114 @@ def tool_info(
     if not is_installed:
         console.print("\n[cyan]To install this tool, run:[/cyan]")
         console.print(f"  cuti tools install {tool['name']}")
+
+
+@app.command("activate")
+def activate_tools(
+    setup: bool = typer.Option(False, "--setup", help="Setup automatic activation in shell")
+):
+    """Activate workspace tools in current shell environment."""
+    from ...services.workspace_tools import WorkspaceToolsManager
+    
+    if setup:
+        # Setup automatic activation
+        setup_auto_activation()
+        return
+    
+    manager = WorkspaceToolsManager()
+    activation_script = manager.activate_workspace_tools()
+    
+    # Output the source command for the shell to execute
+    # This allows: eval $(cuti tools activate)
+    print(f"source {activation_script}")
+
+
+def setup_auto_activation():
+    """Setup automatic workspace tools activation in shell initialization files."""
+    import shutil
+    
+    # Copy auto-activation script to a known location
+    auto_activate_source = Path(__file__).parent.parent.parent / "shell" / "auto_activate.sh"
+    auto_activate_dest = Path.home() / ".cuti" / "auto_activate.sh"
+    
+    if auto_activate_source.exists():
+        auto_activate_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(auto_activate_source, auto_activate_dest)
+        auto_activate_dest.chmod(0o755)
+    else:
+        console.print("[red]Auto-activation script not found[/red]")
+        return
+    
+    # Add to shell initialization files
+    activation_line = f"\n# Cuti workspace tools auto-activation\n[ -f {auto_activate_dest} ] && source {auto_activate_dest}\n"
+    
+    shells_updated = []
+    for shell_rc in [Path.home() / ".bashrc", Path.home() / ".zshrc"]:
+        if shell_rc.exists():
+            content = shell_rc.read_text()
+            if str(auto_activate_dest) not in content:
+                shell_rc.write_text(content + activation_line)
+                shells_updated.append(shell_rc.name)
+    
+    if shells_updated:
+        console.print(f"[green]✓ Auto-activation setup complete![/green]")
+        console.print(f"[cyan]Updated: {', '.join(shells_updated)}[/cyan]")
+        console.print("[yellow]Restart your shell or run:[/yellow]")
+        console.print(f"  source {auto_activate_dest}")
+    else:
+        console.print("[yellow]Auto-activation already configured[/yellow]")
+
+
+@app.command("workspace")
+def workspace_tools():
+    """Show workspace-specific tools configuration and status."""
+    from ...services.workspace_tools import WorkspaceToolsManager
+    
+    manager = WorkspaceToolsManager()
+    
+    # Show workspace tools status
+    tools_info = manager.list_workspace_tools()
+    
+    # Create panel for workspace info
+    workspace_text = f"""[bold cyan]Workspace Tools Configuration[/bold cyan]
+    
+[yellow]Workspace:[/yellow] {tools_info['workspace']}
+[yellow]Inherit Container Tools:[/yellow] {'Yes' if tools_info['inherit_container'] else 'No'}
+[yellow]Inherit System Tools:[/yellow] {'Yes' if tools_info['inherit_system'] else 'No'}
+"""
+    
+    panel = Panel(workspace_text, box=box.ROUNDED, padding=(1, 2))
+    console.print(panel)
+    
+    # Show workspace-specific tools
+    if tools_info['workspace_tools']:
+        table = Table(
+            title="[bold]Workspace-Specific Tools[/bold]",
+            box=box.SIMPLE_HEAD,
+            show_header=True,
+            header_style="bold magenta"
+        )
+        
+        table.add_column("Tool", style="cyan")
+        table.add_column("Available", justify="center")
+        table.add_column("Path", style="dim")
+        
+        for tool_name, tool_data in tools_info['workspace_tools'].items():
+            available = "[green]✓[/green]" if tool_data.get('available') else "[red]✗[/red]"
+            path = tool_data.get('path', 'N/A')
+            table.add_row(tool_name, available, path)
+        
+        console.print(table)
+    else:
+        console.print("[yellow]No workspace-specific tools installed[/yellow]")
+    
+    # Show tool paths
+    if tools_info['tool_paths']:
+        console.print("\n[cyan]Tool Paths (in order):[/cyan]")
+        for path in tools_info['tool_paths']:
+            console.print(f"  • {path}")
+    
+    console.print("\n[dim]Tip: Use --scope workspace when installing to add tools only to this workspace[/dim]")
 
 
 @app.command("check")
