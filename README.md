@@ -60,6 +60,7 @@ Perfect for AI-powered development, automation workflows, and LLM orchestration.
 |-------|-------------|
 | [Docker Container Setup](docs/devcontainer.md) | Complete containerized environment guide |
 | [Claude Authentication](docs/claude-container-auth.md) | Anthropic API & Claude CLI setup |
+| [Claude Account Switching](docs/claude-account-switching.md) | Manage multiple Claude accounts |
 | [Task Management](docs/todo-system.md) | AI agent todo system |
 | [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
 

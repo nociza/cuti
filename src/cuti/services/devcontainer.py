@@ -619,7 +619,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         docker_args = [
             "docker", "run", "--rm", "--init",
             "-v", f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
-            "-v", f"{Path.home() / '.cuti'}:/root/.cuti-global", 
+            "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
             "-v", f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",  # Linux-specific config
             "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude-macos:ro",  # macOS config read-only
             "-v", "/var/run/docker.sock:/var/run/docker.sock",  # Mount Docker socket for Docker-in-Docker
@@ -707,6 +707,22 @@ if [ -d /home/cuti/.claude-linux ]; then
     # Fix ownership if needed (container user might have different UID/GID)
     sudo chown -R cuti:cuti /home/cuti/.claude-linux 2>/dev/null || true
     echo "🔗 Linux Claude config mounted from host"
+fi
+
+# Setup symlink for cuti account management to access global .cuti directory
+if [ -d /home/cuti/.cuti-shared ]; then
+    # Fix ownership of the shared directory to ensure cuti user can access it
+    sudo chown -R cuti:cuti /home/cuti/.cuti-shared 2>/dev/null || true
+    
+    # Create symlink from .cuti to .cuti-shared if it doesn't exist or isn't a symlink
+    if [ ! -L /home/cuti/.cuti ]; then
+        # Remove if it's a regular directory
+        if [ -d /home/cuti/.cuti ]; then
+            sudo rm -rf /home/cuti/.cuti
+        fi
+        ln -sf /home/cuti/.cuti-shared /home/cuti/.cuti
+    fi
+    echo "🔗 Global .cuti directory mounted and accessible for account management"
 fi
 
 # Copy settings from macOS config if available (read-only mount)

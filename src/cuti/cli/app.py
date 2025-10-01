@@ -48,6 +48,10 @@ try:
     from .commands.sync import app as sync_app
 except ImportError:
     sync_app = None
+try:
+    from .commands.claude_account import app as claude_app
+except ImportError:
+    claude_app = None
 
 app = typer.Typer(
     name="cuti",
@@ -158,6 +162,10 @@ if favorites_app:
 # Add sync commands if available
 if sync_app:
     app.add_typer(sync_app, name="sync", help="Sync usage data")
+
+# Add claude account commands if available
+if claude_app:
+    app.add_typer(claude_app, name="claude", help="Manage Claude accounts")
 
 # Add top-level commands for convenience
 from .commands.queue import start_queue, add_prompt, show_status
