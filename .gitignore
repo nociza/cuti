@@ -4,6 +4,9 @@ __pycache__/
 .env
 dist/
 
+# Website docs (copied from root docs/ during build)
+website/docs/
+
 # Cuti workspace data
 .cuti/
 

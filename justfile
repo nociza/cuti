@@ -321,11 +321,37 @@ clean:
     rm -rf build/
     rm -rf *.egg-info/
 
+# Sync docs from root to website folder
+website-sync-docs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    echo "📄 Syncing documentation files..."
+    
+    # Check if docs directory exists
+    if [ ! -d "docs" ]; then
+        echo "❌ Root docs directory not found"
+        exit 1
+    fi
+    
+    # Create website/docs if it doesn't exist
+    mkdir -p website/docs
+    
+    # Copy all markdown files from root docs to website/docs
+    rsync -av --delete --include='*.md' --exclude='*' docs/ website/docs/
+    
+    doc_count=$(find website/docs -name "*.md" | wc -l | tr -d ' ')
+    echo "✅ Synced $doc_count documentation files to website/docs/"
+
 # Build website (validate and prepare for deployment)
 website-build:
     #!/usr/bin/env bash
     set -euo pipefail
     
+    # Sync docs first
+    just website-sync-docs
+    
+    echo ""
     echo "🌐 Building website..."
     
     # Check if website directory exists
@@ -376,6 +402,10 @@ website-serve:
     #!/usr/bin/env bash
     set -euo pipefail
     
+    # Sync docs first
+    just website-sync-docs
+    
+    echo ""
     echo "🚀 Starting local website server..."
     echo ""
     cd website
@@ -440,7 +470,7 @@ website-deploy-github:
         fi
     fi
     
-    # Build first
+    # Build (which syncs docs automatically)
     just website-build
     
     echo ""

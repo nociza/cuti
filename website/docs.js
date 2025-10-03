@@ -1,17 +1,17 @@
 // Documentation content loader
 const docs = {
-    'automatic-tools-activation': '../docs/automatic-tools-activation.md',
-    'claude-account-quick-start': '../docs/claude-account-quick-start.md',
-    'claude-account-switching': '../docs/claude-account-switching.md',
-    'claude-api-keys': '../docs/claude-api-keys.md',
-    'claude-container-auth': '../docs/claude-container-auth.md',
-    'cli-tools-management': '../docs/cli-tools-management.md',
-    'container-status-command': '../docs/container-status-command.md',
-    'container': '../docs/container.md',
-    'devcontainer': '../docs/devcontainer.md',
-    'rate-limit-handling': '../docs/rate-limit-handling.md',
-    'todo-system': '../docs/todo-system.md',
-    'workspace-tools-architecture': '../docs/workspace-tools-architecture.md'
+    'automatic-tools-activation': 'docs/automatic-tools-activation.md',
+    'claude-account-quick-start': 'docs/claude-account-quick-start.md',
+    'claude-account-switching': 'docs/claude-account-switching.md',
+    'claude-api-keys': 'docs/claude-api-keys.md',
+    'claude-container-auth': 'docs/claude-container-auth.md',
+    'cli-tools-management': 'docs/cli-tools-management.md',
+    'container-status-command': 'docs/container-status-command.md',
+    'container': 'docs/container.md',
+    'devcontainer': 'docs/devcontainer.md',
+    'rate-limit-handling': 'docs/rate-limit-handling.md',
+    'todo-system': 'docs/todo-system.md',
+    'workspace-tools-architecture': 'docs/workspace-tools-architecture.md'
 };
 
 // Configure marked.js

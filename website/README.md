@@ -119,11 +119,34 @@ website/
 
 ## Updating Documentation
 
-The website automatically loads documentation from the `../docs/` folder. To add new documentation:
+### Single Source of Truth
 
-1. Add your `.md` file to the `docs/` folder
+Documentation lives in the **root `docs/` folder only**. The `website/docs/` folder is:
+- ✅ **Generated at build time** (not committed to git)
+- ✅ **Automatically synced** by build/serve/deploy commands
+- ✅ **Listed in `.gitignore`**
+
+### Workflow
+
+```bash
+# 1. Edit documentation in root docs/ folder (single source of truth)
+vim docs/my-doc.md
+
+# 2. Test locally (auto-syncs docs)
+just website-serve
+
+# 3. Deploy (auto-syncs docs)
+just website-deploy-github
+```
+
+**All commands automatically sync docs** - you don't need to manually run `just website-sync-docs` unless you want to sync without building/serving.
+
+### Adding New Documentation
+
+1. Add your `.md` file to the root `docs/` folder
 2. Update the `docs` object in `docs.js` to include the new file
 3. Add a navigation link in `docs.html` sidebar
+4. Run `just website-serve` to test (auto-syncs)
 
 ## Customization
 
