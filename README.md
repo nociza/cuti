@@ -56,11 +56,26 @@ Perfect for AI-powered development, automation workflows, and LLM orchestration.
 
 ## 📚 Documentation
 
+### 🌐 Interactive Documentation Website
+
+A beautiful static website with all documentation is available in the `website/` folder. To view it locally:
+
+```bash
+cd website
+python3 serve.py
+# Open http://localhost:8000 in your browser
+```
+
+The website can be hosted on any static hosting service (GitHub Pages, Netlify, Vercel, etc.). See [website/README.md](website/README.md) for details.
+
+### 📖 Documentation Guides
+
 | Guide | Description |
 |-------|-------------|
 | [Docker Container Setup](docs/devcontainer.md) | Complete containerized environment guide |
 | [Claude Authentication](docs/claude-container-auth.md) | Anthropic API & Claude CLI setup |
 | [Claude Account Switching](docs/claude-account-switching.md) | Manage multiple Claude accounts |
+| [Claude API Keys](docs/claude-api-keys.md) | Anthropic & AWS Bedrock API key management |
 | [Task Management](docs/todo-system.md) | AI agent todo system |
 | [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
 

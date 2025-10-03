@@ -100,7 +100,19 @@ def use_account(
     try:
         manager.use_account(account)
         console.print(f"[green]✓[/green] Switched to account: [cyan]{account}[/cyan]")
-        console.print("\n[dim]The credentials are now active in your container.[/dim]")
+        
+        # Check if account has API keys and generate env script
+        env_vars = manager.get_env_vars(account)
+        if env_vars:
+            script_file = manager.save_env_script(account)
+            console.print(f"\n[yellow]📝 API Key Environment Variables:[/yellow]")
+            console.print(f"  To use API keys, run: [cyan]source {script_file}[/cyan]")
+            console.print(f"  Or use: [cyan]cuti claude env {account}[/cyan]")
+            console.print("\n[dim]Set variables:[/dim]")
+            for key in env_vars.keys():
+                console.print(f"  • [cyan]{key}[/cyan]")
+        
+        console.print("\n[dim]OAuth credentials active in containers.[/dim]")
         console.print("[dim]Start a container with:[/dim] [cyan]cuti container[/cyan]")
     except ValueError as e:
         console.print(f"[red]✗[/red] {str(e)}")
@@ -269,4 +281,296 @@ def current_account():
     if info:
         console.print(f"[dim]Type:[/dim] {info.get('type', 'unknown')}")
         console.print(f"[dim]Last Used:[/dim] {info['last_used']}")
+
+
+@app.command("add-api-key")
+def add_api_key(
+    account: str = typer.Argument(..., help="Account name"),
+    api_key: str = typer.Option(..., "--api-key", "-k", help="API key or bearer token"),
+    provider: str = typer.Option("anthropic", "--provider", "-p", help="Provider: anthropic or bedrock"),
+    region: str = typer.Option(None, "--region", "-r", help="AWS region (for Bedrock)"),
+    access_key: str = typer.Option(None, "--access-key", help="AWS access key ID (Bedrock with access keys)"),
+    secret_key: str = typer.Option(None, "--secret-key", help="AWS secret access key (Bedrock with access keys)"),
+    use_bearer: bool = typer.Option(True, "--bearer/--access-keys", help="Use bearer token (default) or access keys for Bedrock")
+):
+    """Add API key credentials to an account.
+    
+    For Bedrock, you can use either:
+    - Bearer token (recommended): Just --api-key and --region
+    - Access keys: --api-key, --region, --access-key, --secret-key with --access-keys flag
+    """
+    manager = ClaudeAccountManager()
+    
+    # Validate provider
+    if provider not in ["anthropic", "bedrock"]:
+        console.print(f"[red]✗[/red] Invalid provider: {provider}")
+        console.print("[dim]Valid providers: anthropic, bedrock[/dim]")
+        raise typer.Exit(1)
+    
+    # Convert provider to credential type
+    cred_type = "anthropic_api" if provider == "anthropic" else "bedrock_api"
+    
+    try:
+        if provider == "bedrock":
+            if use_bearer:
+                # Bearer token mode (Option D - preferred)
+                manager.save_api_key(
+                    account,
+                    api_key,
+                    provider=cred_type,
+                    region=region or "us-east-1",
+                    use_bearer_token=True
+                )
+                console.print(f"[green]✓[/green] Added Bedrock bearer token to account: [cyan]{account}[/cyan]")
+                console.print(f"[dim]Region:[/dim] {region or 'us-east-1'}")
+            else:
+                # Access keys mode (Option B)
+                if not all([region, access_key, secret_key]):
+                    console.print("[red]✗[/red] Access keys mode requires --region, --access-key, and --secret-key")
+                    raise typer.Exit(1)
+                
+                manager.save_api_key(
+                    account,
+                    api_key,
+                    provider=cred_type,
+                    region=region,
+                    access_key_id=access_key,
+                    secret_access_key=secret_key,
+                    use_bearer_token=False
+                )
+                console.print(f"[green]✓[/green] Added Bedrock access keys to account: [cyan]{account}[/cyan]")
+                console.print(f"[dim]Region:[/dim] {region}")
+        else:
+            manager.save_api_key(account, api_key, provider=cred_type)
+            console.print(f"[green]✓[/green] Added {provider} API key to account: [cyan]{account}[/cyan]")
+        
+        console.print(f"\n[dim]API key stored securely with 600 permissions[/dim]")
+        console.print(f"[dim]To use: [cyan]cuti claude env {account}[/cyan][/dim]")
+        
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {str(e)}")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]✗[/red] Failed to save API key: {str(e)}")
+        raise typer.Exit(1)
+
+
+@app.command("show-api-key")
+def show_api_key(
+    account: str = typer.Argument(..., help="Account name"),
+    provider: str = typer.Option("anthropic", "--provider", "-p", help="Provider: anthropic or bedrock"),
+    show_secret: bool = typer.Option(False, "--show-secret", help="Show full API key (default: masked)")
+):
+    """Show API key for an account."""
+    manager = ClaudeAccountManager()
+    
+    api_key_info = manager.get_api_key(account, provider)
+    
+    if not api_key_info:
+        console.print(f"[yellow]⚠[/yellow]  No {provider} API key found for account: {account}")
+        console.print(f"\n[dim]Add one with:[/dim] [cyan]cuti claude add-api-key {account} --api-key YOUR_KEY --provider {provider}[/cyan]")
+        return
+    
+    # Create display panel
+    content = []
+    content.append(f"[bold]Provider:[/bold] {api_key_info.get('provider', provider)}")
+    content.append(f"[bold]Created:[/bold] {api_key_info.get('created', 'unknown')}")
+    
+    if provider == "anthropic":
+        api_key = api_key_info.get("api_key", "")
+        if show_secret:
+            content.append(f"[bold]API Key:[/bold] {api_key}")
+        else:
+            masked = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+            content.append(f"[bold]API Key:[/bold] {masked}")
+    elif provider == "bedrock":
+        auth_method = api_key_info.get('auth_method', 'bearer_token')
+        content.append(f"[bold]Auth Method:[/bold] {auth_method}")
+        content.append(f"[bold]Region:[/bold] {api_key_info.get('region', 'unknown')}")
+        
+        if auth_method == "bearer_token":
+            bearer_token = api_key_info.get("bearer_token", "")
+            if show_secret:
+                content.append(f"[bold]Bearer Token:[/bold] {bearer_token}")
+            else:
+                masked = bearer_token[:12] + "..." + bearer_token[-6:] if len(bearer_token) > 18 else "***"
+                content.append(f"[bold]Bearer Token:[/bold] {masked}")
+        else:
+            access_key = api_key_info.get("access_key_id", "")
+            secret_key = api_key_info.get("secret_access_key", "")
+            
+            if show_secret:
+                content.append(f"[bold]Access Key ID:[/bold] {access_key}")
+                content.append(f"[bold]Secret Access Key:[/bold] {secret_key}")
+            else:
+                masked_access = access_key[:8] + "..." if len(access_key) > 8 else "***"
+                content.append(f"[bold]Access Key ID:[/bold] {masked_access}")
+                content.append(f"[bold]Secret Access Key:[/bold] ***")
+    
+    if not show_secret:
+        content.append(f"\n[dim]Use --show-secret to reveal full credentials[/dim]")
+    
+    panel = Panel(
+        "\n".join(content),
+        title=f"{provider.capitalize()} API Key - {account}",
+        border_style="cyan"
+    )
+    console.print(panel)
+
+
+@app.command("list-api-keys")
+def list_api_keys_cmd(
+    account: str = typer.Argument(..., help="Account name")
+):
+    """List all API key providers for an account."""
+    manager = ClaudeAccountManager()
+    
+    providers = manager.list_api_keys(account)
+    
+    if not providers:
+        console.print(f"[yellow]No API keys found for account: {account}[/yellow]")
+        console.print("\n[dim]Add an API key with:[/dim]")
+        console.print(f"  [cyan]cuti claude add-api-key {account} --api-key YOUR_KEY --provider anthropic[/cyan]")
+        return
+    
+    console.print(f"[green]API Keys for account:[/green] [cyan]{account}[/cyan]\n")
+    
+    for provider in providers:
+        api_key_info = manager.get_api_key(account, provider)
+        if api_key_info:
+            created = api_key_info.get("created", "unknown")
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(created)
+                created = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                pass
+            
+            console.print(f"  • [cyan]{provider}[/cyan] - Added: {created}")
+
+
+@app.command("delete-api-key")
+def delete_api_key_cmd(
+    account: str = typer.Argument(..., help="Account name"),
+    provider: str = typer.Option(..., "--provider", "-p", help="Provider: anthropic or bedrock"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")
+):
+    """Delete an API key from an account."""
+    manager = ClaudeAccountManager()
+    
+    # Check if API key exists
+    api_key_info = manager.get_api_key(account, provider)
+    if not api_key_info:
+        console.print(f"[yellow]⚠[/yellow]  No {provider} API key found for account: {account}")
+        return
+    
+    # Confirm deletion
+    if not force:
+        console.print(f"[yellow]⚠[/yellow]  About to delete {provider} API key from account: [cyan]{account}[/cyan]")
+        confirm = typer.confirm("Are you sure?")
+        if not confirm:
+            console.print("[dim]Deletion cancelled[/dim]")
+            return
+    
+    try:
+        if manager.delete_api_key(account, provider):
+            console.print(f"[green]✓[/green] Deleted {provider} API key from account: [cyan]{account}[/cyan]")
+        else:
+            console.print(f"[red]✗[/red] Failed to delete API key")
+            raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]✗[/red] Failed to delete API key: {str(e)}")
+        raise typer.Exit(1)
+
+
+@app.command("env")
+def show_env(
+    account: str = typer.Argument(None, help="Account name (default: active account)"),
+    export: bool = typer.Option(False, "--export", "-e", help="Print export commands"),
+    save: bool = typer.Option(False, "--save", "-s", help="Save to env.sh file"),
+    unset: bool = typer.Option(False, "--unset", "-u", help="Show unset commands instead")
+):
+    """Show environment variables for API keys.
+    
+    Usage:
+      cuti claude env                    # Show vars for active account
+      cuti claude env my-account         # Show vars for specific account
+      cuti claude env my-account --export  # Print export commands
+      cuti claude env --unset            # Show unset commands
+      
+    To apply:
+      eval $(cuti claude env my-account --export)
+      # Or
+      source ~/.cuti/claude-accounts/my-account/env.sh
+    """
+    manager = ClaudeAccountManager()
+    
+    # Handle unset mode
+    if unset:
+        console.print("[yellow]Unset commands for all Claude API variables:[/yellow]\n")
+        for var in manager.get_env_vars_to_unset():
+            console.print(f"unset {var}")
+        console.print(f"\n[dim]To apply: [cyan]eval $(cuti claude env --unset)[/cyan][/dim]")
+        return
+    
+    # Get account name
+    if not account:
+        account = manager.get_active_account()
+        if not account:
+            console.print("[yellow]No active account[/yellow]")
+            console.print("[dim]Specify an account: [cyan]cuti claude env <account>[/cyan][/dim]")
+            raise typer.Exit(1)
+    
+    # Get environment variables
+    env_vars = manager.get_env_vars(account)
+    
+    if not env_vars:
+        console.print(f"[yellow]No API keys configured for account:[/yellow] {account}")
+        console.print(f"\n[dim]Add an API key with:[/dim] [cyan]cuti claude add-api-key {account} ...[/cyan]")
+        return
+    
+    # Export mode - just print commands
+    if export:
+        for key, value in env_vars.items():
+            console.print(f'export {key}="{value}"')
+        return
+    
+    # Save mode - save to file
+    if save:
+        script_file = manager.save_env_script(account)
+        if script_file:
+            console.print(f"[green]✓[/green] Saved environment script to: [cyan]{script_file}[/cyan]")
+            console.print(f"\n[dim]To use:[/dim] [cyan]source {script_file}[/cyan]")
+        else:
+            console.print("[yellow]No API keys to save[/yellow]")
+        return
+    
+    # Default mode - show variables nicely
+    console.print(f"[green]Environment variables for account:[/green] [cyan]{account}[/cyan]\n")
+    
+    table = Table(show_header=True, box=box.SIMPLE)
+    table.add_column("Variable", style="cyan")
+    table.add_column("Value", style="dim")
+    
+    for key, value in env_vars.items():
+        # Mask sensitive values
+        if "KEY" in key or "SECRET" in key or "TOKEN" in key:
+            if len(value) > 20:
+                masked = value[:8] + "..." + value[-6:]
+            else:
+                masked = "***"
+            table.add_row(key, masked)
+        else:
+            table.add_row(key, value)
+    
+    console.print(table)
+    
+    # Show usage instructions
+    console.print(f"\n[yellow]To apply these variables:[/yellow]")
+    console.print(f"  [cyan]eval $(cuti claude env {account} --export)[/cyan]")
+    console.print(f"\n[yellow]Or save to file and source:[/yellow]")
+    console.print(f"  [cyan]cuti claude env {account} --save[/cyan]")
+    console.print(f"  [cyan]source ~/.cuti/claude-accounts/{account}/env.sh[/cyan]")
+    console.print(f"\n[yellow]To unset all variables:[/yellow]")
+    console.print(f"  [cyan]eval $(cuti claude env --unset)[/cyan]")
 

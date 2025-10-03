@@ -68,6 +68,7 @@ packages = ["src/cuti"]
 
 [tool.hatch.build.targets.sdist]
 include = ["/LICENSE", "/README.md", "/docs", "/src"]
+exclude = ["/website"]
 
 [tool.black]
 line-length               = 88

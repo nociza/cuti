@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuti - AI Development Environment & Multi-Agent Orchestration</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <i class="fas fa-robot"></i>
+                <span>Cuti</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="active">Home</a>
+                <a href="docs.html">Documentation</a>
+                <a href="https://github.com/nociza/cuti" target="_blank">GitHub</a>
+                <a href="https://pypi.org/project/cuti/" target="_blank">PyPI</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>Cuti</h1>
+                <p class="hero-subtitle">AI Development Environment & Multi-Agent Orchestration</p>
+                <p class="hero-description">Instant containerized development with Claude Code, Anthropic API integration, and intelligent agent orchestration</p>
+                <div class="hero-buttons">
+                    <a href="#quick-start" class="btn btn-primary">
+                        <i class="fas fa-rocket"></i> Get Started
+                    </a>
+                    <a href="docs.html" class="btn btn-secondary">
+                        <i class="fas fa-book"></i> Documentation
+                    </a>
+                </div>
+                <div class="badges">
+                    <img src="https://img.shields.io/pypi/v/cuti?color=blue&label=PyPI" alt="PyPI Version">
+                    <img src="https://img.shields.io/pypi/pyversions/cuti" alt="Python Versions">
+                    <img src="https://img.shields.io/pypi/l/cuti" alt="License">
+                    <img src="https://img.shields.io/pypi/dm/cuti?color=green&label=Downloads%2FMonth" alt="Downloads">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section id="quick-start" class="section">
+        <div class="container">
+            <h2>🚀 Quick Start</h2>
+            <div class="code-block">
+                <div class="code-header">
+                    <span>Terminal</span>
+                    <button class="copy-btn" onclick="copyCode(this)">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+                <pre><code># Install Python package from PyPI
+uv tool install cuti
+
+# Launch Docker development environment with Claude
+cuti container</code></pre>
+            </div>
+            <p class="text-center">That's it! You now have a fully configured AI-powered coding environment.</p>
+        </div>
+    </section>
+
+    <section class="section bg-light">
+        <div class="container">
+            <h2>✨ Key Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-docker"></i>
+                    </div>
+                    <h3>Containerized Development</h3>
+                    <p>Claude Code CLI pre-configured with Anthropic integration in an isolated Docker environment</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3>Multi-Agent Orchestration</h3>
+                    <p>Build with multiple AI models - Claude API and Gemini integration for intelligent task management</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <h3>Command Queuing</h3>
+                    <p>Smart task queuing system with priority execution and automatic rate limiting</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-dashboard"></i>
+                    </div>
+                    <h3>Web UI Dashboard</h3>
+                    <p>Launch with <code>cuti web</code> for a comprehensive dashboard to manage your AI agents</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Persistent Authentication</h3>
+                    <p>Claude API authentication persists across sessions with easy account switching</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <h3>Task Automation</h3>
+                    <p>Built-in todo system for AI agents with smart task expansion and tracking</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2>📦 What's Included</h2>
+            <div class="included-list">
+                <div class="included-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>Claude Code CLI</strong> pre-configured with Anthropic integration</span>
+                </div>
+                <div class="included-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>Persistent authentication</strong> for Claude API across sessions</span>
+                </div>
+                <div class="included-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>Python 3.11</strong>, <strong>Node.js 20</strong>, and essential dev tools</span>
+                </div>
+                <div class="included-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>Custom prompt</strong> showing <code>cuti:~/path $</code></span>
+                </div>
+                <div class="included-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>Auto-mounts</strong> current directory for seamless workflow</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section bg-light">
+        <div class="container">
+            <h2>📚 Documentation</h2>
+            <div class="docs-grid">
+                <a href="docs.html?doc=devcontainer" class="doc-card">
+                    <h3><i class="fas fa-container-storage"></i> Docker Container Setup</h3>
+                    <p>Complete containerized environment guide</p>
+                </a>
+                <a href="docs.html?doc=claude-container-auth" class="doc-card">
+                    <h3><i class="fas fa-key"></i> Claude Authentication</h3>
+                    <p>Anthropic API & Claude CLI setup</p>
+                </a>
+                <a href="docs.html?doc=claude-account-switching" class="doc-card">
+                    <h3><i class="fas fa-exchange-alt"></i> Account Switching</h3>
+                    <p>Manage multiple Claude accounts</p>
+                </a>
+                <a href="docs.html?doc=claude-api-keys" class="doc-card">
+                    <h3><i class="fas fa-lock"></i> API Keys</h3>
+                    <p>Anthropic & AWS Bedrock API key management</p>
+                </a>
+                <a href="docs.html?doc=todo-system" class="doc-card">
+                    <h3><i class="fas fa-list-check"></i> Task Management</h3>
+                    <p>AI agent todo system</p>
+                </a>
+                <a href="docs.html?doc=rate-limit-handling" class="doc-card">
+                    <h3><i class="fas fa-gauge-high"></i> Rate Limit Handling</h3>
+                    <p>Smart API throttling & retry logic</p>
+                </a>
+            </div>
+            <div class="text-center" style="margin-top: 2rem;">
+                <a href="docs.html" class="btn btn-primary">View All Documentation</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="section cta">
+        <div class="container">
+            <h2>Ready to Get Started?</h2>
+            <p>Install Cuti and launch your AI-powered development environment in seconds</p>
+            <a href="https://pypi.org/project/cuti/" class="btn btn-large">
+                <i class="fas fa-download"></i> Install from PyPI
+            </a>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Cuti</h4>
+                    <p>AI Development Environment & Multi-Agent Orchestration</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <a href="https://pypi.org/project/cuti/">PyPI</a>
+                    <a href="https://github.com/nociza/cuti">GitHub</a>
+                    <a href="docs.html">Documentation</a>
+                </div>
+                <div class="footer-section">
+                    <h4>License</h4>
+                    <p>Apache 2.0</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cuti. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

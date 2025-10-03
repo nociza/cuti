@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - Cuti</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body class="docs-page">
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <i class="fas fa-robot"></i>
+                <span>Cuti</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="docs.html" class="active">Documentation</a>
+                <a href="https://github.com/nociza/cuti" target="_blank">GitHub</a>
+                <a href="https://pypi.org/project/cuti/" target="_blank">PyPI</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="docs-container">
+        <aside class="docs-sidebar">
+            <div class="sidebar-header">
+                <h3>Documentation</h3>
+            </div>
+            <nav class="docs-nav" id="docs-nav">
+                <div class="nav-section">
+                    <h4>Getting Started</h4>
+                    <a href="#" data-doc="claude-account-quick-start" class="nav-link">
+                        <i class="fas fa-play-circle"></i> Quick Start Guide
+                    </a>
+                    <a href="#" data-doc="devcontainer" class="nav-link">
+                        <i class="fas fa-container-storage"></i> Container Setup
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <h4>Authentication</h4>
+                    <a href="#" data-doc="claude-container-auth" class="nav-link">
+                        <i class="fas fa-key"></i> Container Auth
+                    </a>
+                    <a href="#" data-doc="claude-account-switching" class="nav-link">
+                        <i class="fas fa-exchange-alt"></i> Account Switching
+                    </a>
+                    <a href="#" data-doc="claude-api-keys" class="nav-link">
+                        <i class="fas fa-lock"></i> API Keys
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <h4>Features</h4>
+                    <a href="#" data-doc="todo-system" class="nav-link">
+                        <i class="fas fa-list-check"></i> Todo System
+                    </a>
+                    <a href="#" data-doc="rate-limit-handling" class="nav-link">
+                        <i class="fas fa-gauge-high"></i> Rate Limit Handling
+                    </a>
+                    <a href="#" data-doc="automatic-tools-activation" class="nav-link">
+                        <i class="fas fa-wand-magic-sparkles"></i> Auto Tools Activation
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <h4>CLI Tools</h4>
+                    <a href="#" data-doc="cli-tools-management" class="nav-link">
+                        <i class="fas fa-terminal"></i> CLI Tools Management
+                    </a>
+                    <a href="#" data-doc="container-status-command" class="nav-link">
+                        <i class="fas fa-info-circle"></i> Container Status
+                    </a>
+                    <a href="#" data-doc="container" class="nav-link">
+                        <i class="fas fa-box"></i> Container
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <h4>Architecture</h4>
+                    <a href="#" data-doc="workspace-tools-architecture" class="nav-link">
+                        <i class="fas fa-sitemap"></i> Workspace Tools Architecture
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="docs-content">
+            <div id="doc-content">
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading documentation...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="docs.js"></script>
+</body>
+</html>
+
