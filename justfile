@@ -321,123 +321,18 @@ clean:
     rm -rf build/
     rm -rf *.egg-info/
 
-# Sync docs from root to website folder
-website-sync-docs:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    
-    echo "📄 Syncing documentation files..."
-    
-    # Check if docs directory exists
-    if [ ! -d "docs" ]; then
-        echo "❌ Root docs directory not found"
-        exit 1
-    fi
-    
-    # Create website/docs if it doesn't exist
-    mkdir -p website/docs
-    
-    # Copy all markdown files from root docs to website/docs
-    rsync -av --delete --include='*.md' --exclude='*' docs/ website/docs/
-    
-    doc_count=$(find website/docs -name "*.md" | wc -l | tr -d ' ')
-    echo "✅ Synced $doc_count documentation files to website/docs/"
-
-# Build website (validate and prepare for deployment)
+# Build website (syncs docs and validates)
 website-build:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    
-    # Sync docs first
-    just website-sync-docs
-    
-    echo ""
-    echo "🌐 Building website..."
-    
-    # Check if website directory exists
-    if [ ! -d "website" ]; then
-        echo "❌ website directory not found"
-        exit 1
-    fi
-    
-    # Validate all required files exist
-    required_files=("index.html" "docs.html" "styles.css" "script.js" "docs.js" "favicon.svg")
-    for file in "${required_files[@]}"; do
-        if [ ! -f "website/$file" ]; then
-            echo "❌ Missing required file: website/$file"
-            exit 1
-        fi
-    done
-    
-    echo "✅ All required files present"
-    
-    # Check if markdown docs exist
-    if [ ! -d "docs" ]; then
-        echo "⚠️  Warning: docs directory not found"
-    else
-        doc_count=$(find docs -name "*.md" | wc -l | tr -d ' ')
-        echo "📚 Found $doc_count documentation files"
-    fi
-    
-    # Validate HTML (basic check)
-    echo "🔍 Validating HTML structure..."
-    if ! head -n 1 website/index.html | grep -qi "<!DOCTYPE"; then
-        echo "⚠️  Warning: index.html missing DOCTYPE"
-    fi
-    if ! head -n 1 website/docs.html | grep -qi "<!DOCTYPE"; then
-        echo "⚠️  Warning: docs.html missing DOCTYPE"
-    fi
-    
-    echo "✅ Website build validation complete!"
-    echo ""
-    echo "📝 To test locally, run:"
-    echo "   just website-serve"
-    echo ""
-    echo "🚀 To deploy, run:"
-    echo "   just website-deploy-github  # For GitHub Pages"
-    echo "   just website-deploy          # Interactive deployment"
+    cd website && ./build.sh
 
 # Serve website locally for testing
 website-serve:
     #!/usr/bin/env bash
     set -euo pipefail
-    
-    # Sync docs first
-    just website-sync-docs
-    
+    cd website && ./build.sh
     echo ""
-    echo "🚀 Starting local website server..."
-    echo ""
-    cd website
+    echo "🚀 Starting local server at http://localhost:8000"
     exec python3 serve.py
-
-# Deploy website (interactive - choose platform)
-website-deploy:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    
-    echo "🚀 Website Deployment"
-    echo "===================="
-    echo ""
-    echo "Choose deployment target:"
-    echo "  1) GitHub Pages (gh-pages branch)"
-    echo "  2) Manual (instructions only)"
-    echo ""
-    read -p "Enter choice (1-2): " choice
-    echo ""
-    
-    case $choice in
-        1)
-            just website-deploy-github
-            ;;
-        2)
-            just website-deploy-manual
-            ;;
-        *)
-            echo "❌ Invalid choice"
-            exit 1
-            ;;
-    esac
 
 # Deploy to GitHub Pages (gh-pages branch)
 website-deploy-github:
@@ -445,103 +340,17 @@ website-deploy-github:
     set -euo pipefail
     
     echo "📦 Deploying to GitHub Pages..."
-    echo ""
     
-    # Check if git repo
-    if [ ! -d ".git" ]; then
-        echo "❌ Not a git repository"
-        exit 1
-    fi
-    
-    # Check for uncommitted changes in website/
-    if git status --porcelain website/ | grep -q '^'; then
-        echo "⚠️  Uncommitted changes in website/ directory:"
-        git status --short website/
-        echo ""
-        read -p "Do you want to commit these changes first? (y/N) " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            git add website/
-            read -p "Enter commit message: " commit_msg
-            git commit -m "$commit_msg"
-            echo "✅ Changes committed"
-        else
-            echo "⚠️  Proceeding with uncommitted changes"
-        fi
-    fi
-    
-    # Build (which syncs docs automatically)
+    # Build first
     just website-build
     
     echo ""
     echo "📤 Pushing to gh-pages branch..."
-    
-    # Check if gh-pages branch exists
-    if git rev-parse --verify gh-pages >/dev/null 2>&1; then
-        echo "✅ gh-pages branch exists"
-    else
-        echo "📝 Creating gh-pages branch..."
-        git checkout -b gh-pages
-        git checkout -
-    fi
-    
-    # Use git subtree to push website folder to gh-pages
-    echo "🔄 Deploying website folder to gh-pages branch..."
     git subtree push --prefix website origin gh-pages
     
     echo ""
-    echo "✅ Website deployed to GitHub Pages!"
-    echo ""
-    echo "📍 Your site will be available at:"
-    echo "   https://$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/' | sed 's/.*github.com[:/]\(.*\)/\1/').github.io/$(basename $(git rev-parse --show-toplevel))/"
-    echo ""
-    echo "⏳ Note: It may take a few minutes for changes to appear"
-    echo ""
-    echo "🔧 Enable GitHub Pages in your repo settings:"
-    echo "   Settings → Pages → Source: gh-pages branch → / (root)"
-
-# Show manual deployment instructions
-website-deploy-manual:
-    #!/usr/bin/env bash
-    echo "📖 Manual Deployment Instructions"
-    echo "================================="
-    echo ""
-    echo "Your static website is ready in the 'website/' folder."
-    echo ""
-    echo "🌐 Deployment Options:"
-    echo ""
-    echo "1️⃣  Netlify:"
-    echo "   • Drag and drop 'website/' folder to Netlify"
-    echo "   • Or connect your Git repo and set build directory to 'website'"
-    echo "   • netlify.com"
-    echo ""
-    echo "2️⃣  Vercel:"
-    echo "   • Import your repo"
-    echo "   • Set output directory to 'website'"
-    echo "   • vercel.com"
-    echo ""
-    echo "3️⃣  GitHub Pages (manual):"
-    echo "   • Run: just website-deploy-github"
-    echo ""
-    echo "4️⃣  Cloudflare Pages:"
-    echo "   • Connect Git repo"
-    echo "   • Build directory: website"
-    echo "   • pages.cloudflare.com"
-    echo ""
-    echo "5️⃣  AWS S3 + CloudFront:"
-    echo "   • Upload website/ contents to S3 bucket"
-    echo "   • Configure bucket for static hosting"
-    echo "   • Add CloudFront CDN (optional)"
-    echo ""
-    echo "6️⃣  Firebase Hosting:"
-    echo "   • firebase init hosting"
-    echo "   • Set public directory to 'website'"
-    echo "   • firebase deploy"
-    echo ""
-    echo "📝 The website folder contains all necessary files:"
-    ls -1 website/
-    echo ""
-    echo "✅ No build step required - deploy directly!"
+    echo "✅ Deployed! Enable GitHub Pages in repo settings:"
+    echo "   Settings → Pages → Source: gh-pages branch"
 
 # Help
 help:

@@ -58,52 +58,23 @@ http-server -p 8000
 
 ## Deployment
 
-### Quick Deploy (from root directory)
-
-```bash
-# Interactive deployment (choose your platform)
-just website-deploy
-
-# Deploy directly to GitHub Pages
-just website-deploy-github
-
-# View deployment instructions for other platforms
-just website-deploy-manual
-```
-
-## Hosting Options
-
-This is a static website that can be hosted on any static hosting service:
-
 ### GitHub Pages
 
-1. Push the `website` folder to your repository
-2. Go to Settings → Pages
-3. Select the branch and `/website` folder
-4. Your site will be live at `https://yourusername.github.io/cuti/`
+```bash
+# From project root
+just website-deploy-github
+```
 
-### Netlify
+### Netlify / Vercel / Cloudflare Pages
 
-1. Connect your repository
-2. Set build directory to `website`
-3. Deploy!
+Connect your Git repo and use these settings:
 
-### Vercel
+```
+Build command: cd website && ./build.sh
+Output directory: website
+```
 
-1. Import your repository
-2. Set output directory to `website`
-3. Deploy!
-
-### Other Options
-
-The website works on:
-- AWS S3 + CloudFront
-- Google Cloud Storage
-- Azure Static Web Apps
-- Cloudflare Pages
-- Surge.sh
-- Firebase Hosting
-- Any static hosting provider
+That's it! The `build.sh` script syncs docs automatically.
 
 ## File Structure
 
@@ -114,6 +85,9 @@ website/
 ├── styles.css          # All styles
 ├── script.js           # Home page scripts
 ├── docs.js             # Documentation loader
+├── build.sh            # Build script (syncs docs)
+├── serve.py            # Local dev server
+├── favicon.svg         # Site icon
 └── README.md           # This file
 ```
 
@@ -139,7 +113,7 @@ just website-serve
 just website-deploy-github
 ```
 
-**All commands automatically sync docs** - you don't need to manually run `just website-sync-docs` unless you want to sync without building/serving.
+**All commands automatically sync docs** by running `build.sh`.
 
 ### Adding New Documentation
 
