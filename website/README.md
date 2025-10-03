@@ -58,14 +58,16 @@ just website-deploy-github
 
 ### Netlify / Vercel / Cloudflare Pages
 
-Connect your Git repo and use these settings:
+**Quick Setup:**
+1. Connect your Git repository
+2. Configure build settings:
 
 ```
 Build command: cd website && ./build.sh
 Output directory: website
 ```
 
-That's it! The `build.sh` script syncs docs automatically.
+The build script automatically syncs documentation and creates a fully static website with no server dependencies.
 
 ## File Structure
 

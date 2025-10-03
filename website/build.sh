@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "📦 Building website for deployment..."
+echo "📦 Building static website for deployment..."
 echo ""
 
 # Check if we're in the website directory or root
@@ -13,9 +13,6 @@ elif [ -d "docs" ] && [ -d "website" ]; then
     WEBSITE_DIR="website"
 else
     echo "❌ Cannot find docs directory"
-    echo "This script should be run from either:"
-    echo "  - The website/ directory (with ../docs available)"
-    echo "  - The project root (with docs/ and website/ available)"
     exit 1
 fi
 
@@ -25,9 +22,12 @@ echo "📄 Syncing documentation files..."
 mkdir -p "$WEBSITE_DIR/docs"
 
 # Copy all markdown files from docs to website/docs
-rsync -av --delete --include='*.md' --exclude='*' "$DOCS_SOURCE/" "$WEBSITE_DIR/docs/" 2>/dev/null || \
-    cp -r "$DOCS_SOURCE"/*.md "$WEBSITE_DIR/docs/" 2>/dev/null || \
-    echo "⚠️  Warning: Could not sync docs (may not exist or already synced)"
+if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete --include='*.md' --exclude='*' "$DOCS_SOURCE/" "$WEBSITE_DIR/docs/" 2>/dev/null
+else
+    rm -f "$WEBSITE_DIR/docs"/*.md 2>/dev/null
+    cp "$DOCS_SOURCE"/*.md "$WEBSITE_DIR/docs/" 2>/dev/null
+fi
 
 doc_count=$(find "$WEBSITE_DIR/docs" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 echo "✅ Synced $doc_count documentation files"
@@ -36,7 +36,7 @@ echo ""
 echo "🔍 Validating website..."
 
 # Check if required files exist
-required_files=("index.html" "docs.html" "styles.css" "script.js" "docs.js")
+required_files=("index.html" "docs.html" "styles.css" "script.js" "docs.js" "favicon.svg")
 for file in "${required_files[@]}"; do
     if [ ! -f "$WEBSITE_DIR/$file" ]; then
         echo "❌ Missing required file: $file"
@@ -45,8 +45,8 @@ for file in "${required_files[@]}"; do
 done
 
 echo "✅ All required files present"
+echo "✅ Static website build complete!"
 echo ""
-echo "✅ Website build complete!"
-echo ""
-echo "📂 Output directory: $WEBSITE_DIR"
+echo "📂 Deploy this directory: $WEBSITE_DIR"
+echo "🌐 Website is ready for Cloudflare Pages, Netlify, Vercel, etc."
 
