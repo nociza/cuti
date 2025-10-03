@@ -332,7 +332,7 @@ website-serve:
     cd website && ./build.sh
     echo ""
     echo "🚀 Starting local server at http://localhost:8000"
-    exec python3 serve.py
+    npx -y http-server -p 8000
 
 # Deploy to GitHub Pages (gh-pages branch)
 website-deploy-github:

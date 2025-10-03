@@ -35,26 +35,17 @@ You can also serve the website directly:
 # Navigate to the website directory
 cd website
 
-# Serve using Python 3
-python3 -m http.server 8000
+# Run build script
+./build.sh
 
-# Or use the custom server script
-python3 serve.py
+# Serve using npx (recommended)
+npx -y http-server -p 8000
+
+# Or using Python
+python3 -m http.server 8000
 ```
 
 Then open your browser to http://localhost:8000
-
-### Alternative: Using Node.js
-
-If you have Node.js installed, you can use `http-server`:
-
-```bash
-# Install http-server globally (one time only)
-npm install -g http-server
-
-# Serve the website
-http-server -p 8000
-```
 
 ## Deployment
 

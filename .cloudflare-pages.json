@@ -1,7 +1,0 @@
-{
-  "build": {
-    "command": "cd website && chmod +x build.sh && ./build.sh",
-    "output": "website"
-  }
-}
-
