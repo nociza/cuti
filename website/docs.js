@@ -62,11 +62,17 @@ async function loadDoc(docName) {
         const html = marked.parse(markdown);
         docContent.innerHTML = html;
 
+        // Convert markdown links to proper doc viewer URLs
+        convertMarkdownLinks();
+
         // Add copy buttons to code blocks
         addCopyButtons();
 
         // Update active nav link
         updateActiveNavLink(docName);
+
+        // Update page title
+        updatePageTitle(docName);
 
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -81,6 +87,68 @@ async function loadDoc(docName) {
             </div>
         `;
     }
+}
+
+// Convert markdown links (.md) to proper doc viewer URLs
+function convertMarkdownLinks() {
+    const docContent = document.getElementById('doc-content');
+    const links = docContent.querySelectorAll('a[href]');
+    
+    links.forEach(link => {
+        const href = link.getAttribute('href');
+        
+        // Check if it's a markdown file link
+        if (href && href.endsWith('.md')) {
+            // Extract filename without extension
+            const filename = href.replace(/^.*\//, '').replace(/\.md$/, '');
+            
+            // Check if this doc exists in our docs object
+            if (docs[filename]) {
+                // Convert to doc viewer URL
+                link.setAttribute('href', `docs.html?doc=${filename}`);
+                
+                // Add click handler to load without page reload
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    
+                    // Update URL
+                    const url = new URL(window.location);
+                    url.searchParams.set('doc', filename);
+                    window.history.pushState({}, '', url);
+                    
+                    // Load the doc
+                    loadDoc(filename);
+                });
+            }
+        }
+        // Handle relative links to docs folder
+        else if (href && href.match(/docs\/.*\.md$/)) {
+            const filename = href.replace(/^.*\//, '').replace(/\.md$/, '');
+            
+            if (docs[filename]) {
+                link.setAttribute('href', `docs.html?doc=${filename}`);
+                
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const url = new URL(window.location);
+                    url.searchParams.set('doc', filename);
+                    window.history.pushState({}, '', url);
+                    loadDoc(filename);
+                });
+            }
+        }
+    });
+}
+
+// Update page title based on current doc
+function updatePageTitle(docName) {
+    // Convert doc name to title case
+    const title = docName
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    
+    document.title = `${title} - Cuti Documentation`;
 }
 
 // Add copy buttons to code blocks

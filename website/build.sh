@@ -36,7 +36,7 @@ echo ""
 echo "🔍 Validating website..."
 
 # Check if required files exist
-required_files=("index.html" "docs.html" "styles.css" "script.js" "docs.js" "favicon.svg")
+required_files=("index.html" "docs.html" "styles.css" "script.js" "docs.js" "favicon.svg" "robots.txt" "sitemap.xml")
 for file in "${required_files[@]}"; do
     if [ ! -f "$WEBSITE_DIR/$file" ]; then
         echo "❌ Missing required file: $file"
@@ -44,7 +44,7 @@ for file in "${required_files[@]}"; do
     fi
 done
 
-echo "✅ All required files present"
+echo "✅ All required files present (including SEO files)"
 echo "✅ Static website build complete!"
 echo ""
 echo "📂 Deploy this directory: $WEBSITE_DIR"
