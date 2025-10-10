@@ -116,7 +116,7 @@ RUN groupadd --gid $USER_GID $USERNAME \\
     && chown root:docker /usr/local/bin/docker-compose
 
 # Install Claude Code CLI (latest version)
-RUN npm install -g @anthropic-ai/claude-code@latest \\
+RUN npm-original install -g @anthropic-ai/claude-code@latest \\
     && echo '#!/bin/bash' > /usr/local/bin/claude \\
     && echo '# Claude wrapper script for container environment' >> /usr/local/bin/claude \\
     && echo 'export IS_SANDBOX=1' >> /usr/local/bin/claude \\
