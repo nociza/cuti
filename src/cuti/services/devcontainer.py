@@ -88,10 +88,18 @@ RUN chmod +x /usr/local/bin/docker-compose
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 
-# Install Node.js
+# Install Node.js and pnpm
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
     && apt-get install -y nodejs \\
-    && npm install -g npm@latest
+    && npm install -g npm@latest \\
+    && npm install -g pnpm@latest \\
+    && echo '#!/bin/bash' > /usr/local/bin/npm-original \\
+    && echo 'exec /usr/bin/npm "$@"' >> /usr/local/bin/npm-original \\
+    && chmod +x /usr/local/bin/npm-original \\
+    && echo '#!/bin/bash' > /usr/local/bin/npm \\
+    && echo '# npm aliased to pnpm for better performance' >> /usr/local/bin/npm \\
+    && echo 'exec pnpm "$@"' >> /usr/local/bin/npm \\
+    && chmod +x /usr/local/bin/npm
 
 # Install uv for Python package management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -143,8 +151,11 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
     && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> ~/.zshrc \\
     && echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.zshrc \\
+    && echo 'alias npm-original="/usr/local/bin/npm-original"' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
-    && echo 'echo "Commands: cuti web | cuti cli | claude"' >> ~/.zshrc
+    && echo 'echo "Commands: cuti web | cuti cli | claude"' >> ~/.zshrc \\
+    && echo 'echo "📦 pnpm is the default package manager (npm commands use pnpm)"' >> ~/.zshrc \\
+    && echo 'echo "   Use npm-original for actual npm if needed"' >> ~/.zshrc
 
 WORKDIR /workspace
 SHELL ["/bin/zsh", "-c"]

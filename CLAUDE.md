@@ -3,7 +3,7 @@
 This file contains configuration and context for Claude Code usage within this project.
 It is dynamically managed by the cuti orchestration system.
 
-Last updated: 2025-09-29T00:49:24.416887
+Last updated: 2025-10-08T04:29:50.484525
 
 ## Overall Instructions
 
@@ -41,22 +41,9 @@ python run.py web
 # Start CLI
 python run.py cli
 
-
-
-## Available CLI Tools
-
-The following CLI tools are available in the development environment:
-
-### Tree
-Display directory structure as a tree
-
-Use `tree` to visualize directory structure. Example: `tree -L 2`
-
-### Playwright
-Browser automation and testing framework for headless browser testing
-
-Use `playwright` for browser automation and testing. Example: Create a Python script using `from playwright.async_api import async_playwright` to automate browser tasks.
-
+# Check agent status
+cuti agent list
+```
 
 ## Orchestration Configuration
 
