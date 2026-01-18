@@ -102,10 +102,18 @@
         </aside>
 
         <main class="docs-content">
-            <div id="doc-content">
-                <div class="loading">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading documentation...</p>
+            <div class="docs-body">
+                <div class="docs-toolbar">
+                    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Hide documentation navigation" aria-expanded="true">
+                        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                        <span class="toggle-label">Hide Sidebar</span>
+                    </button>
+                </div>
+                <div id="doc-content">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading documentation...</p>
+                    </div>
                 </div>
             </div>
         </main>
@@ -116,4 +124,3 @@
     <script src="docs.js"></script>
 </body>
 </html>
-

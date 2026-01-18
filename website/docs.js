@@ -225,7 +225,9 @@ function updateActiveNavLink(docName) {
 // Handle navigation clicks
 document.addEventListener('DOMContentLoaded', () => {
     const navLinks = document.querySelectorAll('.docs-nav .nav-link');
-    
+    const docsContainer = document.querySelector('.docs-container');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -251,5 +253,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const docName = urlParams.get('doc') || 'claude-account-quick-start';
         loadDoc(docName);
     });
+
+    setupSidebarToggle(docsContainer, sidebarToggle);
 });
 
+function setupSidebarToggle(container, toggleButton) {
+    if (!container || !toggleButton) {
+        return;
+    }
+
+    const label = toggleButton.querySelector('.toggle-label');
+    const icon = toggleButton.querySelector('i');
+    const mq = window.matchMedia('(max-width: 1024px)');
+
+    const setState = (collapsed) => {
+        container.classList.toggle('sidebar-collapsed', collapsed);
+        toggleButton.setAttribute('aria-expanded', (!collapsed).toString());
+
+        if (label) {
+            label.textContent = collapsed ? 'Show Sidebar' : 'Hide Sidebar';
+        }
+
+        if (icon) {
+            icon.classList.toggle('fa-chevron-left', !collapsed);
+            icon.classList.toggle('fa-bars', collapsed);
+        }
+    };
+
+    toggleButton.addEventListener('click', () => {
+        const collapsed = !container.classList.contains('sidebar-collapsed');
+        setState(collapsed);
+    });
+
+    if (mq.matches) {
+        setState(true);
+    }
+
+    const mqListener = (event) => {
+        setState(event.matches);
+    };
+
+    if (mq.addEventListener) {
+        mq.addEventListener('change', mqListener);
+    } else if (mq.addListener) {
+        mq.addListener(mqListener);
+    }
+}

@@ -412,7 +412,9 @@ body {
 /* Docs Page */
 .docs-container {
     display: flex;
+    align-items: flex-start;
     min-height: calc(100vh - 64px);
+    position: relative;
 }
 
 .docs-sidebar {
@@ -423,6 +425,8 @@ body {
     position: sticky;
     top: 64px;
     height: calc(100vh - 64px);
+    flex-shrink: 0;
+    z-index: 2;
 }
 
 .sidebar-header {
@@ -474,13 +478,71 @@ body {
 }
 
 .docs-content {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     padding: 3rem;
-    max-width: 900px;
+    display: flex;
+    justify-content: center;
+}
+
+.docs-body {
+    width: min(900px, 100%);
+}
+
+.docs-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-white);
+    color: var(--text-color);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border 0.2s, box-shadow 0.2s;
+}
+
+.sidebar-toggle:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow);
+}
+
+.sidebar-toggle i {
+    font-size: 0.875rem;
+}
+
+.sidebar-toggle .toggle-label {
+    font-size: 0.875rem;
+}
+
+.docs-container.sidebar-collapsed .docs-sidebar {
+    display: none;
+}
+
+.docs-container.sidebar-collapsed .sidebar-toggle {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 
 #doc-content {
+    width: 100%;
     line-height: 1.8;
+}
+
+.doc-content-inner,
+#doc-content {
+    margin-left: auto;
+    margin-right: auto;
 }
 
 #doc-content h1 {
@@ -597,6 +659,24 @@ body {
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+    .docs-container {
+        flex-direction: column;
+    }
+
+    .docs-sidebar {
+        width: 100%;
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .docs-content {
+        padding: 2rem 1.5rem;
+    }
+}
+
 @media (max-width: 768px) {
     .nav-links {
         gap: 1rem;
@@ -616,18 +696,6 @@ body {
         align-items: center;
     }
 
-    .docs-container {
-        flex-direction: column;
-    }
-
-    .docs-sidebar {
-        width: 100%;
-        position: static;
-        height: auto;
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
-    }
-
     .docs-content {
         padding: 2rem 1rem;
     }
@@ -636,4 +704,3 @@ body {
         padding: 0 1rem;
     }
 }
-
