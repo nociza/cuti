@@ -144,6 +144,40 @@ Show the currently active account.
 cuti claude current
 ```
 
+### `cuti claude update`
+
+Update the underlying Claude Code CLI (`@anthropic-ai/claude-code`) so that the
+`claude` command inside containers matches the latest Anthropic release.
+
+```bash
+# Update to the latest stable version in your preferred scope
+cuti claude update
+
+# Install a specific release
+cuti claude update 1.0.118
+
+# Try the beta channel
+cuti claude update --beta
+
+# Skip the confirmation prompt (useful for scripted environments)
+cuti claude update --yes
+
+# See the exact npm command that would run without making changes
+cuti claude update --dry-run
+```
+
+Key behaviors:
+- Runs `npm install -g @anthropic-ai/claude-code@<version>` under the hood and
+  verifies the result with `claude --version`.
+- Defaults to a user-scoped install on the host (e.g., `~/.local/bin`). When the
+  command detects it is running inside a cuti container it automatically uses a
+  system-wide install so `/usr/local/bin/claude` is updated for every shell.
+- Prompts for confirmation before changing anything; add `--yes` (or `-y`) to
+  skip the prompt, or `--dry-run` to only print the npm command.
+- Supports `--system` to force a global install, `--force` to reinstall the
+  current version, and `--beta` or an explicit version to pin what gets pulled
+  from npm.
+
 ## How It Works
 
 ### Directory Structure
@@ -355,4 +389,3 @@ cuti devcontainer start
 - [Claude Container Authentication](claude-container-auth.md) - How Claude auth works in containers
 - [Container Management](container.md) - Container commands and usage
 - [DevContainer Documentation](devcontainer.md) - DevContainer setup and configuration
-
