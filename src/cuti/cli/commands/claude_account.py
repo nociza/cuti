@@ -483,6 +483,161 @@ def delete_api_key_cmd(
         raise typer.Exit(1)
 
 
+@app.command("update")
+def update_claude_cli(
+    version: str = typer.Argument(None, help="Specific version to install (e.g., 1.2.3)"),
+    beta: bool = typer.Option(False, "--beta", help="Install the latest beta version"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force reinstallation even if already up-to-date"),
+    system: bool = typer.Option(False, "--system", help="Install system-wide (requires permissions)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without actually updating"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt")
+):
+    """Update the Claude Code CLI (`@anthropic-ai/claude-code`) using npm.
+
+    The Claude CLI that powers `claude code` is distributed as an npm package, so
+    we keep it up-to-date by reinstalling `@anthropic-ai/claude-code`. The
+    command chooses a user installation unless either `--system` is provided or
+    we're inside a cuti container (where a system-wide install is required for
+    the shared `/usr/local/bin/claude` wrapper).
+    """
+    import json
+    import os
+    import platform
+    import shlex
+    import shutil
+    import subprocess
+
+    PACKAGE_NAME = "@anthropic-ai/claude-code"
+
+    console.print("[cyan]🔄 Claude Code CLI Update[/cyan]")
+    console.print("[dim]Checking npm installation and available versions...[/dim]")
+
+    if version and beta:
+        raise typer.BadParameter("Use either a specific version argument or --beta, not both")
+
+    # In containers npm is aliased to pnpm; prefer the real npm binary when present
+    npm_cmd = shutil.which("npm-original") or shutil.which("npm")
+    if not npm_cmd:
+        console.print("[red]✗[/red] npm was not found. Please install Node.js / npm and retry.")
+        raise typer.Exit(1)
+
+    in_container = os.environ.get("CUTI_IN_CONTAINER", "").lower() == "true"
+    use_system_scope = system or in_container
+
+    prefix_args: list[str] = []
+    prefix_path = None
+    if not use_system_scope:
+        prefix_path = Path.home() / ".local"
+        prefix_args = ["--prefix", str(prefix_path)]
+        (prefix_path / "bin").mkdir(parents=True, exist_ok=True)
+        (prefix_path / "lib").mkdir(parents=True, exist_ok=True)
+
+    # Determine which dist-tag/version we will install
+    if version:
+        desired_spec = f"{PACKAGE_NAME}@{version}"
+    elif beta:
+        desired_spec = f"{PACKAGE_NAME}@beta"
+    else:
+        desired_spec = f"{PACKAGE_NAME}@latest"
+
+    try:
+        view_cmd = [npm_cmd, "view", desired_spec, "version"]
+        view_result = subprocess.run(view_cmd, capture_output=True, text=True, check=True)
+        target_version = view_result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]✗[/red] Failed to query npm for {desired_spec}")
+        if e.stderr:
+            console.print(f"[dim]{e.stderr.strip()}[/dim]")
+        raise typer.Exit(1)
+
+    # Determine the currently installed version in the chosen scope
+    current_version = None
+    list_cmd = [npm_cmd, "list", "-g", "--depth", "0", "--json"]
+    if prefix_args:
+        list_cmd.extend(prefix_args)
+    try:
+        list_result = subprocess.run(list_cmd, capture_output=True, text=True, check=False)
+        if list_result.stdout.strip():
+            data = json.loads(list_result.stdout)
+            dependencies = data.get("dependencies", {}) or {}
+            if PACKAGE_NAME in dependencies:
+                current_version = dependencies[PACKAGE_NAME].get("version")
+    except json.JSONDecodeError:
+        pass
+
+    scope_label = "system-wide" if use_system_scope else f"user (~/{prefix_path.relative_to(Path.home())})"
+    console.print(f"[dim]Target version:[/dim] {target_version}")
+    if current_version:
+        console.print(f"[dim]Current version:[/dim] {current_version}")
+    else:
+        console.print("[dim]Current version:[/dim] not detected in this scope")
+    console.print(f"[dim]Install scope:[/dim] {scope_label}\n")
+
+    if current_version == target_version and not force:
+        console.print("[green]✓[/green] Claude Code CLI is already up-to-date. Use --force to reinstall anyway.")
+        return
+
+    if dry_run:
+        console.print("[yellow]DRY RUN[/yellow] No changes will be made.")
+
+    should_prompt = not yes and not dry_run
+    if should_prompt:
+        prompt_msg = f"Install Claude Code CLI {target_version} ({scope_label})?"
+        if not typer.confirm(prompt_msg):
+            console.print("[dim]Update cancelled by user[/dim]")
+            return
+
+    install_cmd: list[str] = []
+    needs_sudo = False
+    system_type = platform.system().lower()
+    if use_system_scope and system_type != "windows":
+        if hasattr(os, "geteuid") and os.geteuid() != 0:
+            needs_sudo = True
+        elif not hasattr(os, "geteuid"):
+            needs_sudo = True
+        if needs_sudo and not shutil.which("sudo"):
+            console.print("[red]✗[/red] System-wide install requires sudo but it was not found.")
+            console.print("Run again with --system disabled or install sudo.")
+            raise typer.Exit(1)
+
+    if needs_sudo:
+        install_cmd.append("sudo")
+
+    install_cmd.extend([npm_cmd, "install", "-g"])
+    if prefix_args:
+        install_cmd.extend(prefix_args)
+    install_cmd.append(desired_spec)
+
+    pretty_cmd = " ".join(shlex.quote(part) for part in install_cmd)
+    if dry_run:
+        console.print(f"[dim]Would run:[/dim] {pretty_cmd}")
+        return
+
+    console.print(f"[dim]Running:[/dim] {pretty_cmd}")
+    try:
+        subprocess.run(install_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]✗[/red] npm install failed with exit code {e.returncode}")
+        raise typer.Exit(1)
+
+    # Verify installation via the claude CLI if available
+    console.print("\n[dim]Verifying installation...[/dim]")
+    claude_path = shutil.which("claude")
+    if claude_path:
+        try:
+            result = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=5)
+            reported_version = result.stdout.strip() or result.stderr.strip()
+            console.print(f"[green]✓[/green] Claude CLI updated at {claude_path}")
+            if reported_version:
+                console.print(f"[dim]Reported version:[/dim] {reported_version}")
+        except Exception as exc:
+            console.print(f"[yellow]⚠[/yellow] Update succeeded but failed to run 'claude --version': {exc}")
+    else:
+        console.print("[yellow]⚠[/yellow] Update completed but 'claude' is not in PATH")
+        if prefix_path:
+            console.print(f"[dim]Add {prefix_path / 'bin'} to your PATH if needed.[/dim]")
+
+
 @app.command("env")
 def show_env(
     account: str = typer.Argument(None, help="Account name (default: active account)"),
@@ -573,4 +728,3 @@ def show_env(
     console.print(f"  [cyan]source ~/.cuti/claude-accounts/{account}/env.sh[/cyan]")
     console.print(f"\n[yellow]To unset all variables:[/yellow]")
     console.print(f"  [cyan]eval $(cuti claude env --unset)[/cyan]")
-

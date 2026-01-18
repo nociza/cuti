@@ -399,13 +399,19 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         import stat
         try:
             # Make the directory world-writable to avoid UID/GID issues
-            linux_claude_dir.chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+            dir_mode = stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+            file_mode = (
+                stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
+            )
+            linux_claude_dir.chmod(dir_mode)
             for item in linux_claude_dir.rglob("*"):
+                if not item.exists():
+                    continue
                 if item.is_dir():
-                    item.chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                    item.chmod(dir_mode)
                 else:
                     # Make files readable and writable by all
-                    item.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
+                    item.chmod(file_mode)
         except Exception as e:
             print(f"⚠️  Could not set permissions: {e}")
         
