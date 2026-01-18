@@ -10,7 +10,7 @@
 
 **Instant containerized development with Claude Code, Anthropic API integration, and intelligent agent orchestration**
 
-[PyPI](https://pypi.org/project/cuti/) • [Documentation](#documentation) • [GitHub](https://github.com/nociza/cuti)
+[PyPI](https://pypi.org/project/cuti/) • [Documentation](https://cutils.org/) • [GitHub](https://github.com/nociza/cuti)
 
 </div>
 
