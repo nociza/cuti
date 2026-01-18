@@ -702,8 +702,9 @@ if [ -e /var/run/docker.sock ]; then
         sudo groupmod -g $DOCKER_GID docker
     fi
     
-    # Ensure user is in docker group
-    if ! groups | grep -q docker; then
+    # Ensure user is in docker group (compare numeric GIDs to avoid missing-name warnings)
+    USER_GROUPS=$(id -G 2>/dev/null || echo "")
+    if ! echo "$USER_GROUPS" | tr ' ' '\n' | grep -qx "$DOCKER_GID"; then
         echo "📦 Adding user to docker group..."
         sudo usermod -aG docker $USER
         # Apply group changes in current session
