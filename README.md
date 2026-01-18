@@ -56,18 +56,6 @@ Perfect for AI-powered development, automation workflows, and LLM orchestration.
 
 ## 📚 Documentation
 
-### 🌐 Interactive Documentation Website
-
-A beautiful static website with all documentation is available in the `website/` folder. To view it locally:
-
-```bash
-cd website
-python3 serve.py
-# Open http://localhost:8000 in your browser
-```
-
-The website can be hosted on any static hosting service (GitHub Pages, Netlify, Vercel, etc.). See [website/README.md](website/README.md) for details.
-
 ### 📖 Documentation Guides
 
 | Guide | Description |
