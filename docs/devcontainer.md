@@ -145,6 +145,29 @@ If you're using an older container image, rebuild to get the alias:
 cuti container --rebuild
 ```
 
+### 🦞 Clawdbot Addon (preview)
+
+The dev container now installs the optional [Clawdbot](https://clawdbot.com) CLI (default **enabled**). Use the new wrappers to manage onboarding, gateway, and messaging without leaving the `cuti` workflow:
+
+```bash
+cuti addons list                 # view/toggle addon state
+cuti clawdbot onboard            # run Clawdbot wizard (auth, workspace, channels)
+cuti clawdbot gateway --port 18789  # stream gateway logs until Ctrl+C
+cuti clawdbot channels-login     # scan WhatsApp / authorize Telegram bots
+cuti clawdbot send --to +15551234567 --message "Hello"
+```
+
+Exposed host mounts:
+
+| Host Path | Container Path | Purpose |
+|-----------|----------------|---------|
+| `~/.cuti/clawdbot/config/` | `/home/cuti/.clawdbot` | Gateway config + channel credentials |
+| `~/.cuti/clawdbot/workspaces/<project-id>/` | `/home/cuti/clawd` | Agent workspace + history for that project |
+
+`<project-id>` combines the project folder name with a short hash of its absolute path, so each cuti workspace keeps its own logs/history even when multiple containers run concurrently, while configs stay global.
+
+See [docs/clawdbot.md](clawdbot.md) for channel-specific steps (WhatsApp QR, Telegram tokens, smoke tests).
+
 ### Docker-in-Docker Usage
 ```bash
 # Build Docker images inside the container

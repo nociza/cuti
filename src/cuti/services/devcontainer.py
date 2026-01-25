@@ -3,15 +3,17 @@ DevContainer Service for cuti
 Automatically generates and manages dev containers for any project with Colima support.
 """
 
+import hashlib
 import json
 import os
-import subprocess
-import shutil
-import tempfile
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from datetime import datetime
 import platform
+import re
+import shutil
+import subprocess
+import tempfile
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from rich.console import Console
@@ -19,6 +21,8 @@ try:
     _RICH_AVAILABLE = True
 except ImportError:
     _RICH_AVAILABLE = False
+
+from .addons import AddonManager
 
 
 class DevContainerService:
@@ -89,7 +93,7 @@ RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 
 # Install Node.js and pnpm
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \\
     && apt-get install -y nodejs \\
     && npm install -g npm@latest \\
     && npm install -g pnpm@latest \\
@@ -130,6 +134,9 @@ RUN npm-original install -g @anthropic-ai/claude-code@latest \\
     && echo 'fi' >> /usr/local/bin/claude \\
     && echo 'exec node "$CLAUDE_CLI" "$@"' >> /usr/local/bin/claude \\
     && chmod +x /usr/local/bin/claude
+
+# Optional Clawdbot install placeholder
+{CLAWDBOT_INSTALL}
 
 {CUTI_INSTALL}
 
@@ -195,11 +202,13 @@ CMD ["/bin/zsh", "-l"]
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
         self.devcontainer_dir = self.working_dir / ".devcontainer"
         self.is_macos = platform.system() == "Darwin"
+        self.addon_manager = AddonManager()
+        self._clawdbot_enabled_cache: Optional[bool] = None
         
         # Check tool availability (cached for CLI compatibility)
         self.docker_available = self._check_tool_available("docker")
         self.colima_available = self._check_tool_available("colima")
-    
+
     def _run_command(self, cmd: List[str], timeout: int = 30, show_output: bool = False) -> subprocess.CompletedProcess:
         """Run a command with consistent error handling."""
         try:
@@ -239,6 +248,57 @@ CMD ["/bin/zsh", "-l"]
             raise RuntimeError(f"Command timed out: {' '.join(cmd)}")
         except FileNotFoundError:
             raise RuntimeError(f"Command not found: {cmd[0]}")
+
+    def _is_clawdbot_enabled(self) -> bool:
+        """Check whether the Clawdbot addon should be installed (prompting if needed)."""
+
+        if self._clawdbot_enabled_cache is not None:
+            return self._clawdbot_enabled_cache
+
+        prompt_text = (
+            "The Clawdbot addon installs the Clawdbot CLI inside the container so you can run the gateway and messaging channels."
+        )
+        enabled = self.addon_manager.ensure_enabled("clawdbot", prompt=prompt_text, default_enabled=True)
+        self._clawdbot_enabled_cache = enabled
+        return enabled
+
+    def _clawdbot_workspace_slug(self) -> str:
+        """Return a stable slug for the current project to scope Clawdbot history."""
+
+        resolved = self.working_dir.resolve()
+        digest = hashlib.sha1(str(resolved).encode("utf-8")).hexdigest()[:8]
+        base_name = resolved.name or "workspace"
+        sanitized = re.sub(r"[^a-zA-Z0-9_-]", "-", base_name).strip("-") or "workspace"
+        return f"{sanitized}-{digest}"
+
+    def _prepare_clawdbot_storage(self) -> Tuple[Path, Path]:
+        """Ensure Clawdbot config/workspace live under ~/.cuti/clawdbot."""
+
+        root = Path.home() / ".cuti" / "clawdbot"
+        root.mkdir(parents=True, exist_ok=True)
+
+        config_dir = root / "config"
+        workspaces_root = root / "workspaces"
+        workspaces_root.mkdir(parents=True, exist_ok=True)
+        workspace_dir = workspaces_root / self._clawdbot_workspace_slug()
+
+        self._migrate_legacy_dir(Path.home() / ".clawdbot", config_dir, "Clawdbot config")
+        self._migrate_legacy_dir(Path.home() / "clawd", workspace_dir, "Clawdbot workspace")
+
+        config_dir.mkdir(parents=True, exist_ok=True)
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        return config_dir, workspace_dir
+
+    def _migrate_legacy_dir(self, legacy_path: Path, new_path: Path, label: str) -> None:
+        """Move/copy legacy directories into the new ~/.cuti hierarchy."""
+
+        try:
+            if legacy_path.exists() and not new_path.exists():
+                shutil.move(str(legacy_path), str(new_path))
+                print(f"🔁 Migrated legacy {label} to {new_path}")
+        except Exception as exc:
+            print(f"⚠️  Could not migrate {label}: {exc}")
     
     def _check_tool_available(self, tool: str) -> bool:
         """Check if a tool is available."""
@@ -365,7 +425,17 @@ RUN /root/.local/bin/uv pip install --system cuti \\
     && chmod +x /usr/local/bin/cuti \\
     && cuti --help > /dev/null && echo "✅ cuti installed from PyPI"
 '''
-        
+
+        if self._is_clawdbot_enabled():
+            clawdbot_install = '''
+# Install Clawdbot CLI (addon)
+RUN npm-original install -g clawdbot@latest \\
+    && clawdbot --version > /dev/null \\
+    && echo "✅ Clawdbot CLI installed"
+'''
+        else:
+            clawdbot_install = "# Clawdbot addon disabled\n"
+
         # Add tools installation if the setup script exists
         tools_setup = ""
         container_tools_path = Path("/workspace/.cuti/container_tools.sh")
@@ -377,7 +447,8 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
 '''
         
         dockerfile = self.DOCKERFILE_TEMPLATE.replace("{CUTI_INSTALL}", cuti_install)
-        
+        dockerfile = dockerfile.replace("{CLAWDBOT_INSTALL}", clawdbot_install)
+
         # Insert tools setup before the final CMD if it exists
         if tools_setup:
             dockerfile = dockerfile.replace("# Set the default command", tools_setup + "\n# Set the default command")
@@ -587,7 +658,12 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         else:
             return "general"
     
-    def run_in_container(self, command: Optional[str] = None, rebuild: bool = False) -> int:
+    def run_in_container(
+        self,
+        command: Optional[str] = None,
+        rebuild: bool = False,
+        interactive: bool = False,
+    ) -> int:
         """Run command in dev container."""
         # Ensure Docker is available
         if not self._check_tool_available("docker"):
@@ -633,6 +709,19 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 print("🐳 Using Docker Desktop - trying cached mode for better macOS compatibility")
                 mount_options = "rw,cached"  # Docker Desktop on macOS needs cached mode
         
+        clawdbot_enabled = self._is_clawdbot_enabled()
+        clawdbot_config_subpath: Optional[str] = None
+        clawdbot_workspace_subpath: Optional[str] = None
+        if clawdbot_enabled:
+            # Ensure host-side directories exist so the container can symlink to them during init
+            config_dir, workspace_dir = self._prepare_clawdbot_storage()
+            cuti_root = Path.home() / ".cuti"
+            try:
+                clawdbot_config_subpath = str(config_dir.relative_to(cuti_root))
+                clawdbot_workspace_subpath = str(workspace_dir.relative_to(cuti_root))
+            except ValueError:
+                clawdbot_config_subpath = clawdbot_workspace_subpath = None
+
         docker_args = [
             "docker", "run", "--rm", "--init",
             "-v", f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
@@ -649,11 +738,19 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--env", "PYTHONUNBUFFERED=1",
             "--env", "PYTHONPATH=/workspace/src",
             "--env", "TERM=xterm-256color",
-            "--env", "PATH=/usr/local/bin:/home/cuti/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "--env", "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
             "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
             "--network", "host",
-            image_name
         ]
+
+        docker_args.extend(["--env", f"CUTI_ENABLE_CLAWDBOT_ADDON={'true' if clawdbot_enabled else 'false'}"])
+        if clawdbot_config_subpath and clawdbot_workspace_subpath:
+            docker_args.extend([
+                "--env", f"CUTI_CLAWDBOT_CONFIG_SUBPATH={clawdbot_config_subpath}",
+                "--env", f"CUTI_CLAWDBOT_WORKSPACE_SUBPATH={clawdbot_workspace_subpath}",
+            ])
+
+        docker_args.append(image_name)
         
         # Setup initialization command for mounted directory
         init_script = """
@@ -727,6 +824,61 @@ if [ -d /home/cuti/.claude-linux ]; then
     echo "🔗 Linux Claude config mounted from host"
 fi
 
+if [ "${CUTI_ENABLE_CLAWDBOT_ADDON}" = "true" ]; then
+    if command -v node >/dev/null 2>&1; then
+        NODE_VERSION=$(node -v | sed 's/^v//')
+        NODE_MAJOR=${NODE_VERSION%%.*}
+    else
+        NODE_MAJOR=0
+    fi
+
+    if [ "$NODE_MAJOR" -lt 22 ]; then
+        echo "⬆️  Upgrading Node.js runtime to v22..."
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - >/tmp/node-setup.log 2>&1
+        if sudo apt-get install -y nodejs >>/tmp/node-setup.log 2>&1; then
+            echo "✅ Node.js upgraded to $(node -v)"
+        else
+            echo "⚠️  Failed to upgrade Node.js"
+            cat /tmp/node-setup.log
+        fi
+    fi
+
+    if command -v clawdbot > /dev/null 2>&1; then
+        echo "✅ Clawdbot CLI already installed"
+    else
+        echo "🦞 Installing Clawdbot CLI..."
+        export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+        if sudo npm-original install -g clawdbot@latest > /tmp/clawdbot-install.log 2>&1; then
+            echo "✅ Clawdbot CLI installed"
+        else
+            echo "⚠️  Failed to install Clawdbot CLI"
+            cat /tmp/clawdbot-install.log
+        fi
+    fi
+
+    REAL_CLAWBOT_PATH=$(command -v clawdbot 2>/dev/null | head -n1)
+    if [ -z "$REAL_CLAWBOT_PATH" ]; then
+        REAL_CLAWBOT_PATH="/usr/local/bin/clawdbot"
+    fi
+
+    # Ensure the user-visible clawdbot command can elevate when needed (config edits)
+    mkdir -p /home/cuti/.local/bin
+    cat > /home/cuti/.local/bin/clawdbot <<CLAWDBOT_WRAPPER
+#!/bin/bash
+REAL_BIN="$REAL_CLAWBOT_PATH"
+
+if [ "\$1" = "config" ]; then
+    sudo -E env HOME=/home/cuti "\$REAL_BIN" "\$@"
+    status=\$?
+    sudo chown -R cuti:cuti /home/cuti/.clawdbot /home/cuti/.cuti/clawdbot 2>/dev/null || true
+    exit \$status
+fi
+
+exec "\$REAL_BIN" "\$@"
+CLAWDBOT_WRAPPER
+    chmod +x /home/cuti/.local/bin/clawdbot
+fi
+
 # Setup symlink for cuti account management to access global .cuti directory
 if [ -d /home/cuti/.cuti-shared ]; then
     # Fix ownership of the shared directory to ensure cuti user can access it
@@ -742,6 +894,78 @@ if [ -d /home/cuti/.cuti-shared ]; then
     fi
     echo "🔗 Global .cuti directory mounted and accessible for account management"
 fi
+
+# Ensure Clawdbot default directories point to the persistent ~/.cuti/clawdbot storage
+if [ -d /home/cuti/.cuti ]; then
+    CLAWDBOT_CONFIG_SUBPATH=${CUTI_CLAWDBOT_CONFIG_SUBPATH:-clawdbot/config}
+    CLAWDBOT_WORKSPACE_SUBPATH=${CUTI_CLAWDBOT_WORKSPACE_SUBPATH:-clawdbot/workspace}
+    CLAWDBOT_CONFIG_TARGET=/home/cuti/.cuti/$CLAWDBOT_CONFIG_SUBPATH
+    CLAWDBOT_WORKSPACE_TARGET=/home/cuti/.cuti/$CLAWDBOT_WORKSPACE_SUBPATH
+
+    mkdir -p "$CLAWDBOT_CONFIG_TARGET" "$CLAWDBOT_WORKSPACE_TARGET" 2>/dev/null || true
+    sudo chown -R cuti:cuti "$CLAWDBOT_CONFIG_TARGET" "$CLAWDBOT_WORKSPACE_TARGET" 2>/dev/null || true
+
+    for mapping in "/home/cuti/.clawdbot:$CLAWDBOT_CONFIG_TARGET" "/home/cuti/clawd:$CLAWDBOT_WORKSPACE_TARGET"; do
+        LINK_PATH=${mapping%%:*}
+        TARGET_PATH=${mapping##*:}
+        if [ -e "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ]; then
+            rm -rf "$LINK_PATH"
+        fi
+        ln -sfn "$TARGET_PATH" "$LINK_PATH"
+    done
+
+    echo "🔗 Clawdbot config linked to ~/.cuti/$CLAWDBOT_CONFIG_SUBPATH"
+    echo "🔗 Clawdbot workspace linked to ~/.cuti/$CLAWDBOT_WORKSPACE_SUBPATH"
+fi
+
+# Ensure the cuti CLI is available inside the container via `uv tool install`
+ensure_cuti_cli() {
+    if command -v cuti >/dev/null 2>&1; then
+        if python3 - <<'PY' >/dev/null 2>&1
+import importlib
+import sys
+
+try:
+    importlib.import_module("cuti")
+except Exception:
+    sys.exit(1)
+PY
+        then
+            return
+        fi
+        echo "⚠️  cuti executable found but module import failed - reinstalling via uv tool"
+    else
+        echo "⚙️  cuti CLI missing inside container - installing via uv tool"
+    fi
+
+    UV_BIN=${UV_BIN:-/home/cuti/.local/bin/uv}
+    if [ ! -x "$UV_BIN" ]; then
+        echo "❌ uv tool not found at $UV_BIN"
+        return
+    fi
+
+    if [ -d /workspace/src/cuti ] && [ -f /workspace/pyproject.toml ]; then
+        echo "   ↪︎ Installing editable cuti from workspace source"
+        if "$UV_BIN" tool install --force --editable /workspace > /tmp/cuti-install.log 2>&1; then
+            echo "✅ cuti installed from workspace via uv tool"
+        else
+            echo "⚠️  Failed to install cuti from workspace"
+            cat /tmp/cuti-install.log
+        fi
+    else
+        echo "   ↪︎ Installing latest cuti from PyPI"
+        if "$UV_BIN" tool install --force cuti > /tmp/cuti-install.log 2>&1; then
+            echo "✅ cuti installed from PyPI via uv tool"
+        else
+            echo "⚠️  Failed to install cuti from PyPI"
+            cat /tmp/cuti-install.log
+        fi
+    fi
+
+    hash -r 2>/dev/null || true
+}
+
+ensure_cuti_cli
 
 # Copy settings from macOS config if available (read-only mount)
 if [ -d /home/cuti/.claude-macos ] && [ ! -f /home/cuti/.claude-linux/CLAUDE.md ]; then
@@ -853,15 +1077,19 @@ else
 fi
 """
         
-        # Add interactive flags if no specific command
+        # Add interactive flags when needed
+        zsh_bin = "/usr/bin/zsh"
+        needs_tty = not command or interactive
         if not command:
             docker_args.insert(2, "-it")
-            full_command = f"{init_script}\nexec /bin/zsh -l"
-            docker_args.extend(["/bin/zsh", "-c", full_command])
+            full_command = f"{init_script}\nexec {zsh_bin} -l"
+            docker_args.extend([zsh_bin, "-c", full_command])
         else:
+            if needs_tty:
+                docker_args.insert(2, "-it")
             full_command = f"{init_script}\n{command}"
-            docker_args.extend(["/bin/zsh", "-c", full_command])
-        
+            docker_args.extend([zsh_bin, "-lc", full_command])
+
         return subprocess.run(docker_args).returncode
     
     def clean(self, clean_credentials: bool = False) -> bool:

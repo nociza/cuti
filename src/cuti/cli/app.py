@@ -52,6 +52,14 @@ try:
     from .commands.claude_account import app as claude_app
 except ImportError:
     claude_app = None
+try:
+    from .commands.addons import app as addons_app
+except ImportError:
+    addons_app = None
+try:
+    from .commands.clawdbot import app as clawdbot_app
+except ImportError:
+    clawdbot_app = None
 
 app = typer.Typer(
     name="cuti",
@@ -166,6 +174,10 @@ if sync_app:
 # Add claude account commands if available
 if claude_app:
     app.add_typer(claude_app, name="claude", help="Manage Claude accounts")
+if addons_app:
+    app.add_typer(addons_app, name="addons", help="Manage optional addons like Clawdbot")
+if clawdbot_app:
+    app.add_typer(clawdbot_app, name="clawdbot", help="Run Clawdbot commands inside the dev container")
 
 # Add top-level commands for convenience
 from .commands.queue import start_queue, add_prompt, show_status

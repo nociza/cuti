@@ -51,6 +51,7 @@ Build with multiple AI models and intelligent task management:
 - **Smart rate limiting** - Automatic retry & backoff
 - **Task automation** - Built-in todo system for AI agents
 - **Claude version switching** - Easy CLI version management
+- **Optional Clawdbot addon** - Run Clawdbot gateway + messaging from the same dev container (`cuti clawdbot ...`)
 
 Perfect for AI-powered development, automation workflows, and LLM orchestration.
 
@@ -86,5 +87,24 @@ Apache 2.0 - See [LICENSE](LICENSE)
 <div align="center">
 
 **[PyPI](https://pypi.org/project/cuti/)** • **[Issues](https://github.com/nociza/cuti/issues)** • **[Contribute](https://github.com/nociza/cuti)**
+
+## 🦞 Clawdbot Add-on (Preview)
+
+The dev container ships with an optional Clawdbot install (default **on** for testing). Use it to run the Clawdbot gateway, connect WhatsApp/Telegram/Discord, and send smoke-test messages without leaving the `cuti` workflow.
+
+```bash
+# Check addon state / toggle it
+cuti addons list
+cuti addons disable clawdbot  # opt-out once you're done testing
+
+# Clawdbot lifecycle
+cuti clawdbot onboard           # installer wizard + daemon setup
+cuti clawdbot start             # auto-pick a port + stream gateway logs
+cuti clawdbot config show       # inspect/edit clawdbot.json via the container
+cuti clawdbot channels-login    # scan WhatsApp QR / authorize channels
+cuti clawdbot send --to +15551234567 --message "Hello"
+```
+
+All Clawdbot state now persists under `~/.cuti/clawdbot/` (subfolders `config/` and `workspace/`), so messaging logins and skills survive across container rebuilds. See [docs/clawdbot.md](docs/clawdbot.md) for channel-specific steps, port-selection rules, and troubleshooting (QR pairing, Telegram tokens, etc.).
 
 </div>
