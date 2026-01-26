@@ -67,6 +67,7 @@ Perfect for AI-powered development, automation workflows, and LLM orchestration.
 | [Claude API Keys](docs/claude-api-keys.md) | Anthropic & AWS Bedrock API key management |
 | [Task Management](docs/todo-system.md) | AI agent todo system |
 | [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
+| [Clawdbot Integration](docs/clawdbot.md) | Run the Clawdbot gateway + channels inside cuti |
 
 ## 🤝 Contributing
 
@@ -88,23 +89,16 @@ Apache 2.0 - See [LICENSE](LICENSE)
 
 **[PyPI](https://pypi.org/project/cuti/)** • **[Issues](https://github.com/nociza/cuti/issues)** • **[Contribute](https://github.com/nociza/cuti)**
 
-## 🦞 Clawdbot Add-on (Preview)
-
-The dev container ships with an optional Clawdbot install (default **on** for testing). Use it to run the Clawdbot gateway, connect WhatsApp/Telegram/Discord, and send smoke-test messages without leaving the `cuti` workflow.
-
-```bash
-# Check addon state / toggle it
-cuti addons list
-cuti addons disable clawdbot  # opt-out once you're done testing
-
-# Clawdbot lifecycle
-cuti clawdbot onboard           # installer wizard + daemon setup
-cuti clawdbot start             # auto-pick a port + stream gateway logs
-cuti clawdbot config show       # inspect/edit clawdbot.json via the container
-cuti clawdbot channels-login    # scan WhatsApp QR / authorize channels
-cuti clawdbot send --to +15551234567 --message "Hello"
-```
-
-All Clawdbot state now persists under `~/.cuti/clawdbot/` (subfolders `config/` and `workspace/`), so messaging logins and skills survive across container rebuilds. See [docs/clawdbot.md](docs/clawdbot.md) for channel-specific steps, port-selection rules, and troubleshooting (QR pairing, Telegram tokens, etc.).
-
 </div>
+
+## 🦞 Clawdbot Integration
+
+Clawdbot ships with cuti now—no manual install needed. The addon runs entirely inside the dev container, auto-links your Clawdbot workspace/config from `~/.cuti/clawdbot/`, and keeps every command interactive (OAuth, QR codes, etc.).
+
+- `cuti clawdbot onboard` – run the official wizard with OAuth + skill setup
+- `cuti clawdbot start` – launch the gateway, auto-pick a port, stream logs
+- `cuti clawdbot config` – edit `clawdbot.json` safely inside the container
+- `cuti clawdbot channels-login` – scan WhatsApp QR or add other channels
+- `cuti clawdbot send --to +15551234567 --message "Hello"` – quick smoke test
+
+See [docs/clawdbot.md](docs/clawdbot.md) for storage layout, channel details, and troubleshooting tips.

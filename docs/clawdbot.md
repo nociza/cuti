@@ -1,6 +1,6 @@
 # Clawdbot Integration (Preview)
 
-Run the Clawdbot gateway and messaging connectors directly from the cuti dev container. The addon is enabled by default for testing and can be toggled at any time.
+Run the Clawdbot gateway and messaging connectors directly from the cuti dev container. The addon is enabled by default and can be toggled at any time. The wrapper handles installing the CLI, wiring persistent storage, and running any command inside the container with the right permissions.
 
 ## Enable or disable the addon
 
@@ -10,14 +10,29 @@ cuti addons disable clawdbot   # opt-out (no install on future rebuilds)
 cuti addons enable clawdbot    # re-enable when you need it again
 ```
 
-State is stored in `~/.cuti/addons.json`. When enabled, the container image installs the Clawdbot CLI (Node 22 runtime) and mounts persistent directories inside `~/.cuti/clawdbot/`:
+State is stored in `~/.cuti/addons.json`. When enabled, the container image installs the Clawdbot CLI (Node 22 runtime) and mounts persistent directories inside `~/.cuti/clawdbot/`.
 
-- `~/.cuti/clawdbot/config/` → `/home/cuti/.clawdbot` (gateway config, channel creds)
-- `~/.cuti/clawdbot/workspaces/<project-id>/` → `/home/cuti/clawd` for that project (workspace, skills, agent files)
+## Storage layout & workspace linking
 
-`<project-id>` uses the folder name plus a short hash of the absolute path, so two different cuti projects never share the same history/workspace while still avoiding collisions when you open the same project in multiple terminals or containers simultaneously.
+Every time you run `cuti clawdbot …` we relink the expected directories before launching the container:
 
-Existing setups that used `~/.clawdbot` or `~/clawd` are migrated automatically the next time you run the container.
+- `~/.cuti/clawdbot/config/` → `/home/cuti/.clawdbot` (gateway config, channel credentials, channel hooks)
+- `~/.cuti/clawdbot/workspaces/<project-id>/` → `/home/cuti/clawd` for that project (agent workspace, logs, skills, session transcripts)
+
+`<project-id>` uses the workspace folder name plus a short hash of its absolute path, so two different cuti projects never collide while the same project opened in multiple shells still shares history. The host still sees the files under `~/.cuti/clawdbot/workspaces/<project-id>/`; inside the container Clawdbot always interacts with `/home/cuti/clawd`.
+
+Legacy installs that used `~/.clawdbot` or `~/clawd` get migrated automatically whenever the wrapper runs.
+
+## Configure the gateway
+
+Use the interactive wizard without leaving the terminal:
+
+```bash
+cuti clawdbot config         # full wizard
+cuti clawdbot config show    # dump the merged clawdbot.json
+```
+
+The command drops into the container with a TTY, so QR screens and prompts render correctly. Because the wrapper runs as root inside the container when needed, edits to `clawdbot.json` and credentials succeed even when the mounted directories are owned by your host user.
 
 ## Onboarding + gateway
 

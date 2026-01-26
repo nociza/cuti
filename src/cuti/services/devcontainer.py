@@ -664,7 +664,13 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         rebuild: bool = False,
         interactive: bool = False,
     ) -> int:
-        """Run command in dev container."""
+        """Run command in dev container.
+
+        Args:
+            command: Command to run in the container
+            rebuild: Force rebuild of the container image
+            interactive: Run in interactive mode with TTY
+        """
         # Ensure Docker is available
         if not self._check_tool_available("docker"):
             if not self.ensure_dependencies():
@@ -713,7 +719,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         clawdbot_config_subpath: Optional[str] = None
         clawdbot_workspace_subpath: Optional[str] = None
         if clawdbot_enabled:
-            # Ensure host-side directories exist so the container can symlink to them during init
+            # Ensure host-side config/workspace directories exist so the container can link to them
             config_dir, workspace_dir = self._prepare_clawdbot_storage()
             cuti_root = Path.home() / ".cuti"
             try:
@@ -745,10 +751,14 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
 
         docker_args.extend(["--env", f"CUTI_ENABLE_CLAWDBOT_ADDON={'true' if clawdbot_enabled else 'false'}"])
         if clawdbot_config_subpath and clawdbot_workspace_subpath:
-            docker_args.extend([
-                "--env", f"CUTI_CLAWDBOT_CONFIG_SUBPATH={clawdbot_config_subpath}",
-                "--env", f"CUTI_CLAWDBOT_WORKSPACE_SUBPATH={clawdbot_workspace_subpath}",
-            ])
+            docker_args.extend(
+                [
+                    "--env",
+                    f"CUTI_CLAWDBOT_CONFIG_SUBPATH={clawdbot_config_subpath}",
+                    "--env",
+                    f"CUTI_CLAWDBOT_WORKSPACE_SUBPATH={clawdbot_workspace_subpath}",
+                ]
+            )
 
         docker_args.append(image_name)
         
@@ -895,7 +905,7 @@ if [ -d /home/cuti/.cuti-shared ]; then
     echo "🔗 Global .cuti directory mounted and accessible for account management"
 fi
 
-# Ensure Clawdbot default directories point to the persistent ~/.cuti/clawdbot storage
+# Ensure Clawdbot config/workspace point to the host-persistent ~/.cuti storage
 if [ -d /home/cuti/.cuti ]; then
     CLAWDBOT_CONFIG_SUBPATH=${CUTI_CLAWDBOT_CONFIG_SUBPATH:-clawdbot/config}
     CLAWDBOT_WORKSPACE_SUBPATH=${CUTI_CLAWDBOT_WORKSPACE_SUBPATH:-clawdbot/workspace}
@@ -905,14 +915,28 @@ if [ -d /home/cuti/.cuti ]; then
     mkdir -p "$CLAWDBOT_CONFIG_TARGET" "$CLAWDBOT_WORKSPACE_TARGET" 2>/dev/null || true
     sudo chown -R cuti:cuti "$CLAWDBOT_CONFIG_TARGET" "$CLAWDBOT_WORKSPACE_TARGET" 2>/dev/null || true
 
-    for mapping in "/home/cuti/.clawdbot:$CLAWDBOT_CONFIG_TARGET" "/home/cuti/clawd:$CLAWDBOT_WORKSPACE_TARGET"; do
-        LINK_PATH=${mapping%%:*}
-        TARGET_PATH=${mapping##*:}
+    cuti_link_clawdbot_path() {
+        local LINK_PATH="$1"
+        local TARGET_PATH="$2"
         if [ -e "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ]; then
-            rm -rf "$LINK_PATH"
+            if rm -rf "$LINK_PATH" 2>/dev/null; then
+                :
+            else
+                sudo rm -rf "$LINK_PATH" 2>/dev/null || true
+            fi
         fi
-        ln -sfn "$TARGET_PATH" "$LINK_PATH"
-    done
+
+        ln -sfn "$TARGET_PATH" "$LINK_PATH" 2>/dev/null || \
+            sudo ln -sfn "$TARGET_PATH" "$LINK_PATH" 2>/dev/null || true
+
+        if [ ! -L "$LINK_PATH" ]; then
+            echo "⚠️  Failed to link $LINK_PATH -> $TARGET_PATH (check permissions)"
+            return 1
+        fi
+    }
+
+    cuti_link_clawdbot_path "/home/cuti/.clawdbot" "$CLAWDBOT_CONFIG_TARGET"
+    cuti_link_clawdbot_path "/home/cuti/clawd" "$CLAWDBOT_WORKSPACE_TARGET"
 
     echo "🔗 Clawdbot config linked to ~/.cuti/$CLAWDBOT_CONFIG_SUBPATH"
     echo "🔗 Clawdbot workspace linked to ~/.cuti/$CLAWDBOT_WORKSPACE_SUBPATH"

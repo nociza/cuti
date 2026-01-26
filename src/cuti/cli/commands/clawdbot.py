@@ -13,7 +13,10 @@ from typing import List, Optional
 
 import typer
 from rich.console import Console
+from rich.prompt import Confirm
+from rich.table import Table
 
+from ...services.clawdbot_instance import ClawdbotInstance, ClawdbotInstanceManager
 from ...services.devcontainer import DevContainerService, is_running_in_container
 
 app = typer.Typer(help="Manage the optional Clawdbot assistant from the host CLI")
@@ -144,6 +147,81 @@ def _auto_select_gateway_port(explicit: Optional[int]) -> int:
     return fallback
 
 
+# ------------------------------------------------------------------
+# Instance Management Helpers
+# ------------------------------------------------------------------
+
+
+def _check_running_instances(
+    manager: ClawdbotInstanceManager, target_port: int
+) -> Optional[ClawdbotInstance]:
+    """Check for running instances, preferring the one on target_port."""
+    running = manager.detect_running_instances()
+    if not running:
+        return None
+
+    # First check if there's one on the target port
+    for instance in running:
+        if instance.port == target_port:
+            return instance
+
+    # Otherwise return the first running instance
+    return running[0]
+
+
+def _warn_concurrent_instance(
+    existing: ClawdbotInstance, current_workspace: Path
+) -> bool:
+    """Display warning about concurrent instance. Returns True to continue."""
+    existing_path = Path(existing.workspace_path)
+
+    console.print()
+    console.print("=" * 60, style="yellow bold")
+    console.print("WARNING: Another Clawdbot instance detected!", style="yellow bold")
+    console.print("=" * 60, style="yellow bold")
+    console.print()
+
+    console.print("[bold]Running instance:[/bold]")
+    console.print(f"  Port: {existing.port}")
+    console.print(f"  Workspace: {existing.workspace_path}")
+    console.print(f"  Started: {existing.started_at}")
+    console.print()
+
+    console.print("[bold]Current workspace:[/bold]")
+    console.print(f"  {current_workspace}")
+    console.print()
+
+    if existing_path.resolve() != current_workspace.resolve():
+        console.print(
+            "Starting a new instance from a different workspace may cause",
+            style="yellow",
+        )
+        console.print(
+            "configuration conflicts. This feature is under active development.",
+            style="yellow",
+        )
+        console.print()
+
+    return Confirm.ask("Continue anyway?", default=False)
+
+
+def _setup_workspace_config(workspace_path: Path) -> str:
+    """Setup workspace config before starting. Returns workspace slug."""
+    console.print("[dim]Configuring workspace...[/dim]")
+
+    manager = ClawdbotInstanceManager()
+    workspace_slug = manager.generate_workspace_slug(workspace_path)
+
+    # Update clawdbot.json to set workspace = /workspace
+    if manager.update_workspace_config():
+        console.print(f"[dim]Project: {workspace_path.name}[/dim]")
+        console.print("[dim]Clawdbot agents will work in: /workspace[/dim]")
+    else:
+        console.print("[yellow]Warning: Could not update workspace config[/yellow]")
+
+    return workspace_slug
+
+
 def _should_auto_build_ui(args: List[str]) -> bool:
     """Return True if the command requires the Control UI assets."""
 
@@ -153,22 +231,22 @@ def _should_auto_build_ui(args: List[str]) -> bool:
 
 
 def _control_ui_bootstrap_script(version: Optional[str]) -> str:
-    """Shell snippet that builds the Control UI once per workspace."""
+    """Shell snippet that builds the Control UI once per container session."""
 
     expected = version or "unknown"
-    workspace = "/home/cuti/clawd"
-    sentinel = f"{workspace}/.cuti-control-ui-built"
+    # Store sentinel in Clawdbot config dir (persists across sessions)
+    clawdbot_config = "/home/cuti/.clawdbot"
+    sentinel = f"{clawdbot_config}/.control-ui-built"
 
     script = f"""
     ensure_clawdbot_control_ui() {{
-        local workspace={shlex.quote(workspace)}
+        local config_dir={shlex.quote(clawdbot_config)}
         local sentinel={shlex.quote(sentinel)}
         local desired={shlex.quote(expected)}
         local need_build=0
 
-        if [ ! -d "$workspace" ]; then
-            echo "⚠️  Clawdbot workspace missing at $workspace"
-            return
+        if [ ! -d "$config_dir" ]; then
+            mkdir -p "$config_dir" 2>/dev/null || true
         fi
 
         if [ ! -f "$sentinel" ]; then
@@ -329,7 +407,13 @@ def _run_clawdbot(
     rebuild: bool = False,
     skip_colima: bool = False,
 ) -> None:
-    """Run a Clawdbot CLI command (host or container)."""
+    """Run a Clawdbot CLI command (host or container).
+
+    Args:
+        args: Arguments to pass to clawdbot CLI
+        rebuild: Force rebuild of the container image
+        skip_colima: Skip starting Colima automatically
+    """
 
     base_command = shlex.join(["clawdbot", *args])
     wrapped_command = _maybe_wrap_with_ui_bootstrap(args, base_command)
@@ -400,6 +484,7 @@ def start(
     verbose: bool = typer.Option(True, "--verbose/--quiet", help="Mirror verbose logs"),
     rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild before starting"),
     skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-start"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip concurrent instance warning"),
     extra_args: List[str] = typer.Argument(
         [],
         help="Additional arguments forwarded to `clawdbot gateway`",
@@ -408,16 +493,67 @@ def start(
 ) -> None:
     """Start the gateway after auto-selecting a usable host port."""
 
+    current_workspace = Path.cwd().resolve()
+    manager = ClawdbotInstanceManager()
+
+    # 1. Setup workspace configuration BEFORE port selection
+    workspace_slug = _setup_workspace_config(current_workspace)
+
+    # 2. Auto-select port
     chosen_port = _auto_select_gateway_port(port)
+
+    # 3. Check for running instances (unless --force)
+    if not force:
+        existing = _check_running_instances(manager, chosen_port)
+        if existing:
+            if not _warn_concurrent_instance(existing, current_workspace):
+                console.print("[dim]Aborted.[/dim]")
+                raise typer.Exit(0)
+            # User wants to continue; find a different port if needed
+            if existing.port == chosen_port:
+                console.print(
+                    f"[yellow]Note: Another instance is running on port {chosen_port} "
+                    f"from {Path(existing.workspace_path).name}[/yellow]"
+                )
+                fallback = _scan_for_open_port(chosen_port + 1)
+                if fallback:
+                    chosen_port = fallback
+                    console.print(f"[dim]Switching to port {chosen_port}[/dim]")
+    else:
+        # With --force, just note if there's another instance
+        existing = _check_running_instances(manager, chosen_port)
+        if existing and existing.port == chosen_port:
+            console.print(
+                f"[yellow]Note: Another instance is running on port {chosen_port} "
+                f"from {Path(existing.workspace_path).name}[/yellow]"
+            )
+            fallback = _scan_for_open_port(chosen_port + 1)
+            if fallback:
+                chosen_port = fallback
+                console.print(f"[dim]Switching to port {chosen_port}[/dim]")
+
+    # 4. Register instance before starting
+    instance_id = manager.register_instance(
+        port=chosen_port,
+        workspace_path=current_workspace,
+        workspace_slug=workspace_slug,
+        pid=os.getpid(),
+    )
+
     console.print(f"[cyan]Launching Clawdbot gateway on port {chosen_port}[/cyan]")
     console.print(f"[dim]Control UI: http://127.0.0.1:{chosen_port}/[/dim]")
 
-    args = ["gateway", "--port", str(chosen_port)]
-    if verbose:
-        args.append("--verbose")
-    if extra_args:
-        args.extend(extra_args)
-    _run_clawdbot(args, rebuild=rebuild, skip_colima=skip_colima)
+    try:
+        # 5. Run gateway
+        args = ["gateway", "--port", str(chosen_port)]
+        if verbose:
+            args.append("--verbose")
+        if extra_args:
+            args.extend(extra_args)
+        _run_clawdbot(args, rebuild=rebuild, skip_colima=skip_colima)
+    finally:
+        # 6. Cleanup on exit
+        manager.unregister_instance(instance_id)
 
 
 @app.command()
@@ -490,3 +626,61 @@ def run(
     """Run any Clawdbot CLI command inside the container (escape hatch)."""
 
     _run_clawdbot(args, rebuild=rebuild, skip_colima=skip_colima)
+
+
+@app.command("status")
+def status() -> None:
+    """Show status of running Clawdbot instances."""
+    manager = ClawdbotInstanceManager()
+    instances = manager.detect_running_instances()
+
+    if not instances:
+        console.print("[dim]No running Clawdbot instances detected.[/dim]")
+        return
+
+    table = Table(title="Running Clawdbot Instances")
+    table.add_column("Instance", style="cyan")
+    table.add_column("Port", style="green")
+    table.add_column("Workspace", style="blue")
+    table.add_column("Started", style="dim")
+    table.add_column("PID", style="dim")
+
+    for instance in instances:
+        workspace_name = Path(instance.workspace_path).name
+        table.add_row(
+            instance.instance_id,
+            str(instance.port),
+            workspace_name,
+            instance.started_at[:19] if instance.started_at else "-",
+            str(instance.pid) if instance.pid else "-",
+        )
+
+    console.print(table)
+    console.print()
+    console.print(f"[dim]Control UI: http://127.0.0.1:{instances[0].port}/[/dim]")
+
+
+@app.command("cleanup")
+def cleanup() -> None:
+    """Remove stale instance entries from tracking file."""
+    manager = ClawdbotInstanceManager()
+
+    # Count instances before cleanup
+    state_before = manager._state.get("instances", {})
+    count_before = len(state_before)
+
+    # Force cleanup
+    manager._cleanup_stale_instances()
+
+    # Count after
+    state_after = manager._state.get("instances", {})
+    count_after = len(state_after)
+
+    removed = count_before - count_after
+    if removed > 0:
+        console.print(f"[green]Cleaned up {removed} stale instance(s).[/green]")
+    else:
+        console.print("[dim]No stale instances found.[/dim]")
+
+    if count_after > 0:
+        console.print(f"[dim]{count_after} active instance(s) remain tracked.[/dim]")
