@@ -281,20 +281,16 @@ def _control_ui_bootstrap_script(version: Optional[str]) -> str:
     }}
 
     cuti_locate_clawdbot_package() {{
-        local resolved
-        resolved=$(node -p "try {{ require.resolve('clawdbot/package.json') }} catch (err) {{ '' }}" 2>/dev/null || echo "")
-        if [ -n "$resolved" ] && [ -f "$resolved" ]; then
-            dirname "$resolved"
-            return
-        fi
-
         local npm_root
         if command -v npm >/dev/null 2>&1; then
             npm_root=$(npm root -g 2>/dev/null || echo "")
+            if [ -n "$npm_root" ] && [ -f "$npm_root/clawdbot/package.json" ]; then
+                echo "$npm_root/clawdbot"
+                return
+            fi
         fi
 
         for candidate in \
-            "$npm_root/clawdbot" \
             "/usr/local/lib/node_modules/clawdbot" \
             "/usr/lib/node_modules/clawdbot" \
             "/opt/homebrew/lib/node_modules/clawdbot"; do
@@ -433,6 +429,7 @@ def _run_clawdbot(
         wrapped_command,
         rebuild=rebuild,
         interactive=requires_tty,
+        mount_docker_socket=False,
     )
     if exit_code != 0:
         raise typer.Exit(exit_code)

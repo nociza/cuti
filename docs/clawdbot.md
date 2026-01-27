@@ -23,6 +23,12 @@ Every time you run `cuti clawdbot …` we relink the expected directories before
 
 Legacy installs that used `~/.clawdbot` or `~/clawd` get migrated automatically whenever the wrapper runs.
 
+## Security notes
+
+- Clawdbot sessions run inside the dev container without the Docker socket mounted, so even if an agent shell misbehaves it cannot talk to your host Docker daemon.
+- Control UI assets are built only from the globally installed Clawdbot package directory; workspace dependencies can’t inject build steps by shadowing `node_modules/clawdbot`.
+- Channel credentials live under `~/.cuti/clawdbot/`; keep that directory in your user account only and avoid sharing it with other host users.
+
 ## Configure the gateway
 
 Use the interactive wizard without leaving the terminal:

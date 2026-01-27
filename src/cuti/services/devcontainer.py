@@ -663,6 +663,8 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         command: Optional[str] = None,
         rebuild: bool = False,
         interactive: bool = False,
+        *,
+        mount_docker_socket: bool = True,
     ) -> int:
         """Run command in dev container.
 
@@ -734,7 +736,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
             "-v", f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",  # Linux-specific config
             "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude-macos:ro",  # macOS config read-only
-            "-v", "/var/run/docker.sock:/var/run/docker.sock",  # Mount Docker socket for Docker-in-Docker
             "-w", "/workspace",
             "--env", "CUTI_IN_CONTAINER=true",
             # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
@@ -748,6 +749,12 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
             "--network", "host",
         ]
+
+        if mount_docker_socket:
+            docker_args.extend([
+                "-v",
+                "/var/run/docker.sock:/var/run/docker.sock",  # Allow Docker-in-Docker when explicitly requested
+            ])
 
         docker_args.extend(["--env", f"CUTI_ENABLE_CLAWDBOT_ADDON={'true' if clawdbot_enabled else 'false'}"])
         if clawdbot_config_subpath and clawdbot_workspace_subpath:
