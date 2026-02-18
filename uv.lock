@@ -220,7 +220,7 @@ wheels = [
 
 [[package]]
 name = "cuti"
-version = "0.1.68"
+version = "0.1.70"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },

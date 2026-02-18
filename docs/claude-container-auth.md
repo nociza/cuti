@@ -116,6 +116,18 @@ cp ~/.claude/CLAUDE.md ~/.cuti/claude-linux/
 cp ~/.claude/settings.json ~/.cuti/claude-linux/
 ```
 
+## Viewing and resuming sessions
+
+Claude Code writes one JSONL transcript per conversation under `~/.claude/projects/` on macOS and `~/.cuti/claude-linux/projects/` inside the container. Use the history helpers to inspect or reopen them:
+
+```bash
+cuti history list          # show recent sessions for this repo
+cuti history show latest   # print messages from the latest conversation
+cuti history resume 2      # resume the session displayed as #2 in the list
+```
+
+See [Claude Chat History](claude-history.md) for a deeper walkthrough of what gets stored and how the new commands work.
+
 ## Technical Details
 
 ### Why Separate Directories?

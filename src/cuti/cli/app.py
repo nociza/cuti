@@ -60,6 +60,10 @@ try:
     from .commands.clawdbot import app as clawdbot_app
 except ImportError:
     clawdbot_app = None
+try:
+    from .commands.history import history_app
+except ImportError:
+    history_app = None
 
 app = typer.Typer(
     name="cuti",
@@ -178,6 +182,8 @@ if addons_app:
     app.add_typer(addons_app, name="addons", help="Manage optional addons like Clawdbot")
 if clawdbot_app:
     app.add_typer(clawdbot_app, name="clawdbot", help="Run Clawdbot commands inside the dev container")
+if history_app:
+    app.add_typer(history_app, name="history", help="Browse Claude chat history and resume sessions")
 
 # Add top-level commands for convenience
 from .commands.queue import start_queue, add_prompt, show_status

@@ -52,6 +52,7 @@ Build with multiple AI models and intelligent task management:
 - **Task automation** - Built-in todo system for AI agents
 - **Claude version switching** - Easy CLI version management
 - **Optional Clawdbot addon** - Run Clawdbot gateway + messaging from the same dev container (`cuti clawdbot ...`)
+- **Claude chat history** - `cuti history` shows transcripts and reopens old Claude Code sessions
 
 Perfect for AI-powered development, automation workflows, and LLM orchestration.
 
@@ -67,6 +68,7 @@ Perfect for AI-powered development, automation workflows, and LLM orchestration.
 | [Claude API Keys](docs/claude-api-keys.md) | Anthropic & AWS Bedrock API key management |
 | [Task Management](docs/todo-system.md) | AI agent todo system |
 | [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
+| [Claude Chat History](docs/claude-history.md) | Inspect & resume Claude Code sessions |
 | [Clawdbot Integration](docs/clawdbot.md) | Run the Clawdbot gateway + channels inside cuti |
 
 ## 🤝 Contributing
