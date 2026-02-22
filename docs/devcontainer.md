@@ -258,7 +258,7 @@ When generating dev containers, cuti automatically detects:
 
 Previous versions had an issue where exiting the container would break the Docker socket connection on macOS with Colima. This has been fixed by:
 - Using `--init` flag for proper signal handling
-- Not modifying Docker socket permissions inside the container
+- Isolating `cuti clawdbot ...` into a separate sandbox profile that never mounts the Docker socket
 - Installing only Docker CLI (not the full Docker engine)
 - Adding proper signal traps for clean exit
 
@@ -504,7 +504,8 @@ docker exec -it [container-name] bash
 
 ### Security Considerations
 
-- Containers run with `--privileged` for full functionality
+- Containers do **not** run with `--privileged`
+- `cuti clawdbot ...` uses a hardened `clawdbot_sandbox` runtime profile with fail-closed security checks
 - Claude automatically uses `--dangerously-skip-permissions` via alias (see [Claude CLI Configuration](#claude-cli-configuration))
 - Config directories mounted with appropriate permissions
 - No telemetry or external connections

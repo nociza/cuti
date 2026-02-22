@@ -37,6 +37,78 @@ def _load_clawdbot_config() -> dict:
         return {}
 
 
+def _clawdbot_credentials_dir() -> Path:
+    """Return the host path where Clawdbot credentials are persisted."""
+
+    return _CLAWDBOT_CONFIG_PATH.parent / "credentials"
+
+
+def _has_clawdbot_credentials() -> bool:
+    """Return True if persisted channel credentials exist."""
+
+    creds_dir = _clawdbot_credentials_dir()
+    if not creds_dir.exists():
+        return False
+    return any(path.is_file() for path in creds_dir.rglob("*"))
+
+
+def _config_has_meaningful_settings(config: dict) -> bool:
+    """Heuristic: detect if clawdbot.json has user-facing settings beyond workspace bootstrap."""
+
+    if not isinstance(config, dict) or not config:
+        return False
+
+    # Any top-level key outside bootstrap/meta structures counts as configured intent.
+    top_level_bootstrap_keys = {"agents", "meta"}
+    if any(key not in top_level_bootstrap_keys for key in config):
+        return True
+
+    agents = config.get("agents")
+    if isinstance(agents, dict):
+        # Settings besides defaults imply user config.
+        if any(key != "defaults" for key in agents):
+            return True
+
+        defaults = agents.get("defaults")
+        if isinstance(defaults, dict):
+            # Only `workspace` is auto-written by cuti; anything else is meaningful.
+            if any(key != "workspace" for key in defaults):
+                return True
+
+    return False
+
+
+def _needs_initial_configuration() -> bool:
+    """Return True when Clawdbot likely needs interactive configuration/onboarding."""
+
+    if _has_clawdbot_credentials():
+        return False
+
+    return not _config_has_meaningful_settings(_load_clawdbot_config())
+
+
+def _ensure_clawdbot_configuration(
+    *,
+    rebuild: bool,
+    skip_colima: bool,
+) -> None:
+    """Launch interactive config flow when no usable config/credentials are detected."""
+
+    if not _needs_initial_configuration():
+        return
+
+    console.print(
+        "[yellow]No Clawdbot configuration detected. Opening interactive configure flow...[/yellow]"
+    )
+    _run_clawdbot(["config"], rebuild=rebuild, skip_colima=skip_colima)
+
+    if _needs_initial_configuration():
+        console.print(
+            "[yellow]Configuration still appears incomplete. "
+            "Run `cuti clawdbot channels-login` after gateway starts if needed.[/yellow]"
+        )
+
+
 def _read_clawdbot_version() -> Optional[str]:
     """Return the last known Clawdbot version from config (if available)."""
 
@@ -145,6 +217,20 @@ def _auto_select_gateway_port(explicit: Optional[int]) -> int:
         f"[dim]Auto-selected fallback port {fallback} for Clawdbot gateway[/dim]"
     )
     return fallback
+
+
+def _extract_gateway_port(args: List[str]) -> Optional[int]:
+    """Extract gateway port from `clawdbot gateway ...` args."""
+
+    if not args or args[0] != "gateway":
+        return None
+
+    for index, token in enumerate(args[:-1]):
+        if token == "--port":
+            port = _coerce_port(args[index + 1])
+            if port is not None:
+                return port
+    return None
 
 
 # ------------------------------------------------------------------
@@ -425,11 +511,15 @@ def _run_clawdbot(
         return
 
     service = _prepare_service(skip_colima)
+    gateway_port = _extract_gateway_port(args)
+    published_ports = [gateway_port] if gateway_port else None
     exit_code = service.run_in_container(
         wrapped_command,
         rebuild=rebuild,
         interactive=requires_tty,
         mount_docker_socket=False,
+        runtime_profile=DevContainerService.RUNTIME_PROFILE_CLAWDBOT_SANDBOX,
+        published_ports=published_ports,
     )
     if exit_code != 0:
         raise typer.Exit(exit_code)
@@ -455,8 +545,8 @@ def gateway(
     verbose: bool = typer.Option(True, "--verbose/--quiet", help="Mirror verbose logs"),
     rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild before starting"),
     skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-start"),
-    extra_args: List[str] = typer.Argument(
-        [],
+    extra_args: Optional[List[str]] = typer.Argument(
+        None,
         help="Additional arguments forwarded to `clawdbot gateway`",
         metavar="[EXTRA...]",
     ),
@@ -482,8 +572,8 @@ def start(
     rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild before starting"),
     skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-start"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip concurrent instance warning"),
-    extra_args: List[str] = typer.Argument(
-        [],
+    extra_args: Optional[List[str]] = typer.Argument(
+        None,
         help="Additional arguments forwarded to `clawdbot gateway`",
         metavar="[EXTRA...]",
     ),
@@ -553,10 +643,47 @@ def start(
         manager.unregister_instance(instance_id)
 
 
+@app.command("up")
+def up(
+    port: Optional[int] = typer.Option(
+        None,
+        "--port",
+        help="Preferred gateway port; defaults to config/env/first available",
+    ),
+    verbose: bool = typer.Option(True, "--verbose/--quiet", help="Mirror verbose logs"),
+    rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild before starting"),
+    skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-start"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip concurrent instance warning"),
+    configure: bool = typer.Option(
+        True,
+        "--configure/--no-configure",
+        help="Auto-open configure flow when no Clawdbot config/credentials are detected",
+    ),
+    extra_args: Optional[List[str]] = typer.Argument(
+        None,
+        help="Additional arguments forwarded to `clawdbot gateway`",
+        metavar="[EXTRA...]",
+    ),
+) -> None:
+    """Bring Clawdbot up: auto-configure if needed, then start gateway."""
+
+    if configure:
+        _ensure_clawdbot_configuration(rebuild=rebuild, skip_colima=skip_colima)
+
+    start(
+        port=port,
+        verbose=verbose,
+        rebuild=rebuild,
+        skip_colima=skip_colima,
+        force=force,
+        extra_args=extra_args,
+    )
+
+
 @app.command()
 def config(
-    extra_args: List[str] = typer.Argument(
-        [],
+    extra_args: Optional[List[str]] = typer.Argument(
+        None,
         help="Arguments forwarded directly to `clawdbot config`",
         metavar="[EXTRA...]",
     ),

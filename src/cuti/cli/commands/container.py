@@ -59,17 +59,20 @@ def get_container_info() -> Dict[str, List[Dict]]:
                         if mount.get('Destination') == '/workspace':
                             workspace_path = mount.get('Source')
                             break
+
+                    labels = inspect_data.get("Config", {}).get("Labels", {}) or {}
+                    runtime_profile = labels.get("cuti.runtime_profile", "unknown")
+                    network_mode = inspect_data.get("HostConfig", {}).get("NetworkMode", "unknown")
                     
                     if workspace_path:
-                        # Extract project name from path
-                        project_name = Path(workspace_path).name
-                        
                         container_info = {
                             'id': container_id,
                             'name': container.get('Names', 'unknown'),
                             'status': container.get('Status', 'unknown'),
                             'created': container.get('CreatedAt', 'unknown'),
-                            'workspace_path': workspace_path
+                            'workspace_path': workspace_path,
+                            'runtime_profile': runtime_profile,
+                            'network_mode': network_mode,
                         }
                         
                         containers_by_workspace[workspace_path].append(container_info)
@@ -193,9 +196,11 @@ def status(
         table.add_column("Container ID", style="cyan", width=14)
         table.add_column("Name", style="green")
         table.add_column("Status", style="yellow")
+        table.add_column("Profile", style="magenta")
         
         if verbose:
             table.add_column("Created", style="dim")
+            table.add_column("Network", style="dim")
         
         # Add rows for each container
         for container in container_list:
@@ -204,13 +209,16 @@ def status(
                     container['id'],
                     container['name'],
                     container['status'],
-                    container['created']
+                    container.get('runtime_profile', 'unknown'),
+                    container['created'],
+                    container.get('network_mode', 'unknown'),
                 )
             else:
                 table.add_row(
                     container['id'],
                     container['name'],
-                    container['status']
+                    container['status'],
+                    container.get('runtime_profile', 'unknown'),
                 )
         
         console.print(table)

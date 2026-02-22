@@ -1,6 +1,6 @@
 # Clawdbot Integration (Preview)
 
-Run the Clawdbot gateway and messaging connectors directly from the cuti dev container. The addon is enabled by default and can be toggled at any time. The wrapper handles installing the CLI, wiring persistent storage, and running any command inside the container with the right permissions.
+Run the Clawdbot gateway and messaging connectors directly from the cuti container runtime. The addon is enabled by default and can be toggled at any time. The wrapper handles installing the CLI, wiring persistent storage, and running commands in the hardened `clawdbot_sandbox` profile.
 
 ## Enable or disable the addon
 
@@ -10,22 +10,25 @@ cuti addons disable clawdbot   # opt-out (no install on future rebuilds)
 cuti addons enable clawdbot    # re-enable when you need it again
 ```
 
-State is stored in `~/.cuti/addons.json`. When enabled, the container image installs the Clawdbot CLI (Node 22 runtime) and mounts persistent directories inside `~/.cuti/clawdbot/`.
+State is stored in `~/.cuti/addons.json`. When enabled, the container image installs the Clawdbot CLI (Node 22 runtime) and uses persistent directories inside `~/.cuti/clawdbot/`.
 
-## Storage layout & workspace linking
+## Storage layout
 
-Every time you run `cuti clawdbot …` we relink the expected directories before launching the container:
+Every time you run `cuti clawdbot …`, the sandbox profile bind-mounts these host paths directly:
 
 - `~/.cuti/clawdbot/config/` → `/home/cuti/.clawdbot` (gateway config, channel credentials, channel hooks)
 - `~/.cuti/clawdbot/workspaces/<project-id>/` → `/home/cuti/clawd` for that project (agent workspace, logs, skills, session transcripts)
 
-`<project-id>` uses the workspace folder name plus a short hash of its absolute path, so two different cuti projects never collide while the same project opened in multiple shells still shares history. The host still sees the files under `~/.cuti/clawdbot/workspaces/<project-id>/`; inside the container Clawdbot always interacts with `/home/cuti/clawd`.
+`<project-id>` uses the workspace folder name plus a short hash of its absolute path, so two different cuti projects never collide while the same project opened in multiple shells still shares history. The host still sees files under `~/.cuti/clawdbot/workspaces/<project-id>/`; inside the container Clawdbot interacts with `/home/cuti/clawd`.
 
-Legacy installs that used `~/.clawdbot` or `~/clawd` get migrated automatically whenever the wrapper runs.
+Legacy installs that used `~/.clawdbot` or `~/clawd` are migrated into `~/.cuti/clawdbot/...` automatically.
 
 ## Security notes
 
-- Clawdbot sessions run inside the dev container without the Docker socket mounted, so even if an agent shell misbehaves it cannot talk to your host Docker daemon.
+- Clawdbot sessions run in `clawdbot_sandbox`: Docker socket is never mounted, and start fails closed if policy checks fail.
+- The sandbox profile does not use host networking; gateway ports are explicitly published (`127.0.0.1:<port>:<port>`).
+- Only the workspace, Clawdbot config, and Clawdbot workspace mounts are allowed in sandbox mode.
+- A seccomp profile is enforced in sandbox mode (`docker/seccomp/kuyuchi-clawdbot-seccomp.json`, copied to `~/.cuti/seccomp/` at runtime).
 - Control UI assets are built only from the globally installed Clawdbot package directory; workspace dependencies can’t inject build steps by shadowing `node_modules/clawdbot`.
 - Channel credentials live under `~/.cuti/clawdbot/`; keep that directory in your user account only and avoid sharing it with other host users.
 
@@ -38,23 +41,32 @@ cuti clawdbot config         # full wizard
 cuti clawdbot config show    # dump the merged clawdbot.json
 ```
 
-The command drops into the container with a TTY, so QR screens and prompts render correctly. Because the wrapper runs as root inside the container when needed, edits to `clawdbot.json` and credentials succeed even when the mounted directories are owned by your host user.
+The command drops into the container with a TTY, so QR screens and prompts render correctly. Config edits are persisted through the mounted `~/.cuti/clawdbot/config` directory.
 
 ## Onboarding + gateway
 
 ```bash
-# 1. Run the wizard (OAuth, Anthropic/OpenAI auth, channel templates)
+# 1. Recommended: one command bring-up (auto-configure when needed)
+cuti clawdbot up
+
+# 2. Manual wizard (if you want explicit setup first)
 cuti clawdbot onboard
 
-# 2. Start the gateway and watch logs (auto-selects a port)
+# 3. Start the gateway and watch logs (auto-selects a port)
 cuti clawdbot start
 
-# 3. Inspect or edit clawdbot.json via the container
+# 4. Inspect or edit clawdbot.json via the container
 cuti clawdbot config show
 
 # Optional: pin the port manually if you need a fixed URL
 cuti clawdbot gateway --port 18789
 ```
+
+`cuti clawdbot up` behavior:
+
+1. Checks whether Clawdbot appears configured (config + credentials heuristic).
+2. If not configured, opens interactive `clawdbot config`.
+3. Starts gateway in the sandbox runtime profile.
 
 `cuti clawdbot start` picks a host port using this order: `--port` flag → `CUTI_CLAWDBOT_PORT` env var → your last saved setting in `~/.cuti/clawdbot/config/clawdbot.json` → the first available port starting at 18789. The CLI prints the chosen Control UI URL (e.g. `http://127.0.0.1:18789`). Pressing `Ctrl+C` now triggers a graceful shutdown sequence so the gateway has time to flush logs, disconnect channels, and the host port is released cleanly.
 
@@ -101,6 +113,8 @@ cuti clawdbot run message send --target +15551234567 --message "Manual command"
 - **Docker/Colima issues**: the wrapper uses the same dependency checks as `cuti container`. Start Docker Desktop or run `colima start` before calling `cuti clawdbot ...`.
 - **Channel login prompts not showing**: WhatsApp login requires an interactive terminal. Run the command from a local shell (not from a background job) so the QR renders properly.
 - **Ports already in use**: pass `--port` to `cuti clawdbot gateway` to pick a different port, and update the Control UI URL accordingly.
+- **Security policy start failure**: if startup reports a policy violation, check `cuti` version and avoid overriding container runtime flags manually.
+- **Custom seccomp profile**: set `CUTI_CLAWDBOT_SECCOMP_PROFILE=/absolute/path/to/profile.json` to override the default profile.
 
 See the upstream documentation for detailed guides:
 - Getting started: <https://docs.clawd.bot/start/getting-started>

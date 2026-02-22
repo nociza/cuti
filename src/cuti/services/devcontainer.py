@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     from rich.console import Console
@@ -27,6 +27,76 @@ from .addons import AddonManager
 
 class DevContainerService:
     """Manages dev container generation and execution for any project."""
+
+    RUNTIME_PROFILE_CLOUD = "cloud"
+    RUNTIME_PROFILE_CLAWDBOT_SANDBOX = "clawdbot_sandbox"
+    CLAWDBOT_SECCOMP_FILENAME = "kuyuchi-clawdbot-seccomp.json"
+    CLAWDBOT_SECCOMP_DIR = Path.home() / ".cuti" / "seccomp"
+
+    DEFAULT_CLAWDBOT_SECCOMP_PROFILE: Dict[str, Any] = {
+        "defaultAction": "SCMP_ACT_ALLOW",
+        "architectures": [
+            "SCMP_ARCH_X86_64",
+            "SCMP_ARCH_X86",
+            "SCMP_ARCH_X32",
+            "SCMP_ARCH_AARCH64",
+            "SCMP_ARCH_ARM",
+        ],
+        "syscalls": [
+            {
+                "names": [
+                    "add_key",
+                    "bpf",
+                    "delete_module",
+                    "finit_module",
+                    "init_module",
+                    "kexec_load",
+                    "keyctl",
+                    "open_by_handle_at",
+                    "perf_event_open",
+                    "process_vm_readv",
+                    "process_vm_writev",
+                    "ptrace",
+                    "request_key",
+                    "userfaultfd",
+                ],
+                "action": "SCMP_ACT_ERRNO",
+                "args": [],
+            }
+        ],
+    }
+
+    # Security checklist derived from docs/kuyuchi-threat-model.md
+    RUNTIME_SECURITY_CHECKLIST: Dict[str, Dict[str, Any]] = {
+        RUNTIME_PROFILE_CLAWDBOT_SANDBOX: {
+            "required_flags": [
+                ("--cap-drop", "ALL"),
+                ("--security-opt", "no-new-privileges:true"),
+                ("--pids-limit", "256"),
+                ("--read-only", None),
+            ],
+            "required_tmpfs_prefixes": [
+                "/tmp:",
+                "/run:",
+            ],
+            "required_security_opt_prefixes": [
+                "seccomp=",
+            ],
+            "allowed_mount_targets": {
+                "/workspace",
+                "/home/cuti/.clawdbot",
+                "/home/cuti/clawd",
+            },
+            "forbidden_mount_targets": {
+                "/var/run/docker.sock",
+                "/home/cuti/.cuti-shared",
+                "/home/cuti/.claude-linux",
+                "/home/cuti/.claude-macos",
+            },
+            "forbidden_network_values": {"host"},
+            "require_workspace_mount": True,
+        }
+    }
     
     # Simplified Dockerfile template
     DOCKERFILE_TEMPLATE = '''FROM python:3.11-bullseye
@@ -657,6 +727,142 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             return "rust"
         else:
             return "general"
+
+    @staticmethod
+    def _extract_mount_target(volume_spec: str) -> Optional[str]:
+        """Extract target path from a docker -v/--volume spec."""
+        parts = volume_spec.split(":")
+        if len(parts) < 2:
+            return None
+        return parts[1]
+
+    def _collect_mount_targets(self, docker_args: List[str]) -> Set[str]:
+        """Collect all bind mount targets from docker args."""
+        targets: Set[str] = set()
+        for idx, arg in enumerate(docker_args):
+            if arg in ("-v", "--volume") and idx + 1 < len(docker_args):
+                target = self._extract_mount_target(docker_args[idx + 1])
+                if target:
+                    targets.add(target)
+        return targets
+
+    @staticmethod
+    def _remove_flag_value_pair(args: List[str], flag: str, value: str) -> List[str]:
+        """Return args with the first matching flag/value pair removed."""
+        new_args = list(args)
+        for idx in range(len(new_args) - 1):
+            if new_args[idx] == flag and new_args[idx + 1] == value:
+                del new_args[idx: idx + 2]
+                break
+        return new_args
+
+    @staticmethod
+    def _flag_has_value(docker_args: List[str], flag: str, expected: str) -> bool:
+        """Return True if docker args contain a flag with the expected value."""
+        for idx, arg in enumerate(docker_args[:-1]):
+            if arg == flag and docker_args[idx + 1] == expected:
+                return True
+        return False
+
+    @staticmethod
+    def _security_opt_values(docker_args: List[str]) -> List[str]:
+        """Return all --security-opt values in docker args."""
+        values: List[str] = []
+        for idx, arg in enumerate(docker_args[:-1]):
+            if arg == "--security-opt":
+                values.append(docker_args[idx + 1])
+        return values
+
+    def _repository_seccomp_profile_path(self) -> Optional[Path]:
+        """Locate repository seccomp profile when available."""
+        try:
+            repo_root = Path(__file__).resolve().parents[3]
+        except IndexError:
+            return None
+
+        candidate = repo_root / "docker" / "seccomp" / self.CLAWDBOT_SECCOMP_FILENAME
+        if candidate.exists():
+            return candidate
+        return None
+
+    def _ensure_clawdbot_seccomp_profile(self) -> Optional[Path]:
+        """Ensure the clawdbot seccomp profile exists and return an absolute host path."""
+        override = os.environ.get("CUTI_CLAWDBOT_SECCOMP_PROFILE")
+        if override:
+            override_path = Path(override).expanduser().resolve()
+            if override_path.exists():
+                return override_path
+            print(f"❌ CUTI_CLAWDBOT_SECCOMP_PROFILE does not exist: {override_path}")
+            return None
+
+        self.CLAWDBOT_SECCOMP_DIR.mkdir(parents=True, exist_ok=True)
+        target_path = (self.CLAWDBOT_SECCOMP_DIR / self.CLAWDBOT_SECCOMP_FILENAME).resolve()
+
+        source_path = self._repository_seccomp_profile_path()
+        if source_path:
+            content = source_path.read_text(encoding="utf-8")
+        else:
+            content = json.dumps(self.DEFAULT_CLAWDBOT_SECCOMP_PROFILE, indent=2) + "\n"
+
+        if not target_path.exists() or target_path.read_text(encoding="utf-8") != content:
+            target_path.write_text(content, encoding="utf-8")
+
+        return target_path
+
+    def _validate_runtime_profile_args(self, runtime_profile: str, docker_args: List[str]) -> List[str]:
+        """Validate runtime args against the profile security checklist."""
+        checklist = self.RUNTIME_SECURITY_CHECKLIST.get(runtime_profile)
+        if not checklist:
+            return []
+
+        errors: List[str] = []
+        mount_targets = self._collect_mount_targets(docker_args)
+
+        required_flags = checklist.get("required_flags", [])
+        for flag, expected in required_flags:
+            if expected is None:
+                if flag not in docker_args:
+                    errors.append(f"missing required flag '{flag}'")
+                continue
+            if not self._flag_has_value(docker_args, flag, expected):
+                errors.append(f"missing required flag/value '{flag} {expected}'")
+
+        required_tmpfs_prefixes = checklist.get("required_tmpfs_prefixes", [])
+        tmpfs_values = []
+        for idx, arg in enumerate(docker_args[:-1]):
+            if arg == "--tmpfs":
+                tmpfs_values.append(docker_args[idx + 1])
+        for prefix in required_tmpfs_prefixes:
+            if not any(value.startswith(prefix) for value in tmpfs_values):
+                errors.append(f"missing required tmpfs mount with prefix '{prefix}'")
+
+        required_security_opt_prefixes = checklist.get("required_security_opt_prefixes", [])
+        security_opt_values = self._security_opt_values(docker_args)
+        for prefix in required_security_opt_prefixes:
+            if not any(value.startswith(prefix) for value in security_opt_values):
+                errors.append(f"missing required --security-opt value with prefix '{prefix}'")
+
+        forbidden_network_values = checklist.get("forbidden_network_values", set())
+        for idx, arg in enumerate(docker_args[:-1]):
+            if arg == "--network" and docker_args[idx + 1] in forbidden_network_values:
+                errors.append(f"forbidden network mode '{docker_args[idx + 1]}'")
+
+        forbidden_targets = checklist.get("forbidden_mount_targets", set())
+        for target in sorted(mount_targets):
+            if target in forbidden_targets:
+                errors.append(f"forbidden mount target '{target}'")
+
+        allowed_targets = checklist.get("allowed_mount_targets")
+        if allowed_targets is not None:
+            allowed = set(allowed_targets)
+            for target in sorted(mount_targets):
+                if target not in allowed:
+                    errors.append(f"mount target '{target}' is not allowed for profile '{runtime_profile}'")
+
+        if checklist.get("require_workspace_mount", False) and "/workspace" not in mount_targets:
+            errors.append("missing required workspace mount '/workspace'")
+
+        return errors
     
     def run_in_container(
         self,
@@ -665,6 +871,8 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         interactive: bool = False,
         *,
         mount_docker_socket: bool = True,
+        runtime_profile: str = RUNTIME_PROFILE_CLOUD,
+        published_ports: Optional[List[int]] = None,
     ) -> int:
         """Run command in dev container.
 
@@ -672,7 +880,21 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             command: Command to run in the container
             rebuild: Force rebuild of the container image
             interactive: Run in interactive mode with TTY
+            mount_docker_socket: Whether to mount host docker socket
+            runtime_profile: Runtime profile (`cloud` or `clawdbot_sandbox`)
+            published_ports: Host/container ports to publish (same port number)
         """
+        if runtime_profile not in {
+            self.RUNTIME_PROFILE_CLOUD,
+            self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX,
+        }:
+            print(f"❌ Unknown runtime profile: {runtime_profile}")
+            return 1
+
+        if runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX and mount_docker_socket:
+            print("❌ Security policy violation: clawdbot sandbox profile cannot mount docker socket")
+            return 1
+
         # Ensure Docker is available
         if not self._check_tool_available("docker"):
             if not self.ensure_dependencies():
@@ -696,9 +918,11 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         image_name = "cuti-dev-universal"
         if not self._build_container_image(image_name, rebuild):
             return 1
-        
-        # Setup Linux-specific Claude configuration
-        linux_claude_dir = self._setup_claude_host_config()
+
+        # Setup Linux-specific Claude configuration (cloud profile only)
+        linux_claude_dir: Optional[Path] = None
+        if runtime_profile == self.RUNTIME_PROFILE_CLOUD:
+            linux_claude_dir = self._setup_claude_host_config()
         
         # Run container
         print("🚀 Starting container...")
@@ -720,52 +944,114 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         clawdbot_enabled = self._is_clawdbot_enabled()
         clawdbot_config_subpath: Optional[str] = None
         clawdbot_workspace_subpath: Optional[str] = None
+        clawdbot_config_dir: Optional[Path] = None
+        clawdbot_workspace_dir: Optional[Path] = None
         if clawdbot_enabled:
-            # Ensure host-side config/workspace directories exist so the container can link to them
-            config_dir, workspace_dir = self._prepare_clawdbot_storage()
+            # Ensure host-side config/workspace directories exist
+            clawdbot_config_dir, clawdbot_workspace_dir = self._prepare_clawdbot_storage()
             cuti_root = Path.home() / ".cuti"
             try:
-                clawdbot_config_subpath = str(config_dir.relative_to(cuti_root))
-                clawdbot_workspace_subpath = str(workspace_dir.relative_to(cuti_root))
+                clawdbot_config_subpath = str(clawdbot_config_dir.relative_to(cuti_root))
+                clawdbot_workspace_subpath = str(clawdbot_workspace_dir.relative_to(cuti_root))
             except ValueError:
                 clawdbot_config_subpath = clawdbot_workspace_subpath = None
 
-        docker_args = [
-            "docker", "run", "--rm", "--init",
-            "-v", f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
-            "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
-            "-v", f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",  # Linux-specific config
-            "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude-macos:ro",  # macOS config read-only
-            "-w", "/workspace",
-            "--env", "CUTI_IN_CONTAINER=true",
-            # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
-            "--env", "IS_SANDBOX=1", 
-            "--env", "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
-            # Don't set CLAUDE_CONFIG_DIR here - let the init script decide based on writability
-            "--env", "PYTHONUNBUFFERED=1",
-            "--env", "PYTHONPATH=/workspace/src",
-            "--env", "TERM=xterm-256color",
-            "--env", "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
-            "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
-            "--network", "host",
-        ]
+        if runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX and not clawdbot_enabled:
+            print("❌ Clawdbot addon is disabled. Enable it with: cuti addons enable clawdbot")
+            return 1
 
-        if mount_docker_socket:
-            docker_args.extend([
-                "-v",
-                "/var/run/docker.sock:/var/run/docker.sock",  # Allow Docker-in-Docker when explicitly requested
-            ])
+        if runtime_profile == self.RUNTIME_PROFILE_CLOUD:
+            if not linux_claude_dir:
+                print("❌ Failed to initialize Linux Claude config directory")
+                return 1
 
-        docker_args.extend(["--env", f"CUTI_ENABLE_CLAWDBOT_ADDON={'true' if clawdbot_enabled else 'false'}"])
-        if clawdbot_config_subpath and clawdbot_workspace_subpath:
-            docker_args.extend(
-                [
-                    "--env",
-                    f"CUTI_CLAWDBOT_CONFIG_SUBPATH={clawdbot_config_subpath}",
-                    "--env",
-                    f"CUTI_CLAWDBOT_WORKSPACE_SUBPATH={clawdbot_workspace_subpath}",
-                ]
-            )
+            docker_args = [
+                "docker", "run", "--rm", "--init",
+                "-v", f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
+                "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
+                "-v", f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",  # Linux-specific config
+                "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude-macos:ro",  # macOS config read-only
+                "--label", f"cuti.runtime_profile={runtime_profile}",
+                "--label", f"cuti.workspace={current_dir}",
+                "-w", "/workspace",
+                "--env", "CUTI_IN_CONTAINER=true",
+                "--env", f"CUTI_RUNTIME_PROFILE={runtime_profile}",
+                # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
+                "--env", "IS_SANDBOX=1",
+                "--env", "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
+                # Don't set CLAUDE_CONFIG_DIR here - let the init script decide based on writability
+                "--env", "PYTHONUNBUFFERED=1",
+                "--env", "PYTHONPATH=/workspace/src",
+                "--env", "TERM=xterm-256color",
+                "--env", "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
+                "--network", "host",
+            ]
+
+            if mount_docker_socket:
+                docker_args.extend([
+                    "-v",
+                    "/var/run/docker.sock:/var/run/docker.sock",  # Allow Docker-in-Docker when explicitly requested
+                ])
+
+            docker_args.extend(["--env", f"CUTI_ENABLE_CLAWDBOT_ADDON={'true' if clawdbot_enabled else 'false'}"])
+            if clawdbot_config_subpath and clawdbot_workspace_subpath:
+                docker_args.extend(
+                    [
+                        "--env",
+                        f"CUTI_CLAWDBOT_CONFIG_SUBPATH={clawdbot_config_subpath}",
+                        "--env",
+                        f"CUTI_CLAWDBOT_WORKSPACE_SUBPATH={clawdbot_workspace_subpath}",
+                    ]
+                )
+        else:
+            # Hardened clawdbot sandbox runtime: workspace + explicit clawdbot mounts only.
+            if not clawdbot_config_dir or not clawdbot_workspace_dir:
+                print("❌ Failed to initialize Clawdbot config/workspace directories")
+                return 1
+
+            seccomp_profile_path = self._ensure_clawdbot_seccomp_profile()
+            if not seccomp_profile_path:
+                print("❌ Failed to prepare clawdbot seccomp profile")
+                return 1
+
+            docker_args = [
+                "docker", "run", "--rm", "--init",
+                "-v", f"{current_dir}:/workspace:{mount_options}",
+                "-v", f"{clawdbot_config_dir}:/home/cuti/.clawdbot:rw",
+                "-v", f"{clawdbot_workspace_dir}:/home/cuti/clawd:rw",
+                "--label", f"cuti.runtime_profile={runtime_profile}",
+                "--label", f"cuti.workspace={current_dir}",
+                "--label", "cuti.mode=clawdbot",
+                "-w", "/workspace",
+                "--env", "CUTI_IN_CONTAINER=true",
+                "--env", f"CUTI_RUNTIME_PROFILE={runtime_profile}",
+                "--env", "CUTI_ENABLE_CLAWDBOT_ADDON=true",
+                "--env", "IS_SANDBOX=1",
+                "--env", "PYTHONUNBUFFERED=1",
+                "--env", "TERM=xterm-256color",
+                "--env", "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
+                "--cap-drop", "ALL",
+                "--security-opt", "no-new-privileges:true",
+                "--security-opt", f"seccomp={seccomp_profile_path}",
+                "--pids-limit", "256",
+                "--read-only",
+                "--tmpfs", "/tmp:rw,noexec,nosuid,nodev",
+                "--tmpfs", "/run:rw,nosuid,nodev",
+            ]
+
+            unique_ports = sorted(set(published_ports or []))
+            for port in unique_ports:
+                docker_args.extend(["-p", f"127.0.0.1:{port}:{port}"])
+
+        security_errors = self._validate_runtime_profile_args(runtime_profile, docker_args)
+        if security_errors:
+            print(f"❌ Runtime security policy validation failed for profile '{runtime_profile}'.")
+            for error in security_errors:
+                print(f"   - {error}")
+            print("🛑 Refusing to start container (fail-closed).")
+            return 1
 
         docker_args.append(image_name)
         
@@ -1106,6 +1392,33 @@ COMPOSE_EOF
 else
     echo "⚠️  Docker socket not found - Docker commands won't work in container"
 fi
+"""
+
+        if runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX:
+            init_script = """
+# Set up signal handlers to ensure clean exit
+trap 'echo "Container exiting cleanly..."; exit 0' SIGTERM SIGINT
+
+if [ ! -d /home/cuti/.clawdbot ]; then
+    echo "❌ Clawdbot config mount missing at /home/cuti/.clawdbot"
+    exit 1
+fi
+
+if [ ! -d /home/cuti/clawd ]; then
+    echo "❌ Clawdbot workspace mount missing at /home/cuti/clawd"
+    exit 1
+fi
+
+if ! command -v clawdbot >/dev/null 2>&1; then
+    echo "❌ Clawdbot CLI not found in container image"
+    echo "   Rebuild with: cuti clawdbot start --rebuild"
+    exit 1
+fi
+
+echo "🔒 Running clawdbot sandbox profile"
+echo "📁 Workspace: /workspace"
+echo "🗂️  Clawdbot config: /home/cuti/.clawdbot"
+echo "🦞 Clawdbot CLI: $(command -v clawdbot)"
 """
         
         # Add interactive flags when needed
