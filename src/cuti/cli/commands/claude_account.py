@@ -495,10 +495,10 @@ def update_claude_cli(
     """Update the Claude Code CLI (`@anthropic-ai/claude-code`) using npm.
 
     The Claude CLI that powers `claude code` is distributed as an npm package, so
-    we keep it up-to-date by reinstalling `@anthropic-ai/claude-code`. The
-    command chooses a user installation unless either `--system` is provided or
-    we're inside a cuti container (where a system-wide install is required for
-    the shared `/usr/local/bin/claude` wrapper).
+    we keep it up-to-date by reinstalling `@anthropic-ai/claude-code`. By
+    default, cuti installs into a shared prefix under `~/.cuti/claude-cli`
+    so host shells and cuti containers can use the same persisted version.
+    Use `--system` to force a system-wide install.
     """
     import json
     import os
@@ -521,13 +521,12 @@ def update_claude_cli(
         console.print("[red]✗[/red] npm was not found. Please install Node.js / npm and retry.")
         raise typer.Exit(1)
 
-    in_container = os.environ.get("CUTI_IN_CONTAINER", "").lower() == "true"
-    use_system_scope = system or in_container
+    use_system_scope = system
 
     prefix_args: list[str] = []
-    prefix_path = None
+    prefix_path: Path | None = None
     if not use_system_scope:
-        prefix_path = Path.home() / ".local"
+        prefix_path = Path.home() / ".cuti" / "claude-cli"
         prefix_args = ["--prefix", str(prefix_path)]
         (prefix_path / "bin").mkdir(parents=True, exist_ok=True)
         (prefix_path / "lib").mkdir(parents=True, exist_ok=True)
@@ -565,7 +564,14 @@ def update_claude_cli(
     except json.JSONDecodeError:
         pass
 
-    scope_label = "system-wide" if use_system_scope else f"user (~/{prefix_path.relative_to(Path.home())})"
+    if use_system_scope:
+        scope_label = "system-wide"
+    else:
+        try:
+            relative_prefix = prefix_path.relative_to(Path.home()) if prefix_path else None
+            scope_label = f"shared (~/{relative_prefix})" if relative_prefix else "shared"
+        except ValueError:
+            scope_label = f"shared ({prefix_path})"
     console.print(f"[dim]Target version:[/dim] {target_version}")
     if current_version:
         console.print(f"[dim]Current version:[/dim] {current_version}")
@@ -620,22 +626,47 @@ def update_claude_cli(
         console.print(f"[red]✗[/red] npm install failed with exit code {e.returncode}")
         raise typer.Exit(1)
 
-    # Verify installation via the claude CLI if available
+    # Verify installation in the chosen scope.
     console.print("\n[dim]Verifying installation...[/dim]")
-    claude_path = shutil.which("claude")
-    if claude_path:
+    shared_claude_path: Path | None = None
+    if prefix_path:
+        shared_claude_path = prefix_path / "bin" / "claude"
+
+    if shared_claude_path and shared_claude_path.exists():
         try:
-            result = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=5)
-            reported_version = result.stdout.strip() or result.stderr.strip()
-            console.print(f"[green]✓[/green] Claude CLI updated at {claude_path}")
-            if reported_version:
-                console.print(f"[dim]Reported version:[/dim] {reported_version}")
+            shared_result = subprocess.run(
+                [str(shared_claude_path), "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            shared_reported = shared_result.stdout.strip() or shared_result.stderr.strip()
+            console.print(f"[green]✓[/green] Shared Claude CLI updated at {shared_claude_path}")
+            if shared_reported:
+                console.print(f"[dim]Shared reported version:[/dim] {shared_reported}")
         except Exception as exc:
-            console.print(f"[yellow]⚠[/yellow] Update succeeded but failed to run 'claude --version': {exc}")
-    else:
-        console.print("[yellow]⚠[/yellow] Update completed but 'claude' is not in PATH")
-        if prefix_path:
-            console.print(f"[dim]Add {prefix_path / 'bin'} to your PATH if needed.[/dim]")
+            console.print(
+                f"[yellow]⚠[/yellow] Update succeeded but failed to run "
+                f"'{shared_claude_path} --version': {exc}"
+            )
+
+    if use_system_scope:
+        claude_path = shutil.which("claude")
+        if claude_path:
+            try:
+                result = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=5)
+                reported_version = result.stdout.strip() or result.stderr.strip()
+                console.print(f"[green]✓[/green] Shell Claude CLI path: {claude_path}")
+                if reported_version:
+                    console.print(f"[dim]Shell reported version:[/dim] {reported_version}")
+            except Exception as exc:
+                console.print(f"[yellow]⚠[/yellow] Update succeeded but failed to run 'claude --version': {exc}")
+        else:
+            console.print("[yellow]⚠[/yellow] Update completed but 'claude' is not in PATH")
+    elif shared_claude_path and shared_claude_path.exists():
+        console.print(
+            f"[dim]This update targets cuti runtime containers via {shared_claude_path}.[/dim]"
+        )
 
 
 @app.command("env")

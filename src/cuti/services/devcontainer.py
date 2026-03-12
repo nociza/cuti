@@ -197,10 +197,17 @@ RUN npm-original install -g @anthropic-ai/claude-code@latest \\
     && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/claude \\
     && echo '# Use Linux-specific config directory to avoid macOS conflicts' >> /usr/local/bin/claude \\
     && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> /usr/local/bin/claude \\
-    && echo '# Check if claude CLI exists and is executable' >> /usr/local/bin/claude \\
-    && echo 'CLAUDE_CLI="/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
+    && echo '# Prefer shared cuti install mounted from host, fallback to image install' >> /usr/local/bin/claude \\
+    && echo 'CLAUDE_CLI="/home/cuti/.cuti/claude-cli/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
+    && echo 'if [ ! -f "$CLAUDE_CLI" ]; then' >> /usr/local/bin/claude \\
+    && echo '    CLAUDE_CLI="/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
+    && echo 'fi' >> /usr/local/bin/claude \\
     && echo 'if [ ! -f "$CLAUDE_CLI" ]; then' >> /usr/local/bin/claude \\
     && echo '    CLAUDE_CLI="/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
+    && echo 'fi' >> /usr/local/bin/claude \\
+    && echo 'if [ ! -f "$CLAUDE_CLI" ]; then' >> /usr/local/bin/claude \\
+    && echo '    echo "Claude CLI not found. Run: cuti claude update" >&2' >> /usr/local/bin/claude \\
+    && echo '    exit 1' >> /usr/local/bin/claude \\
     && echo 'fi' >> /usr/local/bin/claude \\
     && echo 'exec node "$CLAUDE_CLI" "$@"' >> /usr/local/bin/claude \\
     && chmod +x /usr/local/bin/claude
@@ -222,7 +229,7 @@ RUN chown -R cuti:cuti /home/cuti
 
 # Install oh-my-zsh with simple configuration
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
-    && echo 'export PATH="/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
+    && echo 'export PATH="/home/cuti/.cuti/claude-cli/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export PYTHONPATH="/workspace/src:$PYTHONPATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
@@ -983,7 +990,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 "--env", "PYTHONUNBUFFERED=1",
                 "--env", "PYTHONPATH=/workspace/src",
                 "--env", "TERM=xterm-256color",
-                "--env", "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "--env", "PATH=/home/cuti/.cuti/claude-cli/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
                 "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
                 "--network", "host",
             ]
@@ -1030,7 +1037,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 "--env", "IS_SANDBOX=1",
                 "--env", "PYTHONUNBUFFERED=1",
                 "--env", "TERM=xterm-256color",
-                "--env", "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "--env", "PATH=/home/cuti/.cuti/claude-cli/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
                 "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
                 "--cap-drop", "ALL",
                 "--security-opt", "no-new-privileges:true",

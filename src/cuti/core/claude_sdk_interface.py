@@ -7,6 +7,7 @@ import os
 import json
 import asyncio
 import subprocess
+import shutil
 from pathlib import Path
 from typing import AsyncIterator, Dict, Any, Optional, List
 from datetime import datetime
@@ -95,6 +96,17 @@ class ClaudeSDKInterface:
         self.allowed_tools = allowed_tools or []
         self.permission_mode = permission_mode
         self._verify_installation()
+
+    def _resolve_claude_command(self) -> str:
+        """Resolve Claude CLI path, preferring cuti-managed installs."""
+        if os.environ.get("CUTI_IN_CONTAINER") == "true" and Path("/usr/local/bin/claude").exists():
+            return "/usr/local/bin/claude"
+
+        shared_cli = Path.home() / ".cuti" / "claude-cli" / "bin" / "claude"
+        if shared_cli.exists():
+            return str(shared_cli)
+
+        return shutil.which("claude") or "claude"
     
     def _verify_installation(self):
         """Verify that Claude Code CLI and SDK are properly installed."""
@@ -117,9 +129,10 @@ class ClaudeSDKInterface:
                 )
         
         # Verify Claude Code CLI is available
+        claude_cmd = self._resolve_claude_command()
         try:
             result = subprocess.run(
-                ["claude", "--version"],
+                [claude_cmd, "--version"],
                 capture_output=True,
                 text=True,
                 timeout=5

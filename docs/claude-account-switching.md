@@ -167,16 +167,17 @@ cuti claude update --dry-run
 ```
 
 Key behaviors:
-- Runs `npm install -g @anthropic-ai/claude-code@<version>` under the hood and
-  verifies the result with `claude --version`.
-- Defaults to a user-scoped install on the host (e.g., `~/.local/bin`). When the
-  command detects it is running inside a cuti container it automatically uses a
-  system-wide install so `/usr/local/bin/claude` is updated for every shell.
+- Runs `npm install -g --prefix ~/.cuti/claude-cli @anthropic-ai/claude-code@<version>`
+  by default and verifies the shared cuti-managed Claude binary.
+- The default shared install lives in `~/.cuti/claude-cli/`, which is mounted
+  into cuti containers so one update persists across container restarts.
+- The default shared update is for cuti runtime/container usage. Your host shell's
+  own `claude` binary can remain on a different version unless you use `--system`.
+- Supports `--system` when you explicitly want to install into system npm paths.
 - Prompts for confirmation before changing anything; add `--yes` (or `-y`) to
   skip the prompt, or `--dry-run` to only print the npm command.
-- Supports `--system` to force a global install, `--force` to reinstall the
-  current version, and `--beta` or an explicit version to pin what gets pulled
-  from npm.
+- Supports `--force` to reinstall the current version, and `--beta` or an
+  explicit version to pin what gets pulled from npm.
 
 ## How It Works
 
