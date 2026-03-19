@@ -35,7 +35,8 @@ from .api.claude_code_agents import claude_code_agents_router
 from .api.claude_settings import claude_settings_router
 from .api.claude_logs import claude_logs_router
 from .api.workspace import workspace_router
-from .api.claude_status import router as claude_status_router
+from .api.dashboard import router as dashboard_router
+from .api.providers import router as providers_router
 from .api.tools import router as tools_router
 from .api.prompt_prefix import router as prompt_prefix_router
 try:
@@ -69,7 +70,7 @@ def create_app(
     
     app = FastAPI(
         title="cuti Web Interface",
-        description="Production-ready Claude Code utils with web interface",
+        description="Provider-aware workspace control room for cuti",
         version="0.1.0",
     )
 
@@ -96,8 +97,8 @@ def create_app(
         # Handle case where Claude CLI is not available
         print(f"⚠️  Warning: {e}")
         print("📝 Web interface will start with limited functionality.")
-        print("   Chat features will not work without Claude CLI.")
-        print("   To fix: Ensure 'claude' command is available in PATH")
+        print("   Queue dispatch will not work until the default provider CLI is available.")
+        print("   To fix: Ensure 'claude' command is available in PATH or update the provider/container setup.")
         if os.environ.get("CUTI_IN_CONTAINER") == "true":
             print("   In container: Check /usr/local/bin/claude exists and is executable")
         queue_manager = None
@@ -122,10 +123,11 @@ def create_app(
     # Initialize global data manager and usage sync
     global_data_manager = GlobalDataManager()
     if global_data_manager.settings.usage_tracking_enabled:
-        # Start background usage sync service
-        UsageSyncManager.start_service()
         # Perform initial sync
         UsageSyncManager.sync_now()
+        # Start background usage sync service after initial import to avoid
+        # duplicate startup races against the immediate sync.
+        UsageSyncManager.start_service()
     
     # Initialize Claude Code agent manager (reads from .claude/agents)
     claude_code_agent_manager = ClaudeCodeAgentManager(
@@ -189,7 +191,8 @@ def create_app(
     app.include_router(claude_settings_router, prefix="/api")
     app.include_router(claude_logs_router, prefix="/api")
     app.include_router(workspace_router, prefix="/api")
-    app.include_router(claude_status_router)
+    app.include_router(dashboard_router)
+    app.include_router(providers_router)
     app.include_router(tools_router)
     app.include_router(prompt_prefix_router)
     app.include_router(websocket_router)
@@ -323,7 +326,7 @@ def main():
     print(f"💾 Storage: {Path(storage_dir).expanduser()}")
     if working_dir:
         print(f"📁 Working Directory: {working_dir}")
-    print(f"🌐 Dashboard: http://{host}:{port}")
+    print(f"🌐 Control Room: http://{host}:{port}")
     print(f"📚 API Docs: http://{host}:{port}/docs")
     print()
     

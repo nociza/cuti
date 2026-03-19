@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="metrics-grid reveal stagger-1" id="dashboardMetrics">
+    <article class="metric-card accent-coral">
+        <span class="metric-label">Provider readiness</span>
+        <strong class="metric-value" id="metricProviders">--</strong>
+        <p class="metric-detail" id="metricProvidersDetail">Loading provider state</p>
+    </article>
+    <article class="metric-card accent-teal">
+        <span class="metric-label">Queue pressure</span>
+        <strong class="metric-value" id="metricQueue">--</strong>
+        <p class="metric-detail" id="metricQueueDetail">Loading queue state</p>
+    </article>
+    <article class="metric-card accent-gold">
+        <span class="metric-label">Todo progress</span>
+        <strong class="metric-value" id="metricTodos">--</strong>
+        <p class="metric-detail" id="metricTodosDetail">Loading todo state</p>
+    </article>
+    <article class="metric-card accent-slate">
+        <span class="metric-label">Tool coverage</span>
+        <strong class="metric-value" id="metricTools">--</strong>
+        <p class="metric-detail" id="metricToolsDetail">Loading tool state</p>
+    </article>
+</section>
+
+<section class="content-grid reveal stagger-2">
+    <article class="panel panel-large">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Launch work</p>
+                <h2>Queue a prompt</h2>
+            </div>
+            <a href="/tasks" class="text-link">Open task desk</a>
+        </div>
+        <form class="stack-form" id="promptForm">
+            <label>
+                <span>Prompt</span>
+                <textarea name="content" rows="6" placeholder="Describe the work you want queued into the workspace."></textarea>
+            </label>
+            <div class="inline-fields">
+                <label>
+                    <span>Priority</span>
+                    <select name="priority">
+                        <option value="0">Immediate</option>
+                        <option value="1" selected>Normal</option>
+                        <option value="2">Background</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Context files</span>
+                    <input type="text" name="context_files" placeholder="README.md, src/app.py">
+                </label>
+            </div>
+            <button type="submit" class="primary-button">Add to queue</button>
+        </form>
+        <div class="command-strip" id="dashboardQuickCommands"></div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Provider fleet</p>
+                <h2>Current readiness</h2>
+            </div>
+            <a href="/providers" class="text-link">Manage providers</a>
+        </div>
+        <div class="stack-list" id="dashboardProviders"></div>
+    </article>
+</section>
+
+<section class="content-grid reveal stagger-3">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Recent queue activity</p>
+                <h2>Prompt feed</h2>
+            </div>
+            <a href="/tasks" class="text-link">See all prompts</a>
+        </div>
+        <div class="stack-list" id="dashboardPromptList"></div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Workspace focus</p>
+                <h2>Todo state</h2>
+            </div>
+            <a href="/tasks" class="text-link">Edit todos</a>
+        </div>
+        <div class="stack-list" id="dashboardTodoList"></div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Instruction surface</p>
+                <h2>Workspace files</h2>
+            </div>
+            <a href="/agents" class="text-link">Inspect agents</a>
+        </div>
+        <div class="stack-list" id="instructionFileList"></div>
+    </article>
+</section>
+{% endblock %}

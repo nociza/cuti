@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="content-grid reveal stagger-1">
+    <article class="panel panel-large">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Dispatch desk</p>
+                <h2>Queue prompts</h2>
+            </div>
+        </div>
+        <form class="stack-form" id="tasksPromptForm">
+            <label>
+                <span>Prompt</span>
+                <textarea name="content" rows="7" placeholder="Send a concrete instruction into the queue."></textarea>
+            </label>
+            <div class="inline-fields">
+                <label>
+                    <span>Priority</span>
+                    <select name="priority">
+                        <option value="0">Immediate</option>
+                        <option value="1" selected>Normal</option>
+                        <option value="2">Background</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Working directory</span>
+                    <input type="text" name="working_directory" value="{{ working_directory }}">
+                </label>
+            </div>
+            <label>
+                <span>Context files</span>
+                <input type="text" name="context_files" placeholder="README.md, src/main.py">
+            </label>
+            <button type="submit" class="primary-button">Queue prompt</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Task framing</p>
+                <h2>Create a todo</h2>
+            </div>
+        </div>
+        <form class="stack-form" id="todoForm">
+            <label>
+                <span>Todo</span>
+                <textarea name="content" rows="5" placeholder="Describe the next concrete unit of work."></textarea>
+            </label>
+            <label>
+                <span>Priority</span>
+                <select name="priority">
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </label>
+            <button type="submit" class="secondary-button">Add todo</button>
+        </form>
+    </article>
+</section>
+
+<section class="content-grid reveal stagger-2">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Queue status</p>
+                <h2>Recent prompts</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="tasksPromptList"></div>
+    </article>
+    <article class="panel panel-large">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Todo ledger</p>
+                <h2>Current work items</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="tasksTodoList"></div>
+    </article>
+</section>
+{% endblock %}

@@ -1,16 +1,10 @@
-# Clawdbot Integration (Preview)
+# Clawdbot Sandbox
 
-Run the Clawdbot gateway and messaging connectors directly from the cuti container runtime. The addon is enabled by default and can be toggled at any time. The wrapper handles installing the CLI, wiring persistent storage, and running commands in the hardened `clawdbot_sandbox` profile.
+Run the legacy Clawdbot gateway and messaging connectors through cuti's separate `clawdbot_sandbox` runtime profile.
 
-## Enable or disable the addon
+This is not part of the agent provider system. If you want the OpenClaw provider inside the standard cloud dev container, use `cuti providers enable openclaw` instead. This document covers the older `cuti clawdbot ...` workflow, which keeps its own storage under `~/.cuti/clawdbot/` and applies a stricter sandbox profile.
 
-```bash
-cuti addons list
-cuti addons disable clawdbot   # opt-out (no install on future rebuilds)
-cuti addons enable clawdbot    # re-enable when you need it again
-```
-
-State is stored in `~/.cuti/addons.json`. When enabled, the container image installs the Clawdbot CLI (Node 22 runtime) and uses persistent directories inside `~/.cuti/clawdbot/`.
+The sandbox installs the Clawdbot CLI on demand if it is missing, so there is no addon flag or separate enable/disable state anymore.
 
 ## Storage layout
 
@@ -109,7 +103,7 @@ cuti clawdbot run message send --target +15551234567 --message "Manual command"
 
 ## Troubleshooting
 
-- **Clawdbot CLI missing**: ensure the addon is enabled (`cuti addons list`) and rerun with `--rebuild` (forces the container image to reinstall Clawdbot).
+- **Clawdbot CLI missing**: rerun the command once in an interactive shell; the sandbox now self-installs the legacy CLI when needed. If the container image itself is stale, retry with `cuti clawdbot start --rebuild`.
 - **Docker/Colima issues**: the wrapper uses the same dependency checks as `cuti container`. Start Docker Desktop or run `colima start` before calling `cuti clawdbot ...`.
 - **Channel login prompts not showing**: WhatsApp login requires an interactive terminal. Run the command from a local shell (not from a background job) so the QR renders properly.
 - **Ports already in use**: pass `--port` to `cuti clawdbot gateway` to pick a different port, and update the Control UI URL accordingly.

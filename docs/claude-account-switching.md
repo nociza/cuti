@@ -144,40 +144,15 @@ Show the currently active account.
 cuti claude current
 ```
 
-### `cuti claude update`
+### `cuti providers update claude`
 
-Update the underlying Claude Code CLI (`@anthropic-ai/claude-code`) so that the
-`claude` command inside containers matches the latest Anthropic release.
+Provider updates now live under the shared provider command surface:
 
 ```bash
-# Update to the latest stable version in your preferred scope
-cuti claude update
-
-# Install a specific release
-cuti claude update 1.0.118
-
-# Try the beta channel
-cuti claude update --beta
-
-# Skip the confirmation prompt (useful for scripted environments)
-cuti claude update --yes
-
-# See the exact npm command that would run without making changes
-cuti claude update --dry-run
+cuti providers update claude
 ```
 
-Key behaviors:
-- Runs `npm install -g --prefix ~/.cuti/claude-cli @anthropic-ai/claude-code@<version>`
-  by default and verifies the shared cuti-managed Claude binary.
-- The default shared install lives in `~/.cuti/claude-cli/`, which is mounted
-  into cuti containers so one update persists across container restarts.
-- The default shared update is for cuti runtime/container usage. Your host shell's
-  own `claude` binary can remain on a different version unless you use `--system`.
-- Supports `--system` when you explicitly want to install into system npm paths.
-- Prompts for confirmation before changing anything; add `--yes` (or `-y`) to
-  skip the prompt, or `--dry-run` to only print the npm command.
-- Supports `--force` to reinstall the current version, and `--beta` or an
-  explicit version to pin what gets pulled from npm.
+This refreshes Claude Code inside the cuti container using the provider installer path rather than the older npm-specific host workflow.
 
 ## How It Works
 

@@ -12,6 +12,8 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ...services.instructions import update_instruction_files_with_tools
+
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
 
@@ -205,53 +207,12 @@ def check_tool_installed(check_command: str) -> bool:
 
 
 def update_claude_md(tools: List[Dict[str, Any]]):
-    """Update CLAUDE.md with enabled tools information."""
-    claude_md_path = Path("/workspace/CLAUDE.md")
-    
-    if not claude_md_path.exists():
-        return
-    
+    """Update provider instruction files with enabled tools information."""
+
     try:
-        with open(claude_md_path, 'r') as f:
-            content = f.read()
-        
-        # Find or create tools section
-        tools_section_start = content.find("## Available CLI Tools")
-        tools_section_end = content.find("\n## ", tools_section_start + 1) if tools_section_start != -1 else -1
-        
-        # Build new tools section
-        tools_content = "\n## Available CLI Tools\n\n"
-        tools_content += "The following CLI tools are available in the development environment:\n\n"
-        
-        enabled_tools = [t for t in tools if t.get('enabled') and t.get('installed')]
-        
-        if enabled_tools:
-            for tool in enabled_tools:
-                tools_content += f"### {tool['display_name']}\n"
-                tools_content += f"{tool['description']}\n\n"
-                tools_content += f"{tool['usage_instructions']}\n\n"
-        else:
-            tools_content += "*No additional CLI tools are currently enabled.*\n\n"
-        
-        # Replace or append tools section
-        if tools_section_start != -1:
-            if tools_section_end != -1:
-                new_content = content[:tools_section_start] + tools_content + content[tools_section_end:]
-            else:
-                new_content = content[:tools_section_start] + tools_content
-        else:
-            # Append before the last section or at the end
-            last_section = content.rfind("\n# ")
-            if last_section != -1:
-                new_content = content[:last_section] + "\n" + tools_content + content[last_section:]
-            else:
-                new_content = content + "\n" + tools_content
-        
-        with open(claude_md_path, 'w') as f:
-            f.write(new_content)
-            
+        update_instruction_files_with_tools(tools)
     except Exception as e:
-        print(f"Error updating CLAUDE.md: {e}")
+        print(f"Error updating instruction files: {e}")
 
 
 def update_container_setup(tools: List[Dict[str, Any]]):

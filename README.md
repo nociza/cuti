@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/pypi/dm/cuti?color=green&label=Downloads%2FMonth)](https://pypi.org/project/cuti/)
 [![Downloads Total](https://static.pepy.tech/badge/cuti)](https://pepy.tech/project/cuti)
 
-**Instant containerized development with Claude Code, Anthropic API integration, and intelligent agent orchestration**
+**Instant containerized development with Claude Code by default, plus provider-aware agent tooling**
 
 [PyPI](https://pypi.org/project/cuti/) • [Documentation](https://cutils.org/) • [GitHub](https://github.com/nociza/cuti)
 
@@ -23,7 +23,7 @@
 
 </div>
 
-## 🚀 Quick Start - Docker Container with Claude Code CLI
+## 🚀 Quick Start - Docker Container with Claude Code
 
 ```bash
 # Install Python package from PyPI
@@ -40,21 +40,40 @@ That's it! You now have a fully configured AI-powered coding environment with:
 - ✅ **Custom prompt** showing `cuti:~/path $`
 - ✅ **Auto-mounts** current directory for seamless workflow
 
-The Docker container provides isolated, reproducible AI-assisted development with Claude Code terminal integration.
+The Docker container provides isolated, reproducible AI-assisted development with Claude as the default agent provider.
 
 ## 🌟 Key Features - AI Agent Orchestration & Automation
 
 Build with multiple AI models and intelligent task management:
 - **Multi-agent orchestration** - Claude API, Gemini integration
 - **Command queuing system** with priority execution
-- **Web UI dashboard** - Launch with `cuti web`
+- **Web UI control room** - Launch with `cuti web` for overview, providers, tasks, tools, and agent inventory
 - **Smart rate limiting** - Automatic retry & backoff
 - **Task automation** - Built-in todo system for AI agents
 - **Claude version switching** - Easy CLI version management
-- **Optional Clawdbot addon** - Run Clawdbot gateway + messaging from the same dev container (`cuti clawdbot ...`)
+- **Agent providers** - Enable Codex, OpenCode, OpenClaw, and future providers alongside Claude with `cuti providers ...`
+- **Provider-aware setup** - cuti mounts provider auth/config/skills and updates common instruction files for enabled tools
+- **Legacy Clawdbot sandbox** - Run the older gateway + messaging workflow separately with `cuti clawdbot ...`
 - **Claude chat history** - `cuti history` shows transcripts and reopens old Claude Code sessions
 
 Perfect for AI-powered development, automation workflows, and LLM orchestration.
+
+## 🤖 Agent Providers
+
+Claude is enabled by default. Additional providers are opt-in and can be enabled together:
+
+```bash
+cuti providers list
+cuti providers doctor
+cuti providers enable codex
+cuti providers enable opencode
+cuti providers enable openclaw
+cuti providers auth claude --login
+cuti container --rebuild
+cuti providers update codex
+```
+
+When selected, `cuti` handles the provider-specific container wiring for auth, config mounts, CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `SOUL.md`, and `TOOLS.md`. The host CLI can also inspect readiness, launch setup flows, and refresh provider installs through `cuti providers ...`.
 
 ## 📚 Documentation
 
@@ -62,14 +81,14 @@ Perfect for AI-powered development, automation workflows, and LLM orchestration.
 
 | Guide | Description |
 |-------|-------------|
-| [Docker Container Setup](docs/devcontainer.md) | Complete containerized environment guide |
+| [Docker Container Setup](docs/devcontainer.md) | Container runtime, provider selection, mounts, and auth |
 | [Claude Authentication](docs/claude-container-auth.md) | Anthropic API & Claude CLI setup |
 | [Claude Account Switching](docs/claude-account-switching.md) | Manage multiple Claude accounts |
 | [Claude API Keys](docs/claude-api-keys.md) | Anthropic & AWS Bedrock API key management |
 | [Task Management](docs/todo-system.md) | AI agent todo system |
 | [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
 | [Claude Chat History](docs/claude-history.md) | Inspect & resume Claude Code sessions |
-| [Clawdbot Integration](docs/clawdbot.md) | Run the Clawdbot gateway + channels inside cuti |
+| [Clawdbot Sandbox](docs/clawdbot.md) | Legacy Clawdbot gateway workflow in the separate sandbox profile |
 
 ## 🤝 Contributing
 
@@ -93,9 +112,9 @@ Apache 2.0 - See [LICENSE](LICENSE)
 
 </div>
 
-## 🦞 Clawdbot Integration
+## 🦞 Clawdbot Sandbox
 
-Clawdbot ships with cuti now—no manual install needed. The addon runs entirely inside the dev container, auto-links your Clawdbot workspace/config from `~/.cuti/clawdbot/`, and keeps every command interactive (OAuth, QR codes, etc.).
+`cuti clawdbot` is a separate legacy sandbox workflow. It is not part of provider selection and uses its own hardened runtime profile plus persistent storage under `~/.cuti/clawdbot/`.
 
 - `cuti clawdbot onboard` – run the official wizard with OAuth + skill setup
 - `cuti clawdbot start` – launch the gateway, auto-pick a port, stream logs

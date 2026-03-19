@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="content-grid reveal stagger-1">
+    <article class="panel panel-large">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Provider model</p>
+                <h2>Container composition</h2>
+            </div>
+        </div>
+        <p class="panel-copy">Providers define which agent CLIs, auth mounts, instruction files, and self-update flows are wired into the cuti container. Claude stays selected by default; everything else is explicit.</p>
+        <div class="badge-row" id="providerSelectionSummary"></div>
+    </article>
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">What the UI can do</p>
+                <h2>Selection controls</h2>
+            </div>
+        </div>
+        <ul class="feature-list">
+            <li>Enable or disable providers for future container runs.</li>
+            <li>See whether auth and state files already exist on the host.</li>
+            <li>Copy the correct terminal commands for onboarding and self-update.</li>
+        </ul>
+    </article>
+</section>
+
+<section class="card-grid reveal stagger-2" id="providersGrid"></section>
+{% endblock %}

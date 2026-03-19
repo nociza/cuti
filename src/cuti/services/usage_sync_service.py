@@ -39,6 +39,7 @@ class UsageSyncService:
         self._last_sync = None
         self._sync_count = 0
         self._error_count = 0
+        self._sync_lock = threading.Lock()
     
     def start(self):
         """Start the background sync service."""
@@ -90,36 +91,37 @@ class UsageSyncService:
         Returns:
             Number of new records imported
         """
-        try:
-            if not self.global_manager.settings.usage_tracking_enabled:
+        with self._sync_lock:
+            try:
+                if not self.global_manager.settings.usage_tracking_enabled:
+                    return 0
+                
+                logger.debug("Starting usage data sync")
+                
+                # Import Claude logs
+                imported = self.global_manager.import_claude_logs(self.claude_data_path)
+                
+                if imported > 0:
+                    logger.info(f"Synced {imported} new usage records")
+                
+                # Update sync metadata
+                self._last_sync = datetime.now()
+                self._sync_count += 1
+                
+                # Reset error count on successful sync
+                if imported >= 0:
+                    self._error_count = 0
+                
+                # Perform cleanup if needed (once per day)
+                if self._should_cleanup():
+                    self._perform_cleanup()
+                
+                return imported
+                
+            except Exception as e:
+                logger.error(f"Failed to sync usage data: {e}")
+                self._error_count += 1
                 return 0
-            
-            logger.debug("Starting usage data sync")
-            
-            # Import Claude logs
-            imported = self.global_manager.import_claude_logs(self.claude_data_path)
-            
-            if imported > 0:
-                logger.info(f"Synced {imported} new usage records")
-            
-            # Update sync metadata
-            self._last_sync = datetime.now()
-            self._sync_count += 1
-            
-            # Reset error count on successful sync
-            if imported >= 0:
-                self._error_count = 0
-            
-            # Perform cleanup if needed (once per day)
-            if self._should_cleanup():
-                self._perform_cleanup()
-            
-            return imported
-            
-        except Exception as e:
-            logger.error(f"Failed to sync usage data: {e}")
-            self._error_count += 1
-            return 0
     
     def _should_cleanup(self) -> bool:
         """Check if cleanup should be performed."""

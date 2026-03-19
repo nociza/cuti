@@ -67,7 +67,7 @@ def main():
     print(f"💾 Storage: {Path(storage_dir).expanduser()}")
     if working_dir:
         print(f"📁 Working Directory: {working_dir}")
-    print(f"🌐 Dashboard: http://{host}:{port}")
+    print(f"🌐 Control Room: http://{host}:{port}")
     print(f"📚 API Docs: http://{host}:{port}/docs")
     print()
     

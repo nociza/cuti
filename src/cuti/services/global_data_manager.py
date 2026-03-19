@@ -274,24 +274,24 @@ to remove all stored data. Run `cuti settings` to manage preferences.
                 
                 for entry in entries:
                     try:
-                        # Check if record already exists
-                        cursor.execute('''
-                            SELECT id FROM usage_records
-                            WHERE timestamp = ? AND message_id = ? AND request_id = ?
-                        ''', (entry.timestamp, entry.message_id, entry.request_id))
-                        
-                        if cursor.fetchone():
+                        timestamp = self._sqlite_timestamp(entry.timestamp)
+                        if self._usage_record_exists(
+                            cursor,
+                            timestamp,
+                            entry.message_id,
+                            entry.request_id,
+                        ):
                             continue
                         
                         # Insert new record
                         cursor.execute('''
-                            INSERT INTO usage_records (
+                            INSERT OR IGNORE INTO usage_records (
                                 timestamp, project_path, input_tokens, output_tokens,
                                 cache_creation_tokens, cache_read_tokens, total_tokens,
                                 model, cost, message_id, request_id, session_id, metadata
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
-                            entry.timestamp,
+                            timestamp,
                             project_path,
                             entry.input_tokens,
                             entry.output_tokens,
@@ -307,7 +307,7 @@ to remove all stored data. Run `cuti settings` to manage preferences.
                             json.dumps({'imported_at': datetime.now().isoformat()})
                         ))
                         
-                        imported += 1
+                        imported += cursor.rowcount
                         
                     except Exception as e:
                         logger.error(f"Failed to import record: {e}")
@@ -318,12 +318,47 @@ to remove all stored data. Run `cuti settings` to manage preferences.
                 
                 conn.commit()
             
-            logger.info(f"Imported {imported} usage records")
+            if imported > 0:
+                logger.info(f"Imported {imported} usage records")
             return imported
             
         except Exception as e:
             logger.error(f"Failed to import Claude logs: {e}")
             return 0
+
+    @staticmethod
+    def _usage_record_exists(
+        cursor: sqlite3.Cursor,
+        timestamp: Any,
+        message_id: Optional[str],
+        request_id: Optional[str],
+    ) -> bool:
+        """Return True when an equivalent usage record already exists.
+
+        SQLite treats NULLs as distinct inside UNIQUE constraints, so import
+        code needs its own NULL-safe duplicate check.
+        """
+
+        cursor.execute(
+            '''
+                SELECT 1
+                FROM usage_records
+                WHERE timestamp = ?
+                  AND COALESCE(message_id, '') = COALESCE(?, '')
+                  AND COALESCE(request_id, '') = COALESCE(?, '')
+                LIMIT 1
+            ''',
+            (timestamp, message_id, request_id),
+        )
+        return cursor.fetchone() is not None
+
+    @staticmethod
+    def _sqlite_timestamp(value: Any) -> Any:
+        """Normalize datetimes before binding them into sqlite queries."""
+
+        if hasattr(value, "isoformat"):
+            return value.isoformat(sep=" ")
+        return value
     
     def _update_project_stats(self, conn: sqlite3.Connection, project_path: str):
         """Update project statistics."""
@@ -895,6 +930,8 @@ to remove all stored data. Run `cuti settings` to manage preferences.
         
         days = days or self.settings.auto_cleanup_days
         cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_usage = self._sqlite_timestamp(cutoff_date)
+        cutoff_message = cutoff_date.isoformat()
         
         with sqlite3.connect(str(self.db_path), timeout=30.0) as conn:
             cursor = conn.cursor()
@@ -903,7 +940,7 @@ to remove all stored data. Run `cuti settings` to manage preferences.
             cursor.execute('''
                 DELETE FROM usage_records
                 WHERE timestamp < ?
-            ''', (cutoff_date,))
+            ''', (cutoff_usage,))
             
             deleted_usage = cursor.rowcount
             
@@ -911,7 +948,7 @@ to remove all stored data. Run `cuti settings` to manage preferences.
             cursor.execute('''
                 DELETE FROM chat_messages
                 WHERE timestamp < ?
-            ''', (cutoff_date.isoformat(),))
+            ''', (cutoff_message,))
             
             deleted_messages = cursor.rowcount
             
@@ -925,9 +962,11 @@ to remove all stored data. Run `cuti settings` to manage preferences.
             
             deleted_sessions = cursor.rowcount
             
-            # Vacuum to reclaim space
-            conn.execute("VACUUM")
             conn.commit()
+
+        if deleted_usage or deleted_messages or deleted_sessions:
+            with sqlite3.connect(str(self.db_path), timeout=30.0, isolation_level=None) as conn:
+                conn.execute("VACUUM")
         
         logger.info(f"Cleaned up {deleted_usage} usage records, {deleted_messages} chat messages, {deleted_sessions} sessions")
     

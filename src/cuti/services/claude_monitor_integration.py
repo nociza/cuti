@@ -71,7 +71,7 @@ class ClaudeMonitorIntegration:
         # Verify data path exists
         data_path = Path(self.claude_data_path).expanduser()
         if not data_path.exists():
-            logger.warning(f"Claude data path does not exist: {data_path}")
+            logger.debug(f"Claude data path does not exist yet: {data_path}")
         else:
             logger.info(f"Using Claude data path: {data_path}")
     

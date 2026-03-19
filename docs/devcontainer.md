@@ -1,6 +1,6 @@
 # Dev Container Documentation
 
-The cuti dev container provides a fully configured development environment with cuti, Claude CLI, and all necessary tools pre-installed and configured.
+The cuti dev container provides a fully configured development environment with cuti, Claude as the default agent provider, and optional provider wiring for additional CLIs such as Codex, OpenCode, and OpenClaw.
 
 ## Quick Start
 
@@ -20,6 +20,12 @@ cuti container --command "claude 'Explain this project'"
 - No conflicts with macOS Keychain
 - One-time authentication for all containers
 - 📚 [Complete Authentication Guide](claude-container-auth.md)
+
+### 🤖 Agent Providers
+- Claude is enabled by default
+- Additional providers can be enabled together with `cuti providers enable ...`
+- Provider-specific auth, config, and skills directories are mounted automatically
+- Provider CLIs are installed through their current standalone/native install paths at container startup
 
 ### 🎯 Smart Container Selection
 - **Universal Container** (`cuti-dev-universal`): Used when running from any project directory
@@ -103,6 +109,13 @@ cuti container --command "cuti status"
 # Run Claude directly
 cuti container --command "claude 'What does this project do?'"
 
+# Enable more providers for the same container profile
+cuti providers enable codex
+cuti providers enable opencode
+cuti providers enable openclaw
+cuti container --rebuild
+cuti container --command "codex --version && opencode --version && openclaw --version"
+
 # Run Python scripts
 cuti container --command "python script.py"
 ```
@@ -145,15 +158,63 @@ If you're using an older container image, rebuild to get the alias:
 cuti container --rebuild
 ```
 
-### 🦞 Clawdbot Addon (preview)
+### 🤖 Agent Providers
 
-The dev container now installs the optional [Clawdbot](https://clawdbot.com) CLI (default **enabled**). Use the new wrappers to manage onboarding, gateway, and messaging without leaving the `cuti` workflow:
+Claude remains the default CLI in the standard cloud container profile. Additional providers are opt-in and can be enabled together:
 
 ```bash
-cuti addons list                 # view/toggle addon state
-cuti clawdbot onboard            # run Clawdbot wizard (auth, workspace, channels)
-cuti clawdbot gateway --port 18789  # stream gateway logs until Ctrl+C
-cuti clawdbot channels-login     # scan WhatsApp / authorize Telegram bots
+cuti providers list
+cuti providers doctor
+cuti providers enable codex
+cuti providers enable opencode
+cuti providers enable openclaw
+cuti providers auth claude --login
+cuti container --rebuild
+cuti providers update codex
+```
+
+The standard cloud profile exports provider metadata into the container:
+
+- `CUTI_AGENT_PROVIDERS` contains the enabled provider IDs
+- `CUTI_PRIMARY_AGENT_PROVIDER` prefers `claude` when enabled
+- `CODEX_HOME`, `XDG_CONFIG_HOME`, and `XDG_DATA_HOME` are set for provider state
+
+Provider-specific mounts are added automatically when the provider is enabled:
+
+| Provider | Host Path | Container Path | Purpose |
+|----------|-----------|----------------|---------|
+| Claude | `~/.cuti/claude-linux/` | `/home/cuti/.claude-linux` | Linux Claude credentials |
+| Claude | `~/.claude/` | `/home/cuti/.claude-macos` | macOS config reference (read-only) |
+| Codex | `~/.codex/` | `/home/cuti/.codex` | Auth, config, skills |
+| OpenCode | `~/.opencode/` | `/home/cuti/.opencode` | CLI install and provider state |
+| OpenCode | `~/.config/opencode/` | `/home/cuti/.config/opencode` | Config |
+| OpenCode | `~/.local/share/opencode/` | `/home/cuti/.local/share/opencode` | Data |
+| OpenClaw | `~/.openclaw/` | `/home/cuti/.openclaw` | Runtime state |
+| Shared agent files | `~/.agents/` | `/home/cuti/.agents` | Shared provider skills/prompts |
+
+Install behavior is provider-specific:
+
+- Claude uses the official native installer
+- Codex uses the official standalone installer
+- OpenCode uses the official install script
+- OpenClaw uses its published npm package and wrapper
+
+Host-side provider commands:
+
+- `cuti providers list` shows selection plus setup summary
+- `cuti providers status <provider>` shows detailed host/container state
+- `cuti providers doctor` checks readiness across providers
+- `cuti providers auth <provider> --login` launches the provider's interactive setup flow inside the container
+- `cuti providers update <provider>` refreshes that provider inside the container using cuti's provider installer path
+
+### 🦞 Legacy Clawdbot Sandbox
+
+`cuti clawdbot ...` remains available, but it is a separate sandboxed runtime profile rather than an agent provider. It keeps its own persistent storage and security policy:
+
+```bash
+cuti clawdbot onboard
+cuti clawdbot gateway --port 18789
+cuti clawdbot channels-login
 cuti clawdbot send --to +15551234567 --message "Hello"
 ```
 
@@ -164,9 +225,7 @@ Exposed host mounts:
 | `~/.cuti/clawdbot/config/` | `/home/cuti/.clawdbot` | Gateway config + channel credentials |
 | `~/.cuti/clawdbot/workspaces/<project-id>/` | `/home/cuti/clawd` | Agent workspace + history for that project |
 
-`<project-id>` combines the project folder name with a short hash of its absolute path, so each cuti workspace keeps its own logs/history even when multiple containers run concurrently, while configs stay global.
-
-See [docs/clawdbot.md](clawdbot.md) for channel-specific steps (WhatsApp QR, Telegram tokens, smoke tests).
+See [docs/clawdbot.md](clawdbot.md) for the legacy gateway workflow.
 
 ### Docker-in-Docker Usage
 ```bash
@@ -195,7 +254,7 @@ docker-compose --version
 #### `cuti-dev-universal` (Default for most projects)
 - Base: `python:3.11-bullseye`
 - Cuti: Installed from PyPI via `uv tool install cuti`
-- Claude CLI: Latest version with auth propagation
+- Agent providers: Claude preinstalled, other enabled providers installed at runtime
 - Docker CLI: Installed for Docker-in-Docker support
 - Tools: git, zsh, ripgrep, fd-find, bat, jq, curl, wget
 - Python: uv package manager, pytest, httpx, fastapi, uvicorn
@@ -214,17 +273,22 @@ The container automatically mounts:
 | Host Path | Container Path | Purpose |
 |-----------|---------------|---------|
 | Current directory | `/workspace` | Your project files |
-| `~/.cuti/claude-linux/` | `/home/cuti/.claude-linux` | Linux Claude credentials |
-| `~/.claude/` | `/home/cuti/.claude-macos` | macOS config (read-only) |
-| `~/.cuti/` | `/root/.cuti-global` | Global cuti config |
+| `~/.cuti/` | `/home/cuti/.cuti-shared` | Shared cuti config and account state |
 | `/var/run/docker.sock` | `/var/run/docker.sock` | Docker socket for Docker-in-Docker |
+
+Additional provider mounts are added only for enabled providers.
 
 ### Environment Variables
 
 Automatically set in container:
 - `CUTI_IN_CONTAINER=true` - Indicates running in container
+- `CUTI_AGENT_PROVIDERS` - Comma-separated enabled providers
+- `CUTI_PRIMARY_AGENT_PROVIDER` - Primary provider for prompts/help text
 - `CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux` - Linux Claude config location
 - `CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true` - Skip permission checks
+- `CODEX_HOME=/home/cuti/.codex` - Codex state root
+- `XDG_CONFIG_HOME=/home/cuti/.config` - Shared XDG config root
+- `XDG_DATA_HOME=/home/cuti/.local/share` - Shared XDG data root
 - `PYTHONUNBUFFERED=1` - Python unbuffered output
 - `TERM=xterm-256color` - Color terminal support
 - `ANTHROPIC_API_KEY` - Loaded from environment or file if available

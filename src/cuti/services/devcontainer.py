@@ -22,7 +22,7 @@ try:
 except ImportError:
     _RICH_AVAILABLE = False
 
-from .addons import AddonManager
+from .providers import ProviderManager
 
 
 class DevContainerService:
@@ -124,39 +124,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create enhanced docker-compose wrapper
-RUN cat > /usr/local/bin/docker-compose << 'EOF'
-#!/bin/bash
-# Enhanced docker-compose wrapper for cuti containers
-# Ensures proper permissions and compatibility
-
-# First check if we can access Docker
-if ! docker version &>/dev/null 2>&1; then
-    # Try with sudo if available
-    if command -v sudo &>/dev/null && sudo -n docker version &>/dev/null 2>&1; then
-        # sudo works without password, use it
-        if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
-            exec sudo docker compose version
-        else
-            exec sudo docker compose "$@"
-        fi
-    else
-        # Docker not accessible, show helpful error
-        echo "Error: Cannot access Docker. Please check:" >&2
-        echo "  1. Docker socket is mounted: -v /var/run/docker.sock:/var/run/docker.sock" >&2
-        echo "  2. User is in docker group: groups | grep docker" >&2
-        echo "  3. Socket permissions: ls -la /var/run/docker.sock" >&2
-        exit 1
-    fi
-fi
-
-# Docker is accessible, use docker compose directly
-if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
-    exec docker compose version
-else
-    exec docker compose "$@"
-fi
-EOF
-RUN chmod +x /usr/local/bin/docker-compose
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            '# Enhanced docker-compose wrapper for cuti containers' \
+            '# Ensures proper permissions and compatibility' \
+            '' \
+            '# First check if we can access Docker' \
+            'if ! docker version &>/dev/null 2>&1; then' \
+            '    # Try with sudo if available' \
+            '    if command -v sudo &>/dev/null && sudo -n docker version &>/dev/null 2>&1; then' \
+            '        # sudo works without password, use it' \
+            '        if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then' \
+            '            exec sudo docker compose version' \
+            '        else' \
+            '            exec sudo docker compose "$@"' \
+            '        fi' \
+            '    else' \
+            '        # Docker not accessible, show helpful error' \
+            '        echo "Error: Cannot access Docker. Please check:" >&2' \
+            '        echo "  1. Docker socket is mounted: -v /var/run/docker.sock:/var/run/docker.sock" >&2' \
+            '        echo "  2. User is in docker group: groups | grep docker" >&2' \
+            '        echo "  3. Socket permissions: ls -la /var/run/docker.sock" >&2' \
+            '        exit 1' \
+            '    fi' \
+            'fi' \
+            '' \
+            '# Docker is accessible, use docker compose directly' \
+            'if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then' \
+            '    exec docker compose version' \
+            'else' \
+            '    exec docker compose "$@"' \
+            'fi'; \
+    } > /usr/local/bin/docker-compose \
+    && chmod +x /usr/local/bin/docker-compose
 
 # Configure locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
@@ -189,31 +190,101 @@ RUN groupadd --gid $USER_GID $USERNAME \\
     && chmod 755 /usr/local/bin/docker-compose \\
     && chown root:docker /usr/local/bin/docker-compose
 
-# Install Claude Code CLI (latest version)
-RUN npm-original install -g @anthropic-ai/claude-code@latest \\
-    && echo '#!/bin/bash' > /usr/local/bin/claude \\
-    && echo '# Claude wrapper script for container environment' >> /usr/local/bin/claude \\
-    && echo 'export IS_SANDBOX=1' >> /usr/local/bin/claude \\
-    && echo 'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' >> /usr/local/bin/claude \\
-    && echo '# Use Linux-specific config directory to avoid macOS conflicts' >> /usr/local/bin/claude \\
-    && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> /usr/local/bin/claude \\
-    && echo '# Prefer shared cuti install mounted from host, fallback to image install' >> /usr/local/bin/claude \\
-    && echo 'CLAUDE_CLI="/home/cuti/.cuti/claude-cli/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
-    && echo 'if [ ! -f "$CLAUDE_CLI" ]; then' >> /usr/local/bin/claude \\
-    && echo '    CLAUDE_CLI="/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
-    && echo 'fi' >> /usr/local/bin/claude \\
-    && echo 'if [ ! -f "$CLAUDE_CLI" ]; then' >> /usr/local/bin/claude \\
-    && echo '    CLAUDE_CLI="/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"' >> /usr/local/bin/claude \\
-    && echo 'fi' >> /usr/local/bin/claude \\
-    && echo 'if [ ! -f "$CLAUDE_CLI" ]; then' >> /usr/local/bin/claude \\
-    && echo '    echo "Claude CLI not found. Run: cuti claude update" >&2' >> /usr/local/bin/claude \\
-    && echo '    exit 1' >> /usr/local/bin/claude \\
-    && echo 'fi' >> /usr/local/bin/claude \\
-    && echo 'exec node "$CLAUDE_CLI" "$@"' >> /usr/local/bin/claude \\
+# Native installer helpers for agent providers
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export HOME="${HOME:-/home/cuti}"' \
+            'curl -fsSL https://claude.ai/install.sh | bash -s -- "$@"'; \
+    } > /usr/local/bin/cuti-install-claude \
+    && chmod +x /usr/local/bin/cuti-install-claude
+
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export HOME="${HOME:-/home/cuti}"' \
+            'export CODEX_INSTALL_DIR="${CODEX_INSTALL_DIR:-$HOME/.local/bin}"' \
+            'curl -fsSL https://github.com/openai/codex/releases/latest/download/install.sh | sh -s -- "$@"'; \
+    } > /usr/local/bin/cuti-install-codex \
+    && chmod +x /usr/local/bin/cuti-install-codex
+
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export HOME="${HOME:-/home/cuti}"' \
+            'curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path "$@"'; \
+    } > /usr/local/bin/cuti-install-opencode \
+    && chmod +x /usr/local/bin/cuti-install-opencode
+
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export HOME="${HOME:-/home/cuti}"' \
+            '/usr/local/bin/npm-original install -g openclaw@latest "$@"'; \
+    } > /usr/local/bin/cuti-install-openclaw \
+    && chmod +x /usr/local/bin/cuti-install-openclaw
+
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export IS_SANDBOX=1' \
+            'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' \
+            'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' \
+            'CLAUDE_CLI="/home/cuti/.local/bin/claude"' \
+            'if [ ! -x "$CLAUDE_CLI" ]; then' \
+            '    echo "Claude CLI not found. Rebuild the container or run: /usr/local/bin/cuti-install-claude" >&2' \
+            '    exit 1' \
+            'fi' \
+            'exec "$CLAUDE_CLI" "$@"'; \
+    } > /usr/local/bin/claude \
     && chmod +x /usr/local/bin/claude
 
-# Optional Clawdbot install placeholder
-{CLAWDBOT_INSTALL}
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
+            'CODEX_CLI="/home/cuti/.local/bin/codex"' \
+            'if [ ! -x "$CODEX_CLI" ]; then' \
+            '    echo "Codex CLI not found. Enable the codex provider or run: /usr/local/bin/cuti-install-codex" >&2' \
+            '    exit 1' \
+            'fi' \
+            'exec "$CODEX_CLI" "$@"'; \
+    } > /usr/local/bin/codex \
+    && chmod +x /usr/local/bin/codex
+
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export PATH="/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
+            'OPENCODE_CLI="/home/cuti/.opencode/bin/opencode"' \
+            'if [ ! -x "$OPENCODE_CLI" ]; then' \
+            '    echo "OpenCode CLI not found. Enable the opencode provider or run: /usr/local/bin/cuti-install-opencode" >&2' \
+            '    exit 1' \
+            'fi' \
+            'exec "$OPENCODE_CLI" "$@"'; \
+    } > /usr/local/bin/opencode \
+    && chmod +x /usr/local/bin/opencode
+
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'OPENCLAW_PACKAGE_ROOT="$(/usr/local/bin/npm-original root -g 2>/dev/null || true)/openclaw"' \
+            'OPENCLAW_ENTRY="$OPENCLAW_PACKAGE_ROOT/openclaw.mjs"' \
+            'if [ ! -f "$OPENCLAW_ENTRY" ]; then' \
+            '    echo "OpenClaw CLI not found. Enable the openclaw provider or run: /usr/local/bin/cuti-install-openclaw" >&2' \
+            '    exit 1' \
+            'fi' \
+            'exec node "$OPENCLAW_ENTRY" "$@"'; \
+    } > /usr/local/bin/openclaw \
+    && chmod +x /usr/local/bin/openclaw
 
 {CUTI_INSTALL}
 
@@ -224,20 +295,23 @@ USER $USERNAME
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/cuti/.local/bin:${PATH}"
 
-# Ensure home directory permissions are correct
-RUN chown -R cuti:cuti /home/cuti
+# Install Claude Code via the native installer
+RUN HOME=/home/cuti /usr/local/bin/cuti-install-claude
 
 # Install oh-my-zsh with simple configuration
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
-    && echo 'export PATH="/home/cuti/.cuti/claude-cli/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
+    && echo 'export PATH="/home/cuti/.opencode/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export PYTHONPATH="/workspace/src:$PYTHONPATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
     && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> ~/.zshrc \\
+    && echo 'export CODEX_HOME=/home/cuti/.codex' >> ~/.zshrc \\
+    && echo 'export XDG_CONFIG_HOME=/home/cuti/.config' >> ~/.zshrc \\
+    && echo 'export XDG_DATA_HOME=/home/cuti/.local/share' >> ~/.zshrc \\
     && echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.zshrc \\
     && echo 'alias npm-original="/usr/local/bin/npm-original"' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
-    && echo 'echo "Commands: cuti web | cuti cli | claude"' >> ~/.zshrc \\
+    && echo 'echo "Commands: cuti | claude | codex | opencode | openclaw"' >> ~/.zshrc \\
     && echo 'echo "📦 pnpm is the default package manager (npm commands use pnpm)"' >> ~/.zshrc \\
     && echo 'echo "   Use npm-original for actual npm if needed"' >> ~/.zshrc
 
@@ -274,13 +348,18 @@ CMD ["/bin/zsh", "-l"]
         "remoteUser": "cuti"
     }
     
-    def __init__(self, working_directory: Optional[str] = None):
+    def __init__(
+        self,
+        working_directory: Optional[str] = None,
+        *,
+        provider_storage_dir: Optional[Path] = None,
+    ):
         """Initialize the dev container service."""
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
         self.devcontainer_dir = self.working_dir / ".devcontainer"
         self.is_macos = platform.system() == "Darwin"
-        self.addon_manager = AddonManager()
-        self._clawdbot_enabled_cache: Optional[bool] = None
+        self.provider_manager = ProviderManager(storage_dir=provider_storage_dir)
+        self._selected_providers_cache: Optional[List[str]] = None
         
         # Check tool availability (cached for CLI compatibility)
         self.docker_available = self._check_tool_available("docker")
@@ -326,18 +405,27 @@ CMD ["/bin/zsh", "-l"]
         except FileNotFoundError:
             raise RuntimeError(f"Command not found: {cmd[0]}")
 
-    def _is_clawdbot_enabled(self) -> bool:
-        """Check whether the Clawdbot addon should be installed (prompting if needed)."""
+    def _selected_providers(self) -> List[str]:
+        """Return the enabled provider IDs for the cloud container profile."""
 
-        if self._clawdbot_enabled_cache is not None:
-            return self._clawdbot_enabled_cache
+        if self._selected_providers_cache is None:
+            self._selected_providers_cache = self.provider_manager.selected_providers()
+        return list(self._selected_providers_cache)
 
-        prompt_text = (
-            "The Clawdbot addon installs the Clawdbot CLI inside the container so you can run the gateway and messaging channels."
-        )
-        enabled = self.addon_manager.ensure_enabled("clawdbot", prompt=prompt_text, default_enabled=True)
-        self._clawdbot_enabled_cache = enabled
-        return enabled
+    def _is_provider_enabled(self, provider: str) -> bool:
+        """Return True when a provider is selected for the container runtime."""
+
+        return provider in self._selected_providers()
+
+    def _primary_provider(self) -> Optional[str]:
+        """Return the primary provider for prompts/help text."""
+
+        providers = self._selected_providers()
+        if not providers:
+            return None
+        if "claude" in providers:
+            return "claude"
+        return providers[0]
 
     def _clawdbot_workspace_slug(self) -> str:
         """Return a stable slug for the current project to scope Clawdbot history."""
@@ -376,6 +464,91 @@ CMD ["/bin/zsh", "-l"]
                 print(f"🔁 Migrated legacy {label} to {new_path}")
         except Exception as exc:
             print(f"⚠️  Could not migrate {label}: {exc}")
+
+    def _prepare_agents_storage(self) -> Path:
+        """Ensure shared AGENTS-based personal skill storage exists."""
+
+        agents_dir = Path.home() / ".agents"
+        (agents_dir / "skills").mkdir(parents=True, exist_ok=True)
+        return agents_dir
+
+    def _prepare_codex_storage(self) -> Path:
+        """Ensure Codex home storage exists on the host."""
+
+        codex_dir = Path.home() / ".codex"
+        codex_dir.mkdir(parents=True, exist_ok=True)
+        return codex_dir
+
+    def _prepare_opencode_storage(self) -> Tuple[Path, Path, Path]:
+        """Ensure OpenCode storage directories exist on the host."""
+
+        home_dir = Path.home() / ".opencode"
+        config_dir = Path.home() / ".config" / "opencode"
+        data_dir = Path.home() / ".local" / "share" / "opencode"
+
+        (home_dir / "bin").mkdir(parents=True, exist_ok=True)
+        config_dir.mkdir(parents=True, exist_ok=True)
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        return home_dir, config_dir, data_dir
+
+    def _prepare_openclaw_storage(self) -> Path:
+        """Ensure OpenClaw state storage exists on the host."""
+
+        openclaw_dir = Path.home() / ".openclaw"
+        openclaw_dir.mkdir(parents=True, exist_ok=True)
+        (openclaw_dir / "credentials").mkdir(parents=True, exist_ok=True)
+        return openclaw_dir
+
+    def _selected_providers_env_value(self) -> str:
+        """Return selected providers as a comma-separated environment value."""
+
+        return ",".join(self._selected_providers())
+
+    def _prepare_cloud_provider_mounts(self) -> Tuple[Optional[Path], List[str]]:
+        """Prepare host storage and mount specs for selected cloud providers."""
+
+        providers = set(self._selected_providers())
+        mount_args: List[str] = []
+        linux_claude_dir: Optional[Path] = None
+
+        if "claude" in providers:
+            linux_claude_dir = self._setup_claude_host_config()
+            mount_args.extend(
+                [
+                    "-v",
+                    f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",
+                    "-v",
+                    f"{Path.home() / '.claude'}:/home/cuti/.claude-macos:ro",
+                ]
+            )
+
+        if providers & {"codex", "opencode", "openclaw"}:
+            agents_dir = self._prepare_agents_storage()
+            mount_args.extend(["-v", f"{agents_dir}:/home/cuti/.agents:rw"])
+
+        if "codex" in providers:
+            codex_dir = self._prepare_codex_storage()
+            mount_args.extend(["-v", f"{codex_dir}:/home/cuti/.codex:rw"])
+
+        if "opencode" in providers:
+            opencode_home, opencode_config, opencode_data = self._prepare_opencode_storage()
+            mount_args.extend(
+                [
+                    "-v",
+                    f"{opencode_home}:/home/cuti/.opencode:rw",
+                    "-v",
+                    f"{opencode_config}:/home/cuti/.config/opencode:rw",
+                    "-v",
+                    f"{opencode_data}:/home/cuti/.local/share/opencode:rw",
+                ]
+            )
+
+        if "openclaw" in providers:
+            openclaw_dir = self._prepare_openclaw_storage()
+            mount_args.extend(["-v", f"{openclaw_dir}:/home/cuti/.openclaw:rw"])
+
+        return linux_claude_dir, mount_args
     
     def _check_tool_available(self, tool: str) -> bool:
         """Check if a tool is available."""
@@ -503,16 +676,6 @@ RUN /root/.local/bin/uv pip install --system cuti \\
     && cuti --help > /dev/null && echo "✅ cuti installed from PyPI"
 '''
 
-        if self._is_clawdbot_enabled():
-            clawdbot_install = '''
-# Install Clawdbot CLI (addon)
-RUN npm-original install -g clawdbot@latest \\
-    && clawdbot --version > /dev/null \\
-    && echo "✅ Clawdbot CLI installed"
-'''
-        else:
-            clawdbot_install = "# Clawdbot addon disabled\n"
-
         # Add tools installation if the setup script exists
         tools_setup = ""
         container_tools_path = Path("/workspace/.cuti/container_tools.sh")
@@ -524,7 +687,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
 '''
         
         dockerfile = self.DOCKERFILE_TEMPLATE.replace("{CUTI_INSTALL}", cuti_install)
-        dockerfile = dockerfile.replace("{CLAWDBOT_INSTALL}", clawdbot_install)
 
         # Insert tools setup before the final CMD if it exists
         if tools_setup:
@@ -665,9 +827,10 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                             shutil.copytree(self.working_dir / "docs", Path(tmpdir) / "docs", dirs_exist_ok=True)
                     
                     # Build image
-                    build_cmd = ["docker", "build", "-t", image_name, "-f", str(dockerfile_path), build_context]
+                    build_cmd = ["docker", "build", "-t", image_name, "-f", str(dockerfile_path)]
                     if rebuild:
                         build_cmd.append("--no-cache")
+                    build_cmd.append(build_context)
                     
                     result = self._run_command(build_cmd, timeout=1800, show_output=True)
                     if result.returncode == 0:
@@ -926,11 +1089,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         if not self._build_container_image(image_name, rebuild):
             return 1
 
-        # Setup Linux-specific Claude configuration (cloud profile only)
-        linux_claude_dir: Optional[Path] = None
-        if runtime_profile == self.RUNTIME_PROFILE_CLOUD:
-            linux_claude_dir = self._setup_claude_host_config()
-        
         # Run container
         print("🚀 Starting container...")
         current_dir = Path.cwd().resolve()
@@ -948,12 +1106,19 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 print("🐳 Using Docker Desktop - trying cached mode for better macOS compatibility")
                 mount_options = "rw,cached"  # Docker Desktop on macOS needs cached mode
         
-        clawdbot_enabled = self._is_clawdbot_enabled()
+        primary_provider = self._primary_provider()
+        _linux_claude_dir: Optional[Path] = None
+        provider_mount_args: List[str] = []
+        if runtime_profile == self.RUNTIME_PROFILE_CLOUD:
+            _linux_claude_dir, provider_mount_args = self._prepare_cloud_provider_mounts()
+
+        clawdbot_enabled = False
         clawdbot_config_subpath: Optional[str] = None
         clawdbot_workspace_subpath: Optional[str] = None
         clawdbot_config_dir: Optional[Path] = None
         clawdbot_workspace_dir: Optional[Path] = None
-        if clawdbot_enabled:
+        if runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX:
+            clawdbot_enabled = True
             # Ensure host-side config/workspace directories exist
             clawdbot_config_dir, clawdbot_workspace_dir = self._prepare_clawdbot_storage()
             cuti_root = Path.home() / ".cuti"
@@ -963,21 +1128,11 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             except ValueError:
                 clawdbot_config_subpath = clawdbot_workspace_subpath = None
 
-        if runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX and not clawdbot_enabled:
-            print("❌ Clawdbot addon is disabled. Enable it with: cuti addons enable clawdbot")
-            return 1
-
         if runtime_profile == self.RUNTIME_PROFILE_CLOUD:
-            if not linux_claude_dir:
-                print("❌ Failed to initialize Linux Claude config directory")
-                return 1
-
             docker_args = [
                 "docker", "run", "--rm", "--init",
                 "-v", f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
                 "-v", f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
-                "-v", f"{linux_claude_dir}:/home/cuti/.claude-linux:rw",  # Linux-specific config
-                "-v", f"{Path.home() / '.claude'}:/home/cuti/.claude-macos:ro",  # macOS config read-only
                 "--label", f"cuti.runtime_profile={runtime_profile}",
                 "--label", f"cuti.workspace={current_dir}",
                 "-w", "/workspace",
@@ -990,10 +1145,16 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 "--env", "PYTHONUNBUFFERED=1",
                 "--env", "PYTHONPATH=/workspace/src",
                 "--env", "TERM=xterm-256color",
-                "--env", "PATH=/home/cuti/.cuti/claude-cli/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "--env", "PATH=/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
                 "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
+                "--env", "CODEX_HOME=/home/cuti/.codex",
+                "--env", "XDG_CONFIG_HOME=/home/cuti/.config",
+                "--env", "XDG_DATA_HOME=/home/cuti/.local/share",
+                "--env", f"CUTI_AGENT_PROVIDERS={self._selected_providers_env_value()}",
+                "--env", f"CUTI_PRIMARY_AGENT_PROVIDER={primary_provider or ''}",
                 "--network", "host",
             ]
+            docker_args.extend(provider_mount_args)
 
             if mount_docker_socket:
                 docker_args.extend([
@@ -1001,7 +1162,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                     "/var/run/docker.sock:/var/run/docker.sock",  # Allow Docker-in-Docker when explicitly requested
                 ])
 
-            docker_args.extend(["--env", f"CUTI_ENABLE_CLAWDBOT_ADDON={'true' if clawdbot_enabled else 'false'}"])
             if clawdbot_config_subpath and clawdbot_workspace_subpath:
                 docker_args.extend(
                     [
@@ -1037,7 +1197,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 "--env", "IS_SANDBOX=1",
                 "--env", "PYTHONUNBUFFERED=1",
                 "--env", "TERM=xterm-256color",
-                "--env", "PATH=/home/cuti/.cuti/claude-cli/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "--env", "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
                 "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
                 "--cap-drop", "ALL",
                 "--security-opt", "no-new-privileges:true",
@@ -1071,14 +1231,14 @@ trap 'echo "Container exiting cleanly..."; exit 0' SIGTERM SIGINT
 if touch /workspace/.test_write 2>/dev/null; then
     rm /workspace/.test_write
     WORKSPACE_WRITABLE=true
-    echo "✅ Workspace is writable - Claude can edit code!"
+    echo "✅ Workspace is writable"
     # Use workspace directories when writable
     export CLAUDE_QUEUE_STORAGE_DIR=/workspace/.cuti
     export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux
 else
     WORKSPACE_WRITABLE=false
     echo "⚠️  WARNING: Workspace mounted as read-only!"
-    echo "    This prevents Claude from editing your code."
+    echo "    This prevents agent providers from editing your code."
     echo ""
     echo "    To fix this on macOS:"
     echo "    1. If using Docker Desktop:"
@@ -1092,6 +1252,19 @@ else
     # Fall back to home directories when read-only
     export CLAUDE_QUEUE_STORAGE_DIR=/home/cuti/.cuti
     export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux
+fi
+
+cuti_provider_selected() {
+    case ",${CUTI_AGENT_PROVIDERS:-}," in
+        *,"$1",*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+if [ -n "${CUTI_AGENT_PROVIDERS:-}" ]; then
+    echo "🧩 Selected providers: ${CUTI_AGENT_PROVIDERS}"
+else
+    echo "🧩 No agent providers selected"
 fi
 
 # The .claude-linux directory is mounted for Linux-specific credentials
@@ -1134,59 +1307,77 @@ if [ -d /home/cuti/.claude-linux ]; then
     echo "🔗 Linux Claude config mounted from host"
 fi
 
-if [ "${CUTI_ENABLE_CLAWDBOT_ADDON}" = "true" ]; then
-    if command -v node >/dev/null 2>&1; then
-        NODE_VERSION=$(node -v | sed 's/^v//')
-        NODE_MAJOR=${NODE_VERSION%%.*}
-    else
-        NODE_MAJOR=0
-    fi
-
-    if [ "$NODE_MAJOR" -lt 22 ]; then
-        echo "⬆️  Upgrading Node.js runtime to v22..."
-        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - >/tmp/node-setup.log 2>&1
-        if sudo apt-get install -y nodejs >>/tmp/node-setup.log 2>&1; then
-            echo "✅ Node.js upgraded to $(node -v)"
+if cuti_provider_selected claude; then
+    if [ ! -x /home/cuti/.local/bin/claude ]; then
+        echo "🧠 Installing Claude Code native build..."
+        export HOME=/home/cuti
+        if /usr/local/bin/cuti-install-claude > /tmp/claude-install.log 2>&1; then
+            echo "✅ Claude Code installed"
         else
-            echo "⚠️  Failed to upgrade Node.js"
-            cat /tmp/node-setup.log
+            echo "⚠️  Failed to install Claude Code"
+            cat /tmp/claude-install.log
         fi
     fi
-
-    if command -v clawdbot > /dev/null 2>&1; then
-        echo "✅ Clawdbot CLI already installed"
-    else
-        echo "🦞 Installing Clawdbot CLI..."
-        export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
-        if sudo npm-original install -g clawdbot@latest > /tmp/clawdbot-install.log 2>&1; then
-            echo "✅ Clawdbot CLI installed"
-        else
-            echo "⚠️  Failed to install Clawdbot CLI"
-            cat /tmp/clawdbot-install.log
-        fi
-    fi
-
-    REAL_CLAWBOT_PATH=$(command -v clawdbot 2>/dev/null | head -n1)
-    if [ -z "$REAL_CLAWBOT_PATH" ]; then
-        REAL_CLAWBOT_PATH="/usr/local/bin/clawdbot"
-    fi
-
-    # Ensure the user-visible clawdbot command can elevate when needed (config edits)
-    mkdir -p /home/cuti/.local/bin
-    cat > /home/cuti/.local/bin/clawdbot <<CLAWDBOT_WRAPPER
-#!/bin/bash
-REAL_BIN="$REAL_CLAWBOT_PATH"
-
-if [ "\$1" = "config" ]; then
-    sudo -E env HOME=/home/cuti "\$REAL_BIN" "\$@"
-    status=\$?
-    sudo chown -R cuti:cuti /home/cuti/.clawdbot /home/cuti/.cuti/clawdbot 2>/dev/null || true
-    exit \$status
 fi
 
-exec "\$REAL_BIN" "\$@"
-CLAWDBOT_WRAPPER
-    chmod +x /home/cuti/.local/bin/clawdbot
+if cuti_provider_selected codex; then
+    if [ -x /home/cuti/.local/bin/codex ]; then
+        echo "✅ Codex CLI already installed"
+    else
+        echo "🤖 Installing Codex CLI..."
+        export HOME=/home/cuti
+        export CODEX_INSTALL_DIR=/home/cuti/.local/bin
+        export CODEX_HOME=/home/cuti/.codex
+        if /usr/local/bin/cuti-install-codex > /tmp/codex-install.log 2>&1; then
+            echo "✅ Codex CLI installed"
+            hash -r 2>/dev/null || true
+        else
+            echo "⚠️  Failed to install Codex CLI"
+            cat /tmp/codex-install.log
+        fi
+    fi
+fi
+
+if cuti_provider_selected opencode; then
+    mkdir -p /home/cuti/.opencode /home/cuti/.config/opencode /home/cuti/.local/share/opencode
+    if [ -x /home/cuti/.opencode/bin/opencode ]; then
+        echo "✅ OpenCode CLI already installed"
+    else
+        echo "🪄 Installing OpenCode CLI..."
+        export HOME=/home/cuti
+        if /usr/local/bin/cuti-install-opencode > /tmp/opencode-install.log 2>&1; then
+            echo "✅ OpenCode CLI installed"
+            hash -r 2>/dev/null || true
+        else
+            echo "⚠️  Failed to install OpenCode CLI"
+            cat /tmp/opencode-install.log
+        fi
+    fi
+fi
+
+if cuti_provider_selected openclaw; then
+    mkdir -p /home/cuti/.openclaw /home/cuti/.agents/skills
+    OPENCLAW_PACKAGE_ROOT="$(npm-original root -g 2>/dev/null || true)/openclaw"
+    if [ -f "$OPENCLAW_PACKAGE_ROOT/openclaw.mjs" ]; then
+        echo "✅ OpenClaw CLI already installed"
+    else
+        echo "🦞 Installing OpenClaw CLI..."
+        export HOME=/home/cuti
+        if sudo /usr/local/bin/cuti-install-openclaw > /tmp/openclaw-install.log 2>&1; then
+            echo "✅ OpenClaw CLI installed"
+            hash -r 2>/dev/null || true
+        else
+            echo "⚠️  Failed to install OpenClaw CLI"
+            cat /tmp/openclaw-install.log
+        fi
+    fi
+
+    if [ ! -e /home/cuti/.openclaw/workspace ]; then
+        ln -s /workspace /home/cuti/.openclaw/workspace 2>/dev/null || true
+        if [ -L /home/cuti/.openclaw/workspace ]; then
+            echo "🔗 OpenClaw workspace bootstrapped to /workspace"
+        fi
+    fi
 fi
 
 # Setup symlink for cuti account management to access global .cuti directory
@@ -1206,7 +1397,7 @@ if [ -d /home/cuti/.cuti-shared ]; then
 fi
 
 # Ensure Clawdbot config/workspace point to the host-persistent ~/.cuti storage
-if [ -d /home/cuti/.cuti ]; then
+if [ "${CUTI_ENABLE_CLAWDBOT_ADDON:-false}" = "true" ] && [ -d /home/cuti/.cuti ]; then
     CLAWDBOT_CONFIG_SUBPATH=${CUTI_CLAWDBOT_CONFIG_SUBPATH:-clawdbot/config}
     CLAWDBOT_WORKSPACE_SUBPATH=${CUTI_CLAWDBOT_WORKSPACE_SUBPATH:-clawdbot/workspace}
     CLAWDBOT_CONFIG_TARGET=/home/cuti/.cuti/$CLAWDBOT_CONFIG_SUBPATH
@@ -1291,8 +1482,12 @@ PY
 
 ensure_cuti_cli
 
+# Keep runtime-installed CLIs ahead of system paths in the login shell.
+export PATH="/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+hash -r 2>/dev/null || true
+
 # Copy settings from macOS config if available (read-only mount)
-if [ -d /home/cuti/.claude-macos ] && [ ! -f /home/cuti/.claude-linux/CLAUDE.md ]; then
+if cuti_provider_selected claude && [ -d /home/cuti/.claude-macos ] && [ ! -f /home/cuti/.claude-linux/CLAUDE.md ]; then
     if [ -f /home/cuti/.claude-macos/CLAUDE.md ]; then
         cp /home/cuti/.claude-macos/CLAUDE.md /home/cuti/.claude-linux/CLAUDE.md 2>/dev/null || true
         echo "📄 Copied CLAUDE.md from macOS config"
@@ -1302,39 +1497,41 @@ fi
 # Handle workspace directories based on writability
 if [ "$WORKSPACE_WRITABLE" = "true" ]; then
     # Create workspace directories if they don't exist
-    mkdir -p /workspace/.claude-linux 2>/dev/null || true
     mkdir -p /workspace/.cuti 2>/dev/null || true
+    if cuti_provider_selected claude; then
+        mkdir -p /workspace/.claude-linux 2>/dev/null || true
+        sudo chown -R cuti:cuti /workspace/.claude-linux 2>/dev/null || true
+    fi
     
     # Ensure proper ownership for workspace directories
-    sudo chown -R cuti:cuti /workspace/.claude-linux 2>/dev/null || true
     sudo chown -R cuti:cuti /workspace/.cuti 2>/dev/null || true
     
-    echo "📁 Using workspace directories for Claude queue storage"
+    echo "📁 Using workspace-scoped cuti state"
 fi
 
 # Check authentication status
-if [ -f /home/cuti/.claude-linux/.credentials.json ]; then
-    echo "🔑 Found Linux Claude credentials - authentication ready!"
-else
-    echo "⚠️  No credentials found. Authenticate once with: claude login"
-    echo "   Your credentials will persist across all containers."
-    echo "   Note: Linux credentials are separate from macOS keychain."
-fi
-
-# Verify Claude CLI is accessible
-if command -v claude > /dev/null 2>&1; then
-    echo "✅ Claude CLI is available at: $(which claude)"
-    # Test that it can run
-    if claude --version > /dev/null 2>&1; then
-        echo "✅ Claude CLI verified: $(claude --version 2>&1 | head -n1)"
+if cuti_provider_selected claude; then
+    if [ -f /home/cuti/.claude-linux/.credentials.json ]; then
+        echo "🔑 Found Linux Claude credentials - authentication ready!"
     else
-        echo "⚠️  Claude CLI found but cannot execute --version"
-        echo "   This may cause issues with cuti web chat functionality"
+        echo "⚠️  No Claude credentials found. Authenticate once with: claude login"
+        echo "   Your credentials will persist across all containers."
+        echo "   Note: Linux credentials are separate from macOS keychain."
     fi
-else
-    echo "❌ Claude CLI not found in PATH!"
-    echo "   Expected at /usr/local/bin/claude"
-    echo "   This will prevent cuti web chat from working"
+
+    if [ -x /home/cuti/.local/bin/claude ]; then
+        echo "✅ Claude CLI is available at: $(which claude)"
+        if claude --version > /dev/null 2>&1; then
+            echo "✅ Claude CLI verified: $(claude --version 2>&1 | head -n1)"
+        else
+            echo "⚠️  Claude CLI found but cannot execute --version"
+            echo "   This may cause issues with cuti web chat functionality"
+        fi
+    else
+        echo "❌ Claude CLI not found in PATH!"
+        echo "   Expected at /usr/local/bin/claude"
+        echo "   This will prevent cuti web chat from working"
+    fi
 fi
 
 # Ensure PYTHONPATH includes workspace source for local development
@@ -1417,9 +1614,15 @@ if [ ! -d /home/cuti/clawd ]; then
 fi
 
 if ! command -v clawdbot >/dev/null 2>&1; then
-    echo "❌ Clawdbot CLI not found in container image"
-    echo "   Rebuild with: cuti clawdbot start --rebuild"
-    exit 1
+    echo "🦞 Installing legacy Clawdbot CLI for sandbox mode..."
+    if sudo npm-original install -g clawdbot@latest >/tmp/clawdbot-install.log 2>&1; then
+        echo "✅ Clawdbot CLI installed"
+        hash -r 2>/dev/null || true
+    else
+        echo "❌ Failed to install Clawdbot CLI"
+        cat /tmp/clawdbot-install.log
+        exit 1
+    fi
 fi
 
 echo "🔒 Running clawdbot sandbox profile"

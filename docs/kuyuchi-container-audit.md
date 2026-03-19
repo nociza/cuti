@@ -20,7 +20,7 @@ This audit covers:
 Current image (`cuti-dev-universal`) mixes both goals:
 
 - cloud dev utility environment (Claude CLI, Docker CLI, Python, Node, shell tools)
-- Clawdbot runtime (addon install + gateway wrappers + workspace linking)
+- Clawdbot runtime (legacy sandbox install + gateway wrappers + workspace linking)
 
 Why this exists:
 
@@ -42,8 +42,8 @@ Purpose: support Claude/Clawdbot and Node tool installs; route npm commands thro
 4. Claude CLI wrapper (`--dangerously-skip-permissions`)  
 Purpose: keep Claude operational in container without interactive permission prompts.
 
-5. Optional Clawdbot addon install  
-Purpose: avoid installing Clawdbot for users who disable the addon.
+5. Legacy Clawdbot sandbox install  
+Purpose: keep the separate `cuti clawdbot` runtime self-contained without tying it to provider selection.
 
 6. zsh/oh-my-zsh setup  
 Purpose: interactive shell ergonomics.

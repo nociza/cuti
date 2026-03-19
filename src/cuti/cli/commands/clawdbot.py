@@ -19,7 +19,7 @@ from rich.table import Table
 from ...services.clawdbot_instance import ClawdbotInstance, ClawdbotInstanceManager
 from ...services.devcontainer import DevContainerService, is_running_in_container
 
-app = typer.Typer(help="Manage the optional Clawdbot assistant from the host CLI")
+app = typer.Typer(help="Run the legacy Clawdbot sandbox workflow from the host CLI")
 console = Console()
 
 _CLAWDBOT_CONFIG_PATH = Path.home() / ".cuti" / "clawdbot" / "config" / "clawdbot.json"
@@ -478,8 +478,6 @@ def _prepare_service(skip_colima: bool) -> DevContainerService:
             console.print("[red]Docker is not available[/red]")
             raise typer.Exit(1)
 
-    # Ensure the addon is enabled so the build includes Clawdbot
-    service._is_clawdbot_enabled()
     return service
 
 

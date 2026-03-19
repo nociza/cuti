@@ -3,34 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}cuti - AI Terminal Interface{% endblock %}</title>
-    
-    <!-- Google Fonts -->
+    <title>{% block title %}cuti | {{ page_title }}{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-    
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Alpine.js -->
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-    
-    <!-- Main CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}?v=7">
-    
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}?v=8">
     {% block head %}{% endblock %}
 </head>
-<body{% if body_class %} class="{{ body_class }}"{% endif %}{% if alpine_data %} x-data="{{ alpine_data }}"{% endif %} x-init="init()">
-    {% include 'components/header_modern.html' %}
-    
-    <main class="content-wrapper">
-        {% block content %}{% endblock %}
-    </main>
-    
-    <!-- Main JavaScript -->
-    <script src="{{ url_for('static', path='js/app.js') }}?v=7"></script>
-    
+<body data-page="{{ page_id }}">
+    <div class="background-wash"></div>
+    <div class="background-grid"></div>
+    <div class="shell">
+        <header class="topbar">
+            <a href="/" class="brand">
+                <span class="brand-mark">cu</span>
+                <span class="brand-copy">
+                    <strong>cuti</strong>
+                    <small>workspace operations</small>
+                </span>
+            </a>
+            <nav class="primary-nav" aria-label="Primary">
+                {% for item in nav_items %}
+                <a href="{{ item.url }}" class="nav-link{% if item.active %} is-active{% endif %}">{{ item.label }}</a>
+                {% endfor %}
+            </nav>
+            <div class="topbar-meta">
+                <span class="meta-pill mono" id="headerPrimaryProvider">provider loading</span>
+                <span class="meta-pill mono" id="headerQueueState">queue loading</span>
+            </div>
+        </header>
+
+        <main class="page-frame">
+            <section class="page-hero reveal">
+                <div>
+                    <p class="eyebrow">Current workspace</p>
+                    <h1>{{ page_title }}</h1>
+                    <p class="page-description">{{ page_description }}</p>
+                </div>
+                <div class="hero-meta-stack">
+                    <div class="hero-meta-card">
+                        <span class="meta-label">Working directory</span>
+                        <span class="meta-value mono">{{ working_directory }}</span>
+                    </div>
+                    <div class="hero-meta-card">
+                        <span class="meta-label">Selected providers</span>
+                        <span class="meta-value" id="headerSelectedProviders">Loading selection</span>
+                    </div>
+                </div>
+            </section>
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+
+    <script>
+        window.cutiPage = {{ page_id | tojson }};
+        window.cutiWorkingDirectory = {{ working_directory | tojson }};
+    </script>
+    <script src="{{ url_for('static', path='js/app.js') }}?v=8"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
