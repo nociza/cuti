@@ -18,12 +18,11 @@ def test_project_structure():
     
     # Check that test files are in the right place
     assert (project_root / "tests" / "test_agents.py").exists(), "test_agents.py should be in tests/"
-    assert (project_root / "tests" / "test_interface.py").exists(), "test_interface.py should be in tests/"
     assert (project_root / "tests" / "test_agent_integration.py").exists(), "test_agent_integration.py should be in tests/"
+    assert (project_root / "tests" / "test_web_ops.py").exists(), "test_web_ops.py should be in tests/"
     
     # Check that old test files are removed from root
     assert not (project_root / "test_agents.py").exists(), "Old test_agents.py should be removed from root"
-    assert not (project_root / "test_interface.py").exists(), "Old test_interface.py should be removed from root"
     assert not (project_root / "test_agent_integration.py").exists(), "Old test_agent_integration.py should be removed from root"
 
 

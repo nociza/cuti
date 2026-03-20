@@ -180,10 +180,7 @@ Run browser service in a separate container and connect via URL/token; bot conta
 
 ## Dashboard and Control Plane Direction
 
-Existing `cuti web` already has:
-
-- metrics endpoints (`/api/monitoring/*`)
-- dashboard pages (`statistics`, `agents`, etc.)
+Current `cuti web` is a lightweight read-only ops console rather than a broad dashboard/control plane.
 
 Recommended additions:
 

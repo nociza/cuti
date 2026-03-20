@@ -93,7 +93,7 @@ cuti container
 # cuti:/workspace $ 
 
 # Inside container, all commands work:
-cuti web          # Start web UI (accessible at http://localhost:8000)
+cuti web          # Start read-only ops console (accessible at http://localhost:8000)
 cuti cli          # Start interactive CLI
 cuti agent list   # List available agents
 claude --help     # Use Claude CLI (already authenticated)
@@ -120,9 +120,9 @@ cuti container --command "codex --version && opencode --version && openclaw --ve
 cuti container --command "python script.py"
 ```
 
-### Web Development
+### Ops Console
 ```bash
-# Start web UI in container (accessible from host)
+# Start the read-only ops console in container (accessible from host)
 cuti container --command "cuti web"
 # Then open http://localhost:8000 in your browser
 
@@ -296,7 +296,7 @@ Automatically set in container:
 ### Network Configuration
 
 Container runs with `--network host` for easy service access:
-- Port 8000: cuti web interface
+- Port 8000: cuti ops console
 - Port 8080: Alternative web services
 - Port 3000: Frontend dev servers
 - Port 5000: Flask/FastAPI apps

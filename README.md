@@ -47,7 +47,7 @@ The Docker container provides isolated, reproducible AI-assisted development wit
 Build with multiple AI models and intelligent task management:
 - **Multi-agent orchestration** - Claude API, Gemini integration
 - **Command queuing system** with priority execution
-- **Web UI control room** - Launch with `cuti web` for overview, providers, tasks, tools, and agent inventory
+- **Read-only ops console** - Launch with `cuti web` to inspect provider readiness, queue state, recent activity, and workspace drift
 - **Smart rate limiting** - Automatic retry & backoff
 - **Task automation** - Built-in todo system for AI agents
 - **Claude version switching** - Easy CLI version management

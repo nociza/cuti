@@ -257,7 +257,7 @@ class ClaudeOrchestrationManager:
         ]
         
         if not self.active_agents:
-            lines.append("*No agents currently active. Enable agents through the cuti web interface.*")
+            lines.append("*No agents currently active. Enable agents through the cuti CLI.*")
         else:
             # Sort agents by priority
             sorted_agents = sorted(
@@ -276,7 +276,7 @@ class ClaudeOrchestrationManager:
             "To use an agent, mention it with @ followed by the agent name.",
             "For example: @code-reviewer please review this function",
             "",
-            "Agents can be enabled/disabled through the cuti web interface at http://localhost:8000/agents",
+            "Inspect workspace state through `cuti web`, but use the cuti CLI to enable or disable agents.",
             "",
             "## Development Commands",
             "",
@@ -291,7 +291,7 @@ class ClaudeOrchestrationManager:
             "",
             "### Running the Application",
             "```bash",
-            "# Start web interface",
+            "# Start ops console",
             "python run.py web",
             "",
             "# Start CLI",
@@ -307,8 +307,8 @@ class ClaudeOrchestrationManager:
             "Manual changes will be overwritten when agents are toggled or updated.",
             "",
             "To modify agent configuration:",
-            "1. Use the web interface at http://localhost:8000/agents",
-            "2. Use the CLI: `cuti agent toggle <agent-name>`",
+            "1. Use the CLI: `cuti agent toggle <agent-name>`",
+            "2. Inspect workspace state with `cuti web`",
             "3. Modify `.cuti/agents.json` and reload",
             ""
         ])

@@ -102,6 +102,11 @@ a {
     box-shadow: var(--shadow-soft);
 }
 
+.topbar-compact {
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+}
+
 .brand {
     display: inline-flex;
     align-items: center;
@@ -517,6 +522,21 @@ select:focus {
 .todo-pending,
 .queue-queued,
 .queue-cancelled {
+    color: var(--slate);
+    background: rgba(50, 80, 106, 0.12);
+}
+
+.status-critical {
+    color: var(--danger);
+    background: rgba(164, 63, 44, 0.14);
+}
+
+.status-warning {
+    color: var(--warning);
+    background: rgba(170, 106, 8, 0.14);
+}
+
+.status-note {
     color: var(--slate);
     background: rgba(50, 80, 106, 0.12);
 }

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="metrics-grid reveal stagger-1">
+    <article class="metric-card accent-coral">
+        <span class="metric-label">Providers</span>
+        <strong class="metric-value" id="metricProviders">--</strong>
+        <p class="metric-detail" id="metricProvidersDetail">Loading provider readiness</p>
+    </article>
+    <article class="metric-card accent-gold">
+        <span class="metric-label">Attention</span>
+        <strong class="metric-value" id="metricAttention">--</strong>
+        <p class="metric-detail" id="metricAttentionDetail">Loading action items</p>
+    </article>
+    <article class="metric-card accent-teal">
+        <span class="metric-label">Queued Work</span>
+        <strong class="metric-value" id="metricQueue">--</strong>
+        <p class="metric-detail" id="metricQueueDetail">Loading queue state</p>
+    </article>
+    <article class="metric-card accent-slate">
+        <span class="metric-label">Claude Sessions</span>
+        <strong class="metric-value" id="metricSessions">--</strong>
+        <p class="metric-detail" id="metricSessionsDetail">Loading session history</p>
+    </article>
+</section>
+
+<section class="content-grid reveal stagger-2">
+    <article class="panel panel-large">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Needs attention</p>
+                <h2>Action queue</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="attentionList"></div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Provider health</p>
+                <h2>Readiness matrix</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="providerMatrix"></div>
+    </article>
+</section>
+
+<section class="content-grid reveal stagger-3">
+    <article class="panel panel-large">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Recent activity</p>
+                <h2>Prompt history</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="historyList"></div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Session trail</p>
+                <h2>Claude logs</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="sessionList"></div>
+    </article>
+</section>
+
+<section class="content-grid reveal stagger-4">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Workspace drift</p>
+                <h2>Instruction files</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="workspaceList"></div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Tool reality</p>
+                <h2>Enabled but missing</h2>
+            </div>
+        </div>
+        <div class="stack-list" id="toolList"></div>
+    </article>
+</section>
+
+<section class="content-grid reveal stagger-5">
+    <article class="panel panel-large">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Terminal handoff</p>
+                <h2>Suggested commands</h2>
+            </div>
+        </div>
+        <div class="command-strip" id="commandStrip"></div>
+    </article>
+</section>
+{% endblock %}

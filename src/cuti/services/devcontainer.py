@@ -1525,12 +1525,12 @@ if cuti_provider_selected claude; then
             echo "✅ Claude CLI verified: $(claude --version 2>&1 | head -n1)"
         else
             echo "⚠️  Claude CLI found but cannot execute --version"
-            echo "   This may cause issues with cuti web chat functionality"
+            echo "   Queue inspection and provider validation may be incomplete until this is fixed"
         fi
     else
         echo "❌ Claude CLI not found in PATH!"
         echo "   Expected at /usr/local/bin/claude"
-        echo "   This will prevent cuti web chat from working"
+        echo "   This will prevent queue execution and limit ops console visibility"
     fi
 fi
 

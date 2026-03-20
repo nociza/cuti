@@ -277,7 +277,7 @@ def web(
     storage_dir: str = typer.Option("~/.cuti", "--storage-dir", help="Storage directory"),
     working_directory: Optional[str] = typer.Option(None, "--working-dir", "-w", help="Working directory"),
 ):
-    """Start the web interface."""
+    """Start the read-only ops console."""
     import sys
     import os
     from pathlib import Path

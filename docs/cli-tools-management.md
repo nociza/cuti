@@ -175,9 +175,9 @@ Tool configuration is stored in `~/.cuti/tools_config.json`:
 
 For containers with auto-install enabled, a setup script is generated at `/workspace/.cuti/container_tools.sh`.
 
-## Integration with Web UI
+## Integration with `cuti web`
 
-The CLI commands work in harmony with the web UI at `http://localhost:8000/tools`. Changes made via CLI are reflected in the web interface and vice versa.
+`cuti web` is now a read-only ops console. It shows tool drift, including tools that are enabled in workspace state but missing on the current machine. Use the CLI for all tool changes.
 
 ## Tips
 

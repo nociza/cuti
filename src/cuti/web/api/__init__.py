@@ -1,3 +1,1 @@
-"""
-API endpoints for the web interface.
-"""
+"""API endpoints for the cuti ops console."""

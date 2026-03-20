@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Main entry point for cuti when run with uvx or python -m cuti.
-Starts the web server by default.
+Starts the ops console by default.
 """
 
 import sys
@@ -16,18 +16,18 @@ def main():
     """Main entry point for uvx cuti command."""
     parser = argparse.ArgumentParser(
         prog="cuti",
-        description="Production-ready cuti system with web interface",
+        description="Production-ready cuti system with a read-only ops console",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  uvx cuti                    # Start web interface for current directory
-  uvx cuti --port 3000        # Start web interface on port 3000
+  uvx cuti                    # Start ops console for current directory
+  uvx cuti --port 3000        # Start ops console on port 3000
   uvx cuti --host 0.0.0.0     # Bind to all interfaces
-  uvx cuti /path/to/project   # Start web interface for specific directory
+  uvx cuti /path/to/project   # Start ops console for specific directory
   
-The web interface will automatically start the queue processor in the background.
-Claude Code will be launched in the working directory you specify (or current directory).
-Access the dashboard at http://localhost:8000
+The ops console is read-only. Use the CLI for provider changes, auth, and queue execution.
+Claude workspace state will be inspected from the working directory you specify (or current directory).
+Access the console at http://localhost:8000
         """
     )
     
@@ -75,14 +75,21 @@ Access the dashboard at http://localhost:8000
     port_str = os.getenv("CLAUDE_QUEUE_WEB_PORT")
     port = int(port_str) if port_str else args.port
     storage_dir = os.getenv("CLAUDE_QUEUE_STORAGE_DIR", args.storage_dir)
+    if os.getenv("CLAUDE_QUEUE_STORAGE_DIR"):
+        display_storage = Path(storage_dir).expanduser()
+    elif args.storage_dir != "~/.cuti":
+        display_storage = Path(args.storage_dir).expanduser()
+    else:
+        display_storage = working_dir / ".cuti"
     
-    print(f"🚀 Starting cuti web interface...")
+    print("🚀 Starting cuti ops console...")
     print(f"📍 Host: {host}")
     print(f"🔌 Port: {port}")
     print(f"📁 Working Directory: {working_dir}")
-    print(f"💾 Storage: {Path(storage_dir).expanduser()}")
-    print(f"🌐 Dashboard: http://{host}:{port}")
+    print(f"💾 Storage: {display_storage}")
+    print(f"🌐 Ops Console: http://{host}:{port}")
     print(f"📚 API Docs: http://{host}:{port}/docs")
+    print("📝 This UI is read-only. Use the CLI for changes.")
     print()
     
     # Set environment variable for working directory

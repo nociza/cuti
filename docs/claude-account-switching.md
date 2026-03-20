@@ -342,9 +342,9 @@ cuti container
 # The container automatically uses the active account
 ```
 
-### With Web Interface
+### With Ops Console
 
-The web interface uses the currently active account's credentials. Switch accounts before starting the web interface:
+The ops console uses the currently active account's credentials when it inspects Claude state. Switch accounts before starting `cuti web`:
 
 ```bash
 cuti claude use "My Account"

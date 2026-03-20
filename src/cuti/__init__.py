@@ -1,10 +1,8 @@
-"""
-cuti - Production-ready claude code utils with command queuing, web interface, and monitoring.
-"""
+"""cuti - Production-ready Claude Code utilities with queuing and a read-only ops console."""
 
 __version__ = "0.1.0"
 __author__ = "claude-code, nociza"
-__description__ = "Production-ready claude code utils with command queuing, prompt aliases, web interface, and monitoring."
+__description__ = "Production-ready Claude Code utilities with command queuing, prompt aliases, and a read-only ops console."
 
 # Import main components for convenience
 from .services.queue_service import QueueManager

@@ -7,29 +7,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}?v=8">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}?v=9">
     {% block head %}{% endblock %}
 </head>
 <body data-page="{{ page_id }}">
     <div class="background-wash"></div>
     <div class="background-grid"></div>
     <div class="shell">
-        <header class="topbar">
+        <header class="topbar topbar-compact">
             <a href="/" class="brand">
                 <span class="brand-mark">cu</span>
                 <span class="brand-copy">
                     <strong>cuti</strong>
-                    <small>workspace operations</small>
+                    <small>read-only ops console</small>
                 </span>
             </a>
-            <nav class="primary-nav" aria-label="Primary">
-                {% for item in nav_items %}
-                <a href="{{ item.url }}" class="nav-link{% if item.active %} is-active{% endif %}">{{ item.label }}</a>
-                {% endfor %}
-            </nav>
             <div class="topbar-meta">
                 <span class="meta-pill mono" id="headerPrimaryProvider">provider loading</span>
                 <span class="meta-pill mono" id="headerQueueState">queue loading</span>
+                <span class="meta-pill">CLI-first</span>
             </div>
         </header>
 
@@ -49,6 +45,10 @@
                         <span class="meta-label">Selected providers</span>
                         <span class="meta-value" id="headerSelectedProviders">Loading selection</span>
                     </div>
+                    <div class="hero-meta-card">
+                        <span class="meta-label">Last refresh</span>
+                        <span class="meta-value mono" id="headerLastRefresh">Waiting for data</span>
+                    </div>
                 </div>
             </section>
 
@@ -62,7 +62,7 @@
         window.cutiPage = {{ page_id | tojson }};
         window.cutiWorkingDirectory = {{ working_directory | tojson }};
     </script>
-    <script src="{{ url_for('static', path='js/app.js') }}?v=8"></script>
+    <script src="{{ url_for('static', path='js/app.js') }}?v=9"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
