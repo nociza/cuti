@@ -123,6 +123,8 @@ def test_run_in_container_init_script_handles_runtime_provider_installs(monkeypa
     assert exit_code == 0
     full_command = captured_args["args"][-1]
     assert 'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' in full_command
+    assert "ensure_provider_runtime_shell_path" in full_command
+    assert "cuti-provider-runtime-path" in full_command
     assert "cuti_provider_selected codex" in full_command
     assert "cuti_provider_selected opencode" in full_command
     assert "cuti_provider_selected openclaw" in full_command

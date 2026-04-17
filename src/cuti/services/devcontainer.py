@@ -1868,6 +1868,27 @@ ensure_cuti_cli
 export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 hash -r 2>/dev/null || true
 
+ensure_provider_runtime_shell_path() {
+    local ZSHRC_PATH=/home/cuti/.zshrc
+    local MARKER="cuti-provider-runtime-path"
+
+    if [ ! -f "$ZSHRC_PATH" ]; then
+        touch "$ZSHRC_PATH" 2>/dev/null || true
+    fi
+
+    if [ -f "$ZSHRC_PATH" ] && ! grep -q "$MARKER" "$ZSHRC_PATH" 2>/dev/null; then
+        cat >> "$ZSHRC_PATH" <<'CUTI_PROVIDER_PATH_EOF'
+
+# cuti-provider-runtime-path
+# Keep host-updated provider CLIs ahead of image-local installs in login shells.
+export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+hash -r 2>/dev/null || true
+CUTI_PROVIDER_PATH_EOF
+    fi
+}
+
+ensure_provider_runtime_shell_path
+
 # Copy settings from macOS config if available (read-only mount)
 if cuti_provider_selected claude && [ -d /home/cuti/.claude-macos ] && [ ! -f /home/cuti/.claude-linux/CLAUDE.md ]; then
     if [ -f /home/cuti/.claude-macos/CLAUDE.md ]; then
