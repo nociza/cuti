@@ -63,11 +63,15 @@ class ProviderHostService:
         if provider == "claude":
             return [
                 self.storage_dir / "claude-linux",
+                self.storage_dir / "provider-runtimes" / "claude",
                 self.storage_dir / "claude-accounts",
                 self.home_dir / ".claude",
             ]
         if provider == "codex":
-            return [self.home_dir / ".codex"]
+            return [
+                self.storage_dir / "provider-runtimes" / "codex",
+                self.home_dir / ".codex",
+            ]
         if provider == "opencode":
             return [
                 self.home_dir / ".opencode",
@@ -301,8 +305,8 @@ class ProviderHostService:
         if not status.update_command:
             raise ValueError(f"Provider '{status.provider}' does not define an update command")
         self.ensure_enabled(status.provider)
-        return self._devcontainer_service().run_in_container(
-            command=status.update_command,
+        return self._devcontainer_service().run_provider_update(
+            status.provider,
+            status.update_command,
             rebuild=rebuild,
-            interactive=False,
         )

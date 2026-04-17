@@ -152,7 +152,7 @@ Provider updates now live under the shared provider command surface:
 cuti providers update claude
 ```
 
-This refreshes Claude Code inside the cuti container using the provider installer path rather than the older npm-specific host workflow.
+This refreshes Claude Code through the provider installer path, stores the refreshed CLI under `~/.cuti/provider-runtimes/claude/` for future containers, and updates currently running cuti cloud containers in place.
 
 ## How It Works
 
@@ -165,6 +165,8 @@ This refreshes Claude Code inside the cuti container using the provider installe
 │   ├── .claude.json
 │   ├── settings.json
 │   └── plugins/
+├── provider-runtimes/         # Provider CLI installs used by containers
+│   └── claude/
 ├── claude-accounts/           # Saved accounts
 │   ├── accounts.json          # Account metadata
 │   ├── Work Account/          # Saved account

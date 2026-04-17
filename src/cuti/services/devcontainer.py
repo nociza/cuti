@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -28,10 +29,12 @@ from .providers import ProviderManager
 class DevContainerService:
     """Manages dev container generation and execution for any project."""
 
+    IMAGE_NAME = "cuti-dev-universal"
     RUNTIME_PROFILE_CLOUD = "cloud"
     RUNTIME_PROFILE_CLAWDBOT_SANDBOX = "clawdbot_sandbox"
     CLAWDBOT_SECCOMP_FILENAME = "kuyuchi-clawdbot-seccomp.json"
     CLAWDBOT_SECCOMP_DIR = Path.home() / ".cuti" / "seccomp"
+    PROVIDER_RUNTIME_CONTAINER_DIR = "/home/cuti/.cuti-providers"
 
     DEFAULT_CLAWDBOT_SECCOMP_PROFILE: Dict[str, Any] = {
         "defaultAction": "SCMP_ACT_ALLOW",
@@ -235,7 +238,10 @@ RUN { \
             'export IS_SANDBOX=1' \
             'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' \
             'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' \
-            'CLAUDE_CLI="/home/cuti/.local/bin/claude"' \
+            'CLAUDE_CLI="${CUTI_CLAUDE_CLI:-/home/cuti/.cuti-providers/claude/.local/bin/claude}"' \
+            'if [ ! -x "$CLAUDE_CLI" ]; then' \
+            '    CLAUDE_CLI="/home/cuti/.local/bin/claude"' \
+            'fi' \
             'if [ ! -x "$CLAUDE_CLI" ]; then' \
             '    echo "Claude CLI not found. Rebuild the container or run: /usr/local/bin/cuti-install-claude" >&2' \
             '    exit 1' \
@@ -248,8 +254,11 @@ RUN { \
         printf '%s\\n' \
             '#!/bin/bash' \
             'set -euo pipefail' \
-            'export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
-            'CODEX_CLI="/home/cuti/.local/bin/codex"' \
+            'export PATH="/home/cuti/.cuti-providers/codex/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
+            'CODEX_CLI="${CUTI_CODEX_CLI:-/home/cuti/.cuti-providers/codex/bin/codex}"' \
+            'if [ ! -x "$CODEX_CLI" ]; then' \
+            '    CODEX_CLI="/home/cuti/.local/bin/codex"' \
+            'fi' \
             'if [ ! -x "$CODEX_CLI" ]; then' \
             '    echo "Codex CLI not found. Enable the codex provider or run: /usr/local/bin/cuti-install-codex" >&2' \
             '    exit 1' \
@@ -293,19 +302,20 @@ USER $USERNAME
 
 # Install uv for the non-root user
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/home/cuti/.local/bin:${PATH}"
+ENV PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.local/bin:${PATH}"
 
 # Install Claude Code via the native installer
 RUN HOME=/home/cuti /usr/local/bin/cuti-install-claude
 
 # Install oh-my-zsh with simple configuration
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
-    && echo 'export PATH="/home/cuti/.opencode/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
+    && echo 'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.opencode/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export PYTHONPATH="/workspace/src:$PYTHONPATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
     && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> ~/.zshrc \\
     && echo 'export CODEX_HOME=/home/cuti/.codex' >> ~/.zshrc \\
+    && echo 'export CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin' >> ~/.zshrc \\
     && echo 'export XDG_CONFIG_HOME=/home/cuti/.config' >> ~/.zshrc \\
     && echo 'export XDG_DATA_HOME=/home/cuti/.local/share' >> ~/.zshrc \\
     && echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.zshrc \\
@@ -500,6 +510,76 @@ CMD ["/bin/zsh", "-l"]
         (openclaw_dir / "credentials").mkdir(parents=True, exist_ok=True)
         return openclaw_dir
 
+    @staticmethod
+    def _make_tree_container_writable(path: Path) -> None:
+        """Make a host bind mount writable from the container's fixed user."""
+
+        import stat
+
+        dir_mode = stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+        file_mode = (
+            stat.S_IRUSR
+            | stat.S_IWUSR
+            | stat.S_IRGRP
+            | stat.S_IWGRP
+            | stat.S_IROTH
+            | stat.S_IWOTH
+        )
+        executable_mode = file_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+
+        try:
+            path.chmod(dir_mode)
+            for item in path.rglob("*"):
+                if item.is_dir():
+                    item.chmod(dir_mode)
+                elif item.is_symlink():
+                    continue
+                elif item.is_file():
+                    mode = item.stat().st_mode
+                    path_parts = set(item.relative_to(path).parts)
+                    if mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH) or path_parts & {"bin", "versions"}:
+                        item.chmod(executable_mode)
+                    else:
+                        item.chmod(file_mode)
+        except Exception as exc:
+            print(f"⚠️  Could not set provider runtime permissions for {path}: {exc}")
+
+    def _prepare_provider_runtime_storage(self) -> Path:
+        """Ensure persistent provider CLI install storage exists on the host."""
+
+        runtime_dir = self.provider_manager.storage_dir / "provider-runtimes"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+
+        for provider in self.provider_manager.known_providers():
+            (runtime_dir / provider).mkdir(parents=True, exist_ok=True)
+
+        self._make_tree_container_writable(runtime_dir)
+        return runtime_dir
+
+    def _provider_runtime_path_entries(self) -> List[str]:
+        """Return persistent provider binary directories in PATH order."""
+
+        return [
+            f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/claude/.local/bin",
+            f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/codex/bin",
+        ]
+
+    def _container_path_value(self) -> str:
+        """Return the PATH used for cloud provider containers and updates."""
+
+        entries = [
+            *self._provider_runtime_path_entries(),
+            "/home/cuti/.opencode/bin",
+            "/home/cuti/.local/bin",
+            "/usr/local/bin",
+            "/usr/local/sbin",
+            "/usr/sbin",
+            "/usr/bin",
+            "/sbin",
+            "/bin",
+        ]
+        return ":".join(entries)
+
     def _selected_providers_env_value(self) -> str:
         """Return selected providers as a comma-separated environment value."""
 
@@ -511,6 +591,15 @@ CMD ["/bin/zsh", "-l"]
         providers = set(self._selected_providers())
         mount_args: List[str] = []
         linux_claude_dir: Optional[Path] = None
+
+        if providers:
+            provider_runtime_dir = self._prepare_provider_runtime_storage()
+            mount_args.extend(
+                [
+                    "-v",
+                    f"{provider_runtime_dir}:{self.PROVIDER_RUNTIME_CONTAINER_DIR}:rw",
+                ]
+            )
 
         if "claude" in providers:
             linux_claude_dir = self._setup_claude_host_config()
@@ -1033,7 +1122,282 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             errors.append("missing required workspace mount '/workspace'")
 
         return errors
-    
+
+    def _provider_update_shell_command(
+        self,
+        provider: str,
+        update_command: str,
+        *,
+        use_persistent_runtime: bool,
+    ) -> str:
+        """Return a shell command that updates a provider in the right install root."""
+
+        provider_runtime_dir = self.PROVIDER_RUNTIME_CONTAINER_DIR
+        path_value = self._container_path_value()
+        shell_update_command = update_command
+        if provider == "openclaw" and not update_command.lstrip().startswith("sudo "):
+            shell_update_command = f"sudo {update_command}"
+        fallback_update_commands = {
+            "claude": "curl -fsSL https://claude.ai/install.sh | bash",
+            "codex": "curl -fsSL https://github.com/openai/codex/releases/latest/download/install.sh | sh",
+            "opencode": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
+            "openclaw": "sudo /usr/local/bin/npm-original install -g openclaw@latest",
+        }
+
+        lines = [
+            "set -euo pipefail",
+            f"export PATH={shlex.quote(path_value)}:$PATH",
+            "export NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
+            "export XDG_CONFIG_HOME=/home/cuti/.config",
+            "export XDG_DATA_HOME=/home/cuti/.local/share",
+        ]
+
+        if provider == "claude":
+            if use_persistent_runtime:
+                lines.extend(
+                    [
+                        f"if [ -d {provider_runtime_dir} ]; then",
+                        f"    mkdir -p {provider_runtime_dir}/claude 2>/dev/null || true",
+                        f"    export HOME={provider_runtime_dir}/claude",
+                        f"    export XDG_DATA_HOME={provider_runtime_dir}/claude/.local/share",
+                        f"    export XDG_STATE_HOME={provider_runtime_dir}/claude/.local/state",
+                        f"    export XDG_CACHE_HOME={provider_runtime_dir}/claude/.cache",
+                        "else",
+                        "    export HOME=/home/cuti",
+                        "fi",
+                    ]
+                )
+            else:
+                lines.append("export HOME=/home/cuti")
+            lines.extend(
+                [
+                    "export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux",
+                    "export IS_SANDBOX=1",
+                    "export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
+                ]
+            )
+        elif provider == "codex":
+            lines.append("export HOME=/home/cuti")
+            if use_persistent_runtime:
+                lines.extend(
+                    [
+                        f"if [ -d {provider_runtime_dir} ]; then",
+                        f"    mkdir -p {provider_runtime_dir}/codex/bin 2>/dev/null || true",
+                        f"    export CODEX_INSTALL_DIR={provider_runtime_dir}/codex/bin",
+                        "else",
+                        "    export CODEX_INSTALL_DIR=/home/cuti/.local/bin",
+                        "fi",
+                    ]
+                )
+            else:
+                lines.append("export CODEX_INSTALL_DIR=/home/cuti/.local/bin")
+            lines.append("export CODEX_HOME=/home/cuti/.codex")
+        elif provider == "opencode":
+            lines.extend(
+                [
+                    "export HOME=/home/cuti",
+                    "mkdir -p /home/cuti/.opencode /home/cuti/.config/opencode /home/cuti/.local/share/opencode 2>/dev/null || true",
+                ]
+            )
+        elif provider == "openclaw":
+            lines.extend(
+                [
+                    "export HOME=/home/cuti",
+                    "mkdir -p /home/cuti/.openclaw /home/cuti/.agents/skills 2>/dev/null || true",
+                ]
+            )
+        else:
+            lines.append("export HOME=/home/cuti")
+
+        if update_command.startswith("/usr/local/bin/cuti-install-") and provider in fallback_update_commands:
+            installer_path = shlex.quote(update_command)
+            lines.extend(
+                [
+                    f"if [ -x {installer_path} ]; then",
+                    f"    {shell_update_command}",
+                    "else",
+                    f"    {fallback_update_commands[provider]}",
+                    "fi",
+                    "hash -r 2>/dev/null || true",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    shell_update_command,
+                    "hash -r 2>/dev/null || true",
+                ]
+            )
+
+        meta = self.provider_manager.get_metadata(provider)
+        if meta.commands:
+            command = shlex.quote(meta.commands[0])
+            lines.extend(
+                [
+                    f"if command -v {command} >/dev/null 2>&1; then",
+                    f"    {command} --version || true",
+                    "fi",
+                ]
+            )
+
+        return "\n".join(lines)
+
+    def _running_cloud_cuti_container_ids(self) -> List[str]:
+        """Return IDs for running cuti cloud containers, including older images."""
+
+        queries = [
+            [
+                "docker",
+                "ps",
+                "--filter",
+                f"label=cuti.runtime_profile={self.RUNTIME_PROFILE_CLOUD}",
+                "--format",
+                "{{.ID}}",
+            ],
+            [
+                "docker",
+                "ps",
+                "--filter",
+                f"ancestor={self.IMAGE_NAME}",
+                "--format",
+                "{{.ID}}",
+            ],
+        ]
+        container_ids: List[str] = []
+        seen: Set[str] = set()
+
+        for query in queries:
+            result = self._run_command(query, timeout=10)
+            if result.returncode != 0:
+                continue
+            for line in result.stdout.splitlines():
+                container_id = line.strip()
+                if container_id and container_id not in seen:
+                    seen.add(container_id)
+                    container_ids.append(container_id)
+
+        return container_ids
+
+    def _run_provider_update_container(self, provider: str, update_command: str) -> int:
+        """Run a provider update in a disposable container backed by persistent mounts."""
+
+        _linux_claude_dir, provider_mount_args = self._prepare_cloud_provider_mounts()
+        container_name = (
+            f"cuti-provider-update-{provider}-{os.getpid()}-"
+            f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        )
+        docker_args = [
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            container_name,
+            "--init",
+            "--env",
+            "CUTI_IN_CONTAINER=true",
+            "--env",
+            f"CUTI_RUNTIME_PROFILE={self.RUNTIME_PROFILE_CLOUD}",
+            "--env",
+            "PYTHONUNBUFFERED=1",
+            "--env",
+            "TERM=xterm-256color",
+            "--env",
+            f"PATH={self._container_path_value()}",
+            "--env",
+            "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
+            "--env",
+            f"CUTI_AGENT_PROVIDERS={self._selected_providers_env_value()}",
+            "--env",
+            f"CUTI_PRIMARY_AGENT_PROVIDER={self._primary_provider() or ''}",
+            "--network",
+            "host",
+        ]
+        docker_args.extend(provider_mount_args)
+        docker_args.extend(
+            [
+                self.IMAGE_NAME,
+                "/usr/bin/zsh",
+                "-lc",
+                self._provider_update_shell_command(
+                    provider,
+                    update_command,
+                    use_persistent_runtime=True,
+                ),
+            ]
+        )
+
+        result = self._run_command(docker_args, timeout=900, show_output=True)
+        return result.returncode
+
+    def _run_provider_update_in_active_container(
+        self,
+        container_id: str,
+        provider: str,
+        update_command: str,
+    ) -> int:
+        """Run a provider update inside one already-running cuti container."""
+
+        docker_args = [
+            "docker",
+            "exec",
+            container_id,
+            "/usr/bin/zsh",
+            "-lc",
+            self._provider_update_shell_command(
+                provider,
+                update_command,
+                use_persistent_runtime=False,
+            ),
+        ]
+        result = self._run_command(docker_args, timeout=900, show_output=True)
+        return result.returncode
+
+    def run_provider_update(
+        self,
+        provider: str,
+        update_command: str,
+        *,
+        rebuild: bool = False,
+    ) -> int:
+        """Update a provider for future and currently running cuti containers."""
+
+        if not self._check_tool_available("docker"):
+            if not self.ensure_dependencies():
+                print("❌ Docker not available and couldn't install dependencies")
+                return 1
+
+            if self.is_macos and not self._start_colima():
+                print("❌ Couldn't start container runtime")
+                return 1
+
+        if not self._build_container_image(self.IMAGE_NAME, rebuild):
+            return 1
+
+        print(f"🔄 Updating {provider} for future cuti containers...")
+        exit_code = self._run_provider_update_container(provider, update_command)
+        if exit_code != 0:
+            print(f"❌ Failed to update {provider} in persistent provider runtime")
+            return exit_code
+
+        active_container_ids = self._running_cloud_cuti_container_ids()
+        if not active_container_ids:
+            print("✅ No active cuti containers need in-place provider updates")
+            return 0
+
+        print(f"🔄 Updating {provider} inside {len(active_container_ids)} active cuti container(s)...")
+        for container_id in active_container_ids:
+            exit_code = self._run_provider_update_in_active_container(
+                container_id,
+                provider,
+                update_command,
+            )
+            if exit_code != 0:
+                print(f"❌ Failed to update {provider} in active container {container_id}")
+                return exit_code
+
+        print(f"✅ Updated {provider} in persistent runtime and active cuti containers")
+        return 0
+
     def run_in_container(
         self,
         command: Optional[str] = None,
@@ -1085,7 +1449,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             print("")
         
         # Build container if needed
-        image_name = "cuti-dev-universal"
+        image_name = self.IMAGE_NAME
         if not self._build_container_image(image_name, rebuild):
             return 1
 
@@ -1145,9 +1509,10 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 "--env", "PYTHONUNBUFFERED=1",
                 "--env", "PYTHONPATH=/workspace/src",
                 "--env", "TERM=xterm-256color",
-                "--env", "PATH=/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "--env", f"PATH={self._container_path_value()}",
                 "--env", "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
                 "--env", "CODEX_HOME=/home/cuti/.codex",
+                "--env", f"CODEX_INSTALL_DIR={self.PROVIDER_RUNTIME_CONTAINER_DIR}/codex/bin",
                 "--env", "XDG_CONFIG_HOME=/home/cuti/.config",
                 "--env", "XDG_DATA_HOME=/home/cuti/.local/share",
                 "--env", f"CUTI_AGENT_PROVIDERS={self._selected_providers_env_value()}",
@@ -1267,6 +1632,12 @@ else
     echo "🧩 No agent providers selected"
 fi
 
+if [ -d /home/cuti/.cuti-providers ]; then
+    mkdir -p /home/cuti/.cuti-providers/claude /home/cuti/.cuti-providers/codex/bin 2>/dev/null || true
+    sudo chown -R cuti:cuti /home/cuti/.cuti-providers 2>/dev/null || true
+    echo "🔗 Persistent provider runtimes mounted from host"
+fi
+
 # The .claude-linux directory is mounted for Linux-specific credentials
 # Ensure proper ownership for the mounted directories
 
@@ -1308,7 +1679,10 @@ if [ -d /home/cuti/.claude-linux ]; then
 fi
 
 if cuti_provider_selected claude; then
-    if [ ! -x /home/cuti/.local/bin/claude ]; then
+    CUTI_CLAUDE_RUNTIME_BIN=/home/cuti/.cuti-providers/claude/.local/bin/claude
+    if [ -x "$CUTI_CLAUDE_RUNTIME_BIN" ]; then
+        echo "✅ Claude CLI already installed in persistent provider runtime"
+    elif [ ! -x /home/cuti/.local/bin/claude ]; then
         echo "🧠 Installing Claude Code native build..."
         export HOME=/home/cuti
         if /usr/local/bin/cuti-install-claude > /tmp/claude-install.log 2>&1; then
@@ -1321,12 +1695,20 @@ if cuti_provider_selected claude; then
 fi
 
 if cuti_provider_selected codex; then
-    if [ -x /home/cuti/.local/bin/codex ]; then
+    CUTI_CODEX_RUNTIME_BIN=/home/cuti/.cuti-providers/codex/bin/codex
+    if [ -x "$CUTI_CODEX_RUNTIME_BIN" ]; then
+        echo "✅ Codex CLI already installed in persistent provider runtime"
+    elif [ -x /home/cuti/.local/bin/codex ]; then
         echo "✅ Codex CLI already installed"
     else
         echo "🤖 Installing Codex CLI..."
         export HOME=/home/cuti
-        export CODEX_INSTALL_DIR=/home/cuti/.local/bin
+        if [ -d /home/cuti/.cuti-providers/codex ]; then
+            mkdir -p /home/cuti/.cuti-providers/codex/bin 2>/dev/null || true
+            export CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin
+        else
+            export CODEX_INSTALL_DIR=/home/cuti/.local/bin
+        fi
         export CODEX_HOME=/home/cuti/.codex
         if /usr/local/bin/cuti-install-codex > /tmp/codex-install.log 2>&1; then
             echo "✅ Codex CLI installed"
@@ -1483,7 +1865,7 @@ PY
 ensure_cuti_cli
 
 # Keep runtime-installed CLIs ahead of system paths in the login shell.
-export PATH="/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 hash -r 2>/dev/null || true
 
 # Copy settings from macOS config if available (read-only mount)
@@ -1654,7 +2036,7 @@ echo "🦞 Clawdbot CLI: $(command -v clawdbot)"
             print(f"✅ Removed {self.devcontainer_dir}")
         
         # Remove Docker images
-        for image in ["cuti-dev-universal", f"cuti-dev-{self.working_dir.name}"]:
+        for image in [self.IMAGE_NAME, f"cuti-dev-{self.working_dir.name}"]:
             self._run_command(["docker", "rmi", "-f", image])
             print(f"✅ Removed Docker image {image}")
         

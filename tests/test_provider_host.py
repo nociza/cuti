@@ -81,12 +81,12 @@ def test_run_update_uses_provider_installer(monkeypatch, tmp_path: Path) -> None
         def __init__(self, working_directory=None, provider_storage_dir=None):
             pass
 
-        def run_in_container(self, command=None, rebuild=False, interactive=False, **kwargs):
+        def run_provider_update(self, provider, update_command, rebuild=False):
             calls.append(
                 {
-                    "command": command,
+                    "provider": provider,
+                    "update_command": update_command,
                     "rebuild": rebuild,
-                    "interactive": interactive,
                 }
             )
             return 0
@@ -99,8 +99,8 @@ def test_run_update_uses_provider_installer(monkeypatch, tmp_path: Path) -> None
     assert exit_code == 0
     assert calls == [
         {
-            "command": "/usr/local/bin/cuti-install-claude",
+            "provider": "claude",
+            "update_command": "/usr/local/bin/cuti-install-claude",
             "rebuild": False,
-            "interactive": False,
         }
     ]

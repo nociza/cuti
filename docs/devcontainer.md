@@ -184,6 +184,7 @@ Provider-specific mounts are added automatically when the provider is enabled:
 | Provider | Host Path | Container Path | Purpose |
 |----------|-----------|----------------|---------|
 | Claude | `~/.cuti/claude-linux/` | `/home/cuti/.claude-linux` | Linux Claude credentials |
+| Provider runtimes | `~/.cuti/provider-runtimes/` | `/home/cuti/.cuti-providers` | Persistent provider CLI installs |
 | Claude | `~/.claude/` | `/home/cuti/.claude-macos` | macOS config reference (read-only) |
 | Codex | `~/.codex/` | `/home/cuti/.codex` | Auth, config, skills |
 | OpenCode | `~/.opencode/` | `/home/cuti/.opencode` | CLI install and provider state |
@@ -205,7 +206,7 @@ Host-side provider commands:
 - `cuti providers status <provider>` shows detailed host/container state
 - `cuti providers doctor` checks readiness across providers
 - `cuti providers auth <provider> --login` launches the provider's interactive setup flow inside the container
-- `cuti providers update <provider>` refreshes that provider inside the container using cuti's provider installer path
+- `cuti providers update <provider>` refreshes that provider in persistent provider runtime storage and updates active cuti cloud containers in place
 
 ### 🦞 Legacy Clawdbot Sandbox
 
