@@ -83,6 +83,13 @@ class ProviderHostService:
                 self.home_dir / ".openclaw",
                 self.home_dir / ".agents",
             ]
+        if provider == "hermes":
+            return [
+                self.home_dir / ".hermes",
+                self.home_dir / ".claude",
+                self.home_dir / ".openclaw",
+                self.home_dir / ".agents",
+            ]
         return []
 
     @staticmethod
@@ -106,6 +113,35 @@ class ProviderHostService:
                 if "auth" in lowered or "token" in lowered or "credential" in lowered:
                     matches.append(child)
         return matches
+
+    @staticmethod
+    def _hermes_env_has_provider_secret(env_file: Path) -> bool:
+        if not env_file.exists() or not env_file.is_file():
+            return False
+
+        try:
+            lines = env_file.read_text().splitlines()
+        except OSError:
+            return False
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+
+            key, value = stripped.split("=", 1)
+            key = key.strip().upper()
+            value = value.strip().strip('"').strip("'")
+            if not value or value.startswith(("your-", "sk-your", "<", "${")):
+                continue
+            if key.endswith(("API_KEY", "_TOKEN", "_KEY")) or key in {
+                "ANTHROPIC_TOKEN",
+                "CLAUDE_CODE_OAUTH_TOKEN",
+                "HF_TOKEN",
+            }:
+                return True
+
+        return False
 
     def _status_for_claude(self, meta: ProviderMetadata) -> ProviderHostStatus:
         manager = ClaudeAccountManager(storage_dir=str(self.storage_dir))
@@ -192,7 +228,9 @@ class ProviderHostService:
             detail = f"OpenCode auth or token files detected under {auth_like_files[0].parent}"
         elif any(self._path_has_files(path) for path in state_paths):
             setup_state = "partial"
-            detail = "OpenCode state/config files exist, but no auth-like file was detected."
+            detail = (
+                "OpenCode state/config files exist, but no auth-like file was detected."
+            )
         else:
             setup_state = "missing"
             detail = "No OpenCode state detected yet."
@@ -225,10 +263,64 @@ class ProviderHostService:
             detail = f"OpenClaw credentials detected under {credentials_dir}"
         elif any(self._path_has_files(path) for path in state_paths):
             setup_state = "partial"
-            detail = "OpenClaw state files exist, but no credential files were detected."
+            detail = (
+                "OpenClaw state files exist, but no credential files were detected."
+            )
         else:
             setup_state = "missing"
             detail = "No OpenClaw state detected yet."
+
+        return ProviderHostStatus(
+            provider=meta.name,
+            title=meta.title,
+            enabled=self.provider_manager.is_enabled(meta.name),
+            default_enabled=meta.default_enabled,
+            explicit=self.provider_manager.has_explicit_state(meta.name),
+            commands=list(meta.commands),
+            host_command_path=shutil.which(meta.commands[0]) if meta.commands else None,
+            setup_state=setup_state,
+            detail=detail,
+            state_paths=state_paths,
+            existing_state_paths=existing_state_paths,
+            setup_command=meta.setup_command,
+            setup_hint=meta.setup_hint,
+            update_command=meta.update_command,
+            update_hint=meta.update_hint,
+        )
+
+    def _status_for_hermes(self, meta: ProviderMetadata) -> ProviderHostStatus:
+        state_paths = self._state_paths("hermes")
+        existing_state_paths = [path for path in state_paths if path.exists()]
+        hermes_dir = self.home_dir / ".hermes"
+        env_file = hermes_dir / ".env"
+        config_file = hermes_dir / "config.yaml"
+        claude_credentials = [
+            self.storage_dir / "claude-linux" / ".credentials.json",
+            self.home_dir / ".claude" / ".credentials.json",
+        ]
+        openclaw_dir = self.home_dir / ".openclaw"
+
+        if self._hermes_env_has_provider_secret(env_file):
+            setup_state = "ready"
+            detail = f"Hermes provider credentials detected in {env_file}"
+        elif any(path.exists() for path in claude_credentials):
+            setup_state = "ready"
+            detail = (
+                "Claude Code credentials detected for Hermes native Anthropic auth."
+            )
+        elif config_file.exists() or any(
+            self._path_has_files(path) for path in state_paths
+        ):
+            setup_state = "partial"
+            detail = "Hermes state exists, but no provider API key or Claude credential file was detected."
+        else:
+            setup_state = "missing"
+            detail = "No Hermes state detected yet."
+
+        if openclaw_dir.exists():
+            detail = (
+                f"{detail} OpenClaw migration source is available at {openclaw_dir}."
+            )
 
         return ProviderHostStatus(
             provider=meta.name,
@@ -260,6 +352,8 @@ class ProviderHostService:
             return self._status_for_opencode(meta)
         if meta.name == "openclaw":
             return self._status_for_openclaw(meta)
+        if meta.name == "hermes":
+            return self._status_for_hermes(meta)
         raise ValueError(f"Unsupported provider '{provider}'")
 
     def list_statuses(self, *, enabled_only: bool = False) -> List[ProviderHostStatus]:
@@ -267,7 +361,11 @@ class ProviderHostService:
 
         providers = list(self.provider_manager.known_providers())
         if enabled_only:
-            providers = [provider for provider in providers if self.provider_manager.is_enabled(provider)]
+            providers = [
+                provider
+                for provider in providers
+                if self.provider_manager.is_enabled(provider)
+            ]
         return [self.get_status(provider) for provider in providers]
 
     def ensure_enabled(self, provider: str) -> bool:
@@ -276,7 +374,9 @@ class ProviderHostService:
         canonical = self._metadata(provider).name
         if self.provider_manager.is_enabled(canonical):
             return False
-        self.provider_manager.set_enabled(canonical, True, source="providers-host-command")
+        self.provider_manager.set_enabled(
+            canonical, True, source="providers-host-command"
+        )
         return True
 
     def _devcontainer_service(self) -> DevContainerService:
@@ -290,7 +390,9 @@ class ProviderHostService:
 
         status = self.get_status(provider)
         if not status.setup_command:
-            raise ValueError(f"Provider '{status.provider}' does not define a setup command")
+            raise ValueError(
+                f"Provider '{status.provider}' does not define a setup command"
+            )
         self.ensure_enabled(status.provider)
         return self._devcontainer_service().run_in_container(
             command=status.setup_command,
@@ -303,7 +405,9 @@ class ProviderHostService:
 
         status = self.get_status(provider)
         if not status.update_command:
-            raise ValueError(f"Provider '{status.provider}' does not define an update command")
+            raise ValueError(
+                f"Provider '{status.provider}' does not define an update command"
+            )
         self.ensure_enabled(status.provider)
         return self._devcontainer_service().run_provider_update(
             status.provider,

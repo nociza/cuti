@@ -51,7 +51,7 @@ Build with multiple AI models and intelligent task management:
 - **Smart rate limiting** - Automatic retry & backoff
 - **Task automation** - Built-in todo system for AI agents
 - **Claude version switching** - Easy CLI version management
-- **Agent providers** - Enable Codex, OpenCode, OpenClaw, and future providers alongside Claude with `cuti providers ...`
+- **Agent providers** - Enable Codex, OpenCode, OpenClaw, Hermes Agent, and future providers alongside Claude with `cuti providers ...`
 - **Provider-aware setup** - cuti mounts provider auth/config/skills and updates common instruction files for enabled tools
 - **Legacy Clawdbot sandbox** - Run the older gateway + messaging workflow separately with `cuti clawdbot ...`
 - **Claude chat history** - `cuti history` shows transcripts and reopens old Claude Code sessions
@@ -68,12 +68,13 @@ cuti providers doctor
 cuti providers enable codex
 cuti providers enable opencode
 cuti providers enable openclaw
+cuti providers enable hermes
 cuti providers auth claude --login
 cuti container --rebuild
 cuti providers update codex
 ```
 
-When selected, `cuti` handles the provider-specific container wiring for auth, config mounts, CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `SOUL.md`, and `TOOLS.md`. The host CLI can also inspect readiness, launch setup flows, and refresh provider installs through `cuti providers ...`.
+When selected, `cuti` handles the provider-specific container wiring for auth, config mounts, CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `.hermes.md`, `HERMES.md`, `SOUL.md`, and `TOOLS.md`. Hermes Agent state persists under `~/.hermes`, and `~/.openclaw` is mounted when available so `hermes claw migrate --dry-run` can inspect OpenClaw data before migration. The host CLI can also inspect readiness, launch setup flows, and refresh provider installs through `cuti providers ...`.
 
 ## 📚 Documentation
 

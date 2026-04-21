@@ -8,7 +8,9 @@ from cuti.services.claude_account_manager import ClaudeAccountManager
 from cuti.services.provider_host import ProviderHostService
 
 
-def test_claude_status_reports_ready_when_active_account_exists(monkeypatch, tmp_path: Path) -> None:
+def test_claude_status_reports_ready_when_active_account_exists(
+    monkeypatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     storage_dir = tmp_path / ".cuti"
     manager = ClaudeAccountManager(storage_dir=str(storage_dir))
@@ -36,7 +38,36 @@ def test_codex_status_uses_auth_json(monkeypatch, tmp_path: Path) -> None:
     assert "auth" in status.detail.lower()
 
 
-def test_run_setup_enables_provider_and_invokes_container(monkeypatch, tmp_path: Path) -> None:
+def test_hermes_status_detects_env_provider_key(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    hermes_dir = tmp_path / ".hermes"
+    hermes_dir.mkdir(parents=True)
+    (hermes_dir / ".env").write_text("OPENROUTER_API_KEY=sk-or-v1-test\n")
+
+    service = ProviderHostService(provider_storage_dir=tmp_path / ".cuti")
+    status = service.get_status("hermes")
+
+    assert status.setup_state == "ready"
+    assert str(hermes_dir / ".env") in status.detail
+
+
+def test_hermes_status_reports_openclaw_migration_source(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / ".openclaw" / "credentials").mkdir(parents=True)
+    (tmp_path / ".openclaw" / "credentials" / "token.json").write_text("{}")
+
+    service = ProviderHostService(provider_storage_dir=tmp_path / ".cuti")
+    status = service.get_status("hermes")
+
+    assert status.setup_state == "partial"
+    assert "OpenClaw migration source" in status.detail
+
+
+def test_run_setup_enables_provider_and_invokes_container(
+    monkeypatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     calls: list[dict[str, object]] = []
 
@@ -49,7 +80,9 @@ def test_run_setup_enables_provider_and_invokes_container(monkeypatch, tmp_path:
                 }
             )
 
-        def run_in_container(self, command=None, rebuild=False, interactive=False, **kwargs):
+        def run_in_container(
+            self, command=None, rebuild=False, interactive=False, **kwargs
+        ):
             calls.append(
                 {
                     "command": command,
@@ -59,9 +92,13 @@ def test_run_setup_enables_provider_and_invokes_container(monkeypatch, tmp_path:
             )
             return 0
 
-    monkeypatch.setattr("cuti.services.provider_host.DevContainerService", _FakeDevContainerService)
+    monkeypatch.setattr(
+        "cuti.services.provider_host.DevContainerService", _FakeDevContainerService
+    )
 
-    service = ProviderHostService(str(tmp_path), provider_storage_dir=tmp_path / ".cuti")
+    service = ProviderHostService(
+        str(tmp_path), provider_storage_dir=tmp_path / ".cuti"
+    )
     assert service.provider_manager.is_enabled("codex") is False
 
     exit_code = service.run_setup("codex", rebuild=True)
@@ -91,7 +128,9 @@ def test_run_update_uses_provider_installer(monkeypatch, tmp_path: Path) -> None
             )
             return 0
 
-    monkeypatch.setattr("cuti.services.provider_host.DevContainerService", _FakeDevContainerService)
+    monkeypatch.setattr(
+        "cuti.services.provider_host.DevContainerService", _FakeDevContainerService
+    )
 
     service = ProviderHostService(provider_storage_dir=tmp_path / ".cuti")
     exit_code = service.run_update("claude", rebuild=False)

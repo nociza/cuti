@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from cuti.services.instructions import TOOLS_SECTION_HEADER, update_instruction_files_with_tools
+from cuti.services.instructions import (
+    TOOLS_SECTION_HEADER,
+    update_instruction_files_with_tools,
+)
 from cuti.services.providers import ProviderManager
 
 
@@ -36,13 +39,34 @@ def test_instruction_updates_include_provider_specific_files(tmp_path) -> None:
     assert TOOLS_SECTION_HEADER in soul_md.read_text()
 
 
+def test_instruction_updates_include_hermes_context_files(tmp_path) -> None:
+    provider_storage = tmp_path / ".cuti"
+    manager = ProviderManager(storage_dir=provider_storage)
+    manager.set_enabled("claude", False)
+    manager.set_enabled("hermes", True)
+
+    hermes_md = tmp_path / ".hermes.md"
+    hermes_md.write_text("# Hermes\n")
+
+    updated = update_instruction_files_with_tools(
+        _enabled_tool(),
+        workspace=tmp_path,
+        provider_storage_dir=provider_storage,
+    )
+
+    assert hermes_md in updated
+    assert TOOLS_SECTION_HEADER in hermes_md.read_text()
+
+
 def test_instruction_updates_keep_existing_standard_files_in_sync(tmp_path) -> None:
     claude_md = tmp_path / "CLAUDE.md"
     agents_md = tmp_path / "AGENTS.md"
     claude_md.write_text("# Claude\n")
     agents_md.write_text("# Agents\n")
 
-    updated = update_instruction_files_with_tools(_enabled_tool(), workspace=tmp_path, provider_storage_dir=tmp_path / ".cuti")
+    updated = update_instruction_files_with_tools(
+        _enabled_tool(), workspace=tmp_path, provider_storage_dir=tmp_path / ".cuti"
+    )
 
     assert claude_md in updated
     assert agents_md in updated

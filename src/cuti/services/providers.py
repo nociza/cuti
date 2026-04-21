@@ -60,6 +60,17 @@ KNOWN_PROVIDERS: Dict[str, ProviderMetadata] = {
         update_command="/usr/local/bin/cuti-install-openclaw",
         update_hint="Refresh OpenClaw inside the cuti container from the published npm package.",
     ),
+    "hermes": ProviderMetadata(
+        name="hermes",
+        title="Hermes Agent",
+        description="Nous Research's Hermes Agent, with persisted HERMES_HOME state, skills, memory, gateway data, and OpenClaw migration support.",
+        instruction_files=(".hermes.md", "HERMES.md", "AGENTS.md", "CLAUDE.md"),
+        commands=("hermes",),
+        setup_command="hermes setup",
+        setup_hint="Run the Hermes setup wizard in the cuti container to configure model/provider credentials under ~/.hermes.",
+        update_command="/usr/local/bin/cuti-install-hermes",
+        update_hint="Refresh Hermes Agent inside the cuti container using the official NousResearch installer.",
+    ),
     "opencode": ProviderMetadata(
         name="opencode",
         title="OpenCode",
@@ -100,7 +111,9 @@ class ProviderManager:
         self._providers = decoded if isinstance(decoded, dict) else {}
 
     def _save(self) -> None:
-        self.config_path.write_text(json.dumps(self._providers, indent=2, sort_keys=True))
+        self.config_path.write_text(
+            json.dumps(self._providers, indent=2, sort_keys=True)
+        )
 
     def _canonical_name(self, provider: str) -> str:
         candidate = provider.strip().lower()
@@ -108,7 +121,9 @@ class ProviderManager:
             return candidate
 
         available = ", ".join(sorted(KNOWN_PROVIDERS))
-        raise ValueError(f"Unknown provider '{provider}'. Available providers: {available}")
+        raise ValueError(
+            f"Unknown provider '{provider}'. Available providers: {available}"
+        )
 
     def known_providers(self) -> Dict[str, ProviderMetadata]:
         return KNOWN_PROVIDERS
@@ -149,7 +164,9 @@ class ProviderManager:
             return "claude"
         return selected[0]
 
-    def provider_instruction_files(self, providers: Optional[Iterable[str]] = None) -> List[str]:
+    def provider_instruction_files(
+        self, providers: Optional[Iterable[str]] = None
+    ) -> List[str]:
         selected = providers or self.selected_providers()
         files: List[str] = []
         seen = set()

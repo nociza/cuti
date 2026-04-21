@@ -1,6 +1,6 @@
 # Dev Container Documentation
 
-The cuti dev container provides a fully configured development environment with cuti, Claude as the default agent provider, and optional provider wiring for additional CLIs such as Codex, OpenCode, and OpenClaw.
+The cuti dev container provides a fully configured development environment with cuti, Claude as the default agent provider, and optional provider wiring for additional CLIs such as Codex, OpenCode, OpenClaw, and Hermes Agent.
 
 ## Quick Start
 
@@ -113,8 +113,9 @@ cuti container --command "claude 'What does this project do?'"
 cuti providers enable codex
 cuti providers enable opencode
 cuti providers enable openclaw
+cuti providers enable hermes
 cuti container --rebuild
-cuti container --command "codex --version && opencode --version && openclaw --version"
+cuti container --command "codex --version && opencode --version && openclaw --version && hermes version"
 
 # Run Python scripts
 cuti container --command "python script.py"
@@ -168,6 +169,7 @@ cuti providers doctor
 cuti providers enable codex
 cuti providers enable opencode
 cuti providers enable openclaw
+cuti providers enable hermes
 cuti providers auth claude --login
 cuti container --rebuild
 cuti providers update codex
@@ -177,7 +179,7 @@ The standard cloud profile exports provider metadata into the container:
 
 - `CUTI_AGENT_PROVIDERS` contains the enabled provider IDs
 - `CUTI_PRIMARY_AGENT_PROVIDER` prefers `claude` when enabled
-- `CODEX_HOME`, `XDG_CONFIG_HOME`, and `XDG_DATA_HOME` are set for provider state
+- `CODEX_HOME`, `HERMES_HOME`, `XDG_CONFIG_HOME`, and `XDG_DATA_HOME` are set for provider state
 
 Provider-specific mounts are added automatically when the provider is enabled:
 
@@ -191,6 +193,9 @@ Provider-specific mounts are added automatically when the provider is enabled:
 | OpenCode | `~/.config/opencode/` | `/home/cuti/.config/opencode` | Config |
 | OpenCode | `~/.local/share/opencode/` | `/home/cuti/.local/share/opencode` | Data |
 | OpenClaw | `~/.openclaw/` | `/home/cuti/.openclaw` | Runtime state |
+| Hermes Agent | `~/.hermes/` | `/home/cuti/.hermes` | Config, `.env`, memory, skills, sessions, gateway state |
+| Hermes/OpenClaw migration | `~/.openclaw/` | `/home/cuti/.openclaw` | Read-only migration source when Hermes is enabled without OpenClaw |
+| Hermes Claude auth reuse | `~/.claude/` | `/home/cuti/.claude` | Read-only Claude Code credentials for Hermes native Anthropic auth |
 | Shared agent files | `~/.agents/` | `/home/cuti/.agents` | Shared provider skills/prompts |
 
 Install behavior is provider-specific:
@@ -199,6 +204,14 @@ Install behavior is provider-specific:
 - Codex uses the official standalone installer
 - OpenCode uses the official install script
 - OpenClaw uses its published npm package and wrapper
+- Hermes Agent uses the official NousResearch installer with `HERMES_HOME=/home/cuti/.hermes`
+
+Hermes-specific notes:
+
+- `cuti providers auth hermes --login` runs `hermes setup`
+- `cuti providers update hermes` refreshes the persisted Hermes install under `~/.hermes/hermes-agent`
+- If `~/.openclaw` exists, run `hermes claw migrate --dry-run` inside the container to preview migration of OpenClaw persona, memory, skills, messaging settings, API keys, and workspace instructions before applying it
+- Hermes project context uses `.hermes.md`, `HERMES.md`, `AGENTS.md`, and `CLAUDE.md`; durable personality belongs in `~/.hermes/SOUL.md`
 
 Host-side provider commands:
 
@@ -288,6 +301,8 @@ Automatically set in container:
 - `CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux` - Linux Claude config location
 - `CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true` - Skip permission checks
 - `CODEX_HOME=/home/cuti/.codex` - Codex state root
+- `HERMES_HOME=/home/cuti/.hermes` - Hermes Agent config/state root
+- `HERMES_INSTALL_DIR=/home/cuti/.hermes/hermes-agent` - persisted Hermes Agent installation
 - `XDG_CONFIG_HOME=/home/cuti/.config` - Shared XDG config root
 - `XDG_DATA_HOME=/home/cuti/.local/share` - Shared XDG data root
 - `PYTHONUNBUFFERED=1` - Python unbuffered output

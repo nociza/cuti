@@ -12,12 +12,31 @@ from ...core.models import PromptStatus
 from ...services.instructions import TOOLS_SECTION_HEADER
 from ...services.provider_host import ProviderHostService
 from ...services.providers import ProviderManager
-from ...services.tool_catalog import AVAILABLE_TOOLS, check_tool_installed, load_tools_config
+from ...services.tool_catalog import (
+    AVAILABLE_TOOLS,
+    check_tool_installed,
+    load_tools_config,
+)
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
 
-INSTRUCTION_FILES = ("CLAUDE.md", "AGENTS.md", "SOUL.md", "TOOLS.md", "GOAL.md")
-PROVIDER_INSTRUCTION_FILES = ("CLAUDE.md", "AGENTS.md", "SOUL.md", "TOOLS.md")
+INSTRUCTION_FILES = (
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".hermes.md",
+    "HERMES.md",
+    "SOUL.md",
+    "TOOLS.md",
+    "GOAL.md",
+)
+PROVIDER_INSTRUCTION_FILES = (
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".hermes.md",
+    "HERMES.md",
+    "SOUL.md",
+    "TOOLS.md",
+)
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "note": 2}
 
 
@@ -27,7 +46,6 @@ def _isoformat(value: Any) -> Optional[str]:
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return str(value)
-
 
 
 def _serialize_queue_prompt(prompt: Any) -> Dict[str, Any]:
@@ -42,7 +60,6 @@ def _serialize_queue_prompt(prompt: Any) -> Dict[str, Any]:
     }
 
 
-
 def _serialize_history_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "content": entry.get("content", ""),
@@ -52,7 +69,6 @@ def _serialize_history_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
         "context_files": list(entry.get("context_files") or []),
         "output_preview": entry.get("output_preview"),
     }
-
 
 
 def _queue_summary(request: Request) -> Dict[str, Any]:
@@ -99,10 +115,12 @@ def _queue_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-
 def _history_summary(request: Request) -> Dict[str, Any]:
     history_manager = request.app.state.history_manager
-    history = [_serialize_history_entry(entry) for entry in history_manager.get_history(limit=8)]
+    history = [
+        _serialize_history_entry(entry)
+        for entry in history_manager.get_history(limit=8)
+    ]
     stats = history_manager.get_history_stats() or {}
     return {
         "recent": history,
@@ -116,12 +134,13 @@ def _history_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-
 def _session_summary(request: Request) -> Dict[str, Any]:
     logs_reader = request.app.state.claude_logs_reader
     current_session_id = logs_reader.get_current_session_id()
     sessions = logs_reader.get_all_sessions()[:6]
-    current_stats = logs_reader.get_statistics(current_session_id) if current_session_id else {}
+    current_stats = (
+        logs_reader.get_statistics(current_session_id) if current_session_id else {}
+    )
     return {
         "project_name": logs_reader.project_name,
         "current_session_id": current_session_id,
@@ -130,19 +149,21 @@ def _session_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-
 def _provider_summary(request: Request) -> Dict[str, Any]:
-    service = ProviderHostService(working_directory=str(request.app.state.working_directory))
+    service = ProviderHostService(
+        working_directory=str(request.app.state.working_directory)
+    )
     manager = service.provider_manager
     statuses = [status.to_dict() for status in service.list_statuses()]
     return {
         "primary_provider": manager.primary_provider(),
         "selected_providers": manager.selected_providers(),
-        "ready_count": sum(1 for status in statuses if status["setup_state"] == "ready"),
+        "ready_count": sum(
+            1 for status in statuses if status["setup_state"] == "ready"
+        ),
         "selected_count": sum(1 for status in statuses if status["enabled"]),
         "items": statuses,
     }
-
 
 
 def _tools_summary() -> Dict[str, Any]:
@@ -167,7 +188,9 @@ def _tools_summary() -> Dict[str, Any]:
             }
         )
 
-    missing_enabled = [item for item in items if item["enabled"] and not item["installed"]]
+    missing_enabled = [
+        item for item in items if item["enabled"] and not item["installed"]
+    ]
     return {
         "total_count": len(items),
         "enabled_count": len(enabled),
@@ -178,8 +201,9 @@ def _tools_summary() -> Dict[str, Any]:
     }
 
 
-
-def _workspace_summary(request: Request, selected_instruction_files: List[str], tools_enabled: bool) -> Dict[str, Any]:
+def _workspace_summary(
+    request: Request, selected_instruction_files: List[str], tools_enabled: bool
+) -> Dict[str, Any]:
     working_directory = Path(request.app.state.working_directory)
     files: List[Dict[str, Any]] = []
     missing_selected_files: List[str] = []
@@ -229,7 +253,6 @@ def _workspace_summary(request: Request, selected_instruction_files: List[str], 
     }
 
 
-
 def _action_item(
     severity: str,
     title: str,
@@ -245,7 +268,6 @@ def _action_item(
         "command": command,
         "source": source,
     }
-
 
 
 def _attention_items(
@@ -371,7 +393,6 @@ def _attention_items(
     return items[:8]
 
 
-
 def _recommended_commands(attention_items: List[Dict[str, Any]]) -> List[str]:
     commands: List[str] = []
     for candidate in [item.get("command") for item in attention_items] + [
@@ -395,12 +416,16 @@ async def ops_summary(request: Request) -> Dict[str, Any]:
     workspace = _workspace_summary(
         request,
         selected_instruction_files=providers["selected_providers"]
-        and ProviderManager().provider_instruction_files(providers["selected_providers"])
+        and ProviderManager().provider_instruction_files(
+            providers["selected_providers"]
+        )
         or [],
         tools_enabled=tools["enabled_count"] > 0,
     )
     sessions = _session_summary(request)
-    attention_items = _attention_items(providers, queue, history, tools, workspace, sessions)
+    attention_items = _attention_items(
+        providers, queue, history, tools, workspace, sessions
+    )
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
