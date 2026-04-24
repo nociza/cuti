@@ -51,9 +51,9 @@ Build with multiple AI models and intelligent task management:
 - **Smart rate limiting** - Automatic retry & backoff
 - **Task automation** - Built-in todo system for AI agents
 - **Claude version switching** - Easy CLI version management
-- **Agent providers** - Enable Codex, OpenCode, OpenClaw, Hermes Agent, and future providers alongside Claude with `cuti providers ...`
-- **Provider-aware setup** - cuti mounts provider auth/config/skills and updates common instruction files for enabled tools
-- **Legacy Clawdbot sandbox** - Run the older gateway + messaging workflow separately with `cuti clawdbot ...`
+- **Agent providers** - Enable Codex, OpenCode, OpenClaw, the experimental Hermes Agent integration, and future providers alongside Claude with `cuti providers ...`
+- **Provider-aware setup** - cuti mounts provider auth/config/skills, persistent CLI runtimes, and workspace instruction files for enabled tools
+- **Turnkey OpenClaw** - Run the current OpenClaw gateway, channels, browser, plugins, and voice-call flows with `qt-openclaw ...` or `qt-OpenClaw ...`
 - **Claude chat history** - `cuti history` shows transcripts and reopens old Claude Code sessions
 
 Perfect for AI-powered development, automation workflows, and LLM orchestration.
@@ -70,11 +70,33 @@ cuti providers enable opencode
 cuti providers enable openclaw
 cuti providers enable hermes
 cuti providers auth claude --login
+qt-openclaw onboard
+qt-openclaw up
 cuti container --rebuild
 cuti providers update codex
+cuti providers update openclaw
+cuti providers update hermes
 ```
 
-When selected, `cuti` handles the provider-specific container wiring for auth, config mounts, CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `.hermes.md`, `HERMES.md`, `SOUL.md`, and `TOOLS.md`. Hermes Agent state persists under `~/.hermes`, and `~/.openclaw` is mounted when available so `hermes claw migrate --dry-run` can inspect OpenClaw data before migration. The host CLI can also inspect readiness, launch setup flows, and refresh provider installs through `cuti providers ...`.
+When selected, `cuti` handles the provider-specific container wiring for auth, config mounts, persistent CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `.hermes.md`, `HERMES.md`, `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, `USER.md`, and `HEARTBEAT.md`. OpenClaw installs under `~/.cuti/provider-runtimes/openclaw`, keeps runtime state under `~/.openclaw`, and runs `openclaw doctor --non-interactive` during install/update/bootstrap. Hermes is currently marked experimental in cuti, but its state persists under `~/.hermes`, including Hermes profiles under `~/.hermes/profiles`. `~/.openclaw` is mounted when available so `hermes claw migrate --dry-run` can inspect OpenClaw data before migration, and `cuti providers update hermes` now follows Hermes' native `hermes update` path so bundled skills and profile state stay aligned with upstream behavior.
+
+### OpenClaw Qt Container
+
+Use `qt-openclaw` or `qt-OpenClaw` for the current OpenClaw runtime.
+
+```bash
+qt-openclaw onboard
+qt-openclaw up
+qt-openclaw channels-login --channel whatsapp
+qt-openclaw browser start
+qt-openclaw plugins install @openclaw/voice-call
+qt-openclaw voice-setup
+qt-openclaw voicecall status
+qt-openclaw dashboard --no-open
+```
+
+The command enables the OpenClaw provider automatically and runs inside the standard provider-aware Qt container, with `~/.openclaw`, `~/.agents`, and the persistent OpenClaw CLI runtime mounted for reuse.
+OpenClaw's source-backed command families are exposed directly (`models`, `mcp`, `sandbox`, `memory`, `wiki`, `approvals`, `nodes`, `devices`, `hooks`, `webhooks`, `tasks`, `cron`, `security`, `secrets`, and more). For plugin commands added by future OpenClaw releases, use `qt-openclaw run <command> ...`; it forwards raw arguments to the installed OpenClaw CLI without requiring a cuti release.
 
 ## 📚 Documentation
 
@@ -89,7 +111,6 @@ When selected, `cuti` handles the provider-specific container wiring for auth, c
 | [Task Management](docs/todo-system.md) | AI agent todo system |
 | [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
 | [Claude Chat History](docs/claude-history.md) | Inspect & resume Claude Code sessions |
-| [Clawdbot Sandbox](docs/clawdbot.md) | Legacy Clawdbot gateway workflow in the separate sandbox profile |
 
 ## 🤝 Contributing
 
@@ -112,15 +133,3 @@ Apache 2.0 - See [LICENSE](LICENSE)
 **[PyPI](https://pypi.org/project/cuti/)** • **[Issues](https://github.com/nociza/cuti/issues)** • **[Contribute](https://github.com/nociza/cuti)**
 
 </div>
-
-## 🦞 Clawdbot Sandbox
-
-`cuti clawdbot` is a separate legacy sandbox workflow. It is not part of provider selection and uses its own hardened runtime profile plus persistent storage under `~/.cuti/clawdbot/`.
-
-- `cuti clawdbot onboard` – run the official wizard with OAuth + skill setup
-- `cuti clawdbot start` – launch the gateway, auto-pick a port, stream logs
-- `cuti clawdbot config` – edit `clawdbot.json` safely inside the container
-- `cuti clawdbot channels-login` – scan WhatsApp QR or add other channels
-- `cuti clawdbot send --to +15551234567 --message "Hello"` – quick smoke test
-
-See [docs/clawdbot.md](docs/clawdbot.md) for storage layout, channel details, and troubleshooting tips.

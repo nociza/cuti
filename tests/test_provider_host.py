@@ -48,6 +48,7 @@ def test_hermes_status_detects_env_provider_key(monkeypatch, tmp_path: Path) -> 
     status = service.get_status("hermes")
 
     assert status.setup_state == "ready"
+    assert status.experimental is True
     assert str(hermes_dir / ".env") in status.detail
 
 
@@ -63,6 +64,42 @@ def test_hermes_status_reports_openclaw_migration_source(
 
     assert status.setup_state == "partial"
     assert "OpenClaw migration source" in status.detail
+
+
+def test_hermes_status_reports_profiles_and_active_profile(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    profiles_dir = tmp_path / ".hermes" / "profiles"
+    (profiles_dir / "coder").mkdir(parents=True)
+    (profiles_dir / "reviewer").mkdir(parents=True)
+    (tmp_path / ".hermes" / "active_profile").write_text("coder\n")
+
+    service = ProviderHostService(provider_storage_dir=tmp_path / ".cuti")
+    status = service.get_status("hermes")
+
+    assert "Detected 2 Hermes profiles" in status.detail
+    assert "Active Hermes profile: coder." in status.detail
+
+
+def test_openclaw_status_reports_runtime_and_auth_profile(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    openclaw_dir = tmp_path / ".openclaw"
+    auth_profile = openclaw_dir / "agents" / "main" / "agent" / "auth-profiles.json"
+    runtime_bin = tmp_path / ".cuti" / "provider-runtimes" / "openclaw" / "bin" / "openclaw"
+    auth_profile.parent.mkdir(parents=True)
+    runtime_bin.parent.mkdir(parents=True)
+    auth_profile.write_text("{}")
+    runtime_bin.write_text("#!/bin/sh\n")
+
+    service = ProviderHostService(provider_storage_dir=tmp_path / ".cuti")
+    status = service.get_status("openclaw")
+
+    assert status.setup_state == "ready"
+    assert "persistent runtime installed" in status.detail
+    assert tmp_path / ".cuti" / "provider-runtimes" / "openclaw" in status.state_paths
 
 
 def test_run_setup_enables_provider_and_invokes_container(
@@ -141,5 +178,56 @@ def test_run_update_uses_provider_installer(monkeypatch, tmp_path: Path) -> None
             "provider": "claude",
             "update_command": "/usr/local/bin/cuti-install-claude",
             "rebuild": False,
+        }
+    ]
+
+
+def test_run_provider_command_invokes_container_with_provider_cli(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    calls: list[dict[str, object]] = []
+
+    class _FakeDevContainerService:
+        def __init__(self, working_directory=None, provider_storage_dir=None):
+            pass
+
+        def run_in_container(
+            self,
+            command=None,
+            rebuild=False,
+            interactive=False,
+            mount_docker_socket=True,
+        ):
+            calls.append(
+                {
+                    "command": command,
+                    "rebuild": rebuild,
+                    "interactive": interactive,
+                    "mount_docker_socket": mount_docker_socket,
+                }
+            )
+            return 0
+
+    monkeypatch.setattr(
+        "cuti.services.provider_host.DevContainerService", _FakeDevContainerService
+    )
+
+    service = ProviderHostService(provider_storage_dir=tmp_path / ".cuti")
+    exit_code = service.run_provider_command(
+        "openclaw",
+        ["channels", "login", "--channel", "whatsapp"],
+        rebuild=True,
+        interactive=True,
+    )
+
+    assert exit_code == 0
+    assert service.provider_manager.is_enabled("openclaw") is True
+    assert calls == [
+        {
+            "command": "openclaw channels login --channel whatsapp",
+            "rebuild": True,
+            "interactive": True,
+            "mount_docker_socket": True,
         }
     ]

@@ -54,8 +54,10 @@ dev = [
 container = ["docker>=6.0.0"]
 
 [project.scripts]
-cuti     = "cuti.cli.app:app"
-cuti-web = "cuti.web.app:main"
+cuti         = "cuti.cli.app:app"
+cuti-web     = "cuti.web.app:main"
+qt-OpenClaw  = "cuti.cli.commands.openclaw:app"
+qt-openclaw  = "cuti.cli.commands.openclaw:app"
 
 [project.urls]
 Documentation = "https://github.com/nociza/cuti/blob/main/README.md"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -19,6 +20,8 @@ class ProviderHostStatus:
 
     provider: str
     title: str
+    experimental: bool
+    experimental_note: str
     enabled: bool
     default_enabled: bool
     explicit: bool
@@ -59,6 +62,23 @@ class ProviderHostService:
     def _metadata(self, provider: str) -> ProviderMetadata:
         return self.provider_manager.get_metadata(provider)
 
+    @staticmethod
+    def _status_kwargs(meta: ProviderMetadata) -> Dict[str, Any]:
+        return {
+            "provider": meta.name,
+            "title": meta.title,
+            "experimental": meta.experimental,
+            "experimental_note": meta.experimental_note,
+            "commands": list(meta.commands),
+            "host_command_path": (
+                shutil.which(meta.commands[0]) if meta.commands else None
+            ),
+            "setup_command": meta.setup_command,
+            "setup_hint": meta.setup_hint,
+            "update_command": meta.update_command,
+            "update_hint": meta.update_hint,
+        }
+
     def _state_paths(self, provider: str) -> List[Path]:
         if provider == "claude":
             return [
@@ -80,6 +100,7 @@ class ProviderHostService:
             ]
         if provider == "openclaw":
             return [
+                self.storage_dir / "provider-runtimes" / "openclaw",
                 self.home_dir / ".openclaw",
                 self.home_dir / ".agents",
             ]
@@ -165,21 +186,14 @@ class ProviderHostService:
             detail = "No Claude credentials detected yet."
 
         return ProviderHostStatus(
-            provider=meta.name,
-            title=meta.title,
+            **self._status_kwargs(meta),
             enabled=self.provider_manager.is_enabled(meta.name),
             default_enabled=meta.default_enabled,
             explicit=self.provider_manager.has_explicit_state(meta.name),
-            commands=list(meta.commands),
-            host_command_path=shutil.which(meta.commands[0]) if meta.commands else None,
             setup_state=setup_state,
             detail=detail,
             state_paths=state_paths,
             existing_state_paths=existing_state_paths,
-            setup_command=meta.setup_command,
-            setup_hint=meta.setup_hint,
-            update_command=meta.update_command,
-            update_hint=meta.update_hint,
         )
 
     def _status_for_codex(self, meta: ProviderMetadata) -> ProviderHostStatus:
@@ -201,21 +215,14 @@ class ProviderHostService:
             detail = "No Codex auth session detected yet."
 
         return ProviderHostStatus(
-            provider=meta.name,
-            title=meta.title,
+            **self._status_kwargs(meta),
             enabled=self.provider_manager.is_enabled(meta.name),
             default_enabled=meta.default_enabled,
             explicit=self.provider_manager.has_explicit_state(meta.name),
-            commands=list(meta.commands),
-            host_command_path=shutil.which(meta.commands[0]) if meta.commands else None,
             setup_state=setup_state,
             detail=detail,
             state_paths=state_paths,
             existing_state_paths=existing_state_paths,
-            setup_command=meta.setup_command,
-            setup_hint=meta.setup_hint,
-            update_command=meta.update_command,
-            update_hint=meta.update_hint,
         )
 
     def _status_for_opencode(self, meta: ProviderMetadata) -> ProviderHostStatus:
@@ -236,56 +243,57 @@ class ProviderHostService:
             detail = "No OpenCode state detected yet."
 
         return ProviderHostStatus(
-            provider=meta.name,
-            title=meta.title,
+            **self._status_kwargs(meta),
             enabled=self.provider_manager.is_enabled(meta.name),
             default_enabled=meta.default_enabled,
             explicit=self.provider_manager.has_explicit_state(meta.name),
-            commands=list(meta.commands),
-            host_command_path=shutil.which(meta.commands[0]) if meta.commands else None,
             setup_state=setup_state,
             detail=detail,
             state_paths=state_paths,
             existing_state_paths=existing_state_paths,
-            setup_command=meta.setup_command,
-            setup_hint=meta.setup_hint,
-            update_command=meta.update_command,
-            update_hint=meta.update_hint,
         )
 
     def _status_for_openclaw(self, meta: ProviderMetadata) -> ProviderHostStatus:
         state_paths = self._state_paths("openclaw")
         existing_state_paths = [path for path in state_paths if path.exists()]
-        credentials_dir = self.home_dir / ".openclaw" / "credentials"
+        openclaw_dir = self.home_dir / ".openclaw"
+        credentials_dir = openclaw_dir / "credentials"
+        config_file = openclaw_dir / "openclaw.json"
+        auth_profile_file = openclaw_dir / "agents" / "main" / "agent" / "auth-profiles.json"
+        runtime_bin = self.storage_dir / "provider-runtimes" / "openclaw" / "bin" / "openclaw"
 
-        if self._path_has_files(credentials_dir):
+        if (
+            self._path_has_files(credentials_dir)
+            or auth_profile_file.exists()
+            or os.environ.get("OPENCLAW_GATEWAY_TOKEN")
+        ):
             setup_state = "ready"
-            detail = f"OpenClaw credentials detected under {credentials_dir}"
+            detail = f"OpenClaw credentials detected under {openclaw_dir}"
+            if runtime_bin.exists():
+                detail = f"{detail}; persistent runtime installed at {runtime_bin}"
+        elif config_file.exists():
+            setup_state = "partial"
+            detail = (
+                f"OpenClaw config exists at {config_file}, but no credential or auth profile files were detected."
+            )
         elif any(self._path_has_files(path) for path in state_paths):
             setup_state = "partial"
             detail = (
-                "OpenClaw state files exist, but no credential files were detected."
+                "OpenClaw state/runtime files exist, but no credential or auth profile files were detected."
             )
         else:
             setup_state = "missing"
             detail = "No OpenClaw state detected yet."
 
         return ProviderHostStatus(
-            provider=meta.name,
-            title=meta.title,
+            **self._status_kwargs(meta),
             enabled=self.provider_manager.is_enabled(meta.name),
             default_enabled=meta.default_enabled,
             explicit=self.provider_manager.has_explicit_state(meta.name),
-            commands=list(meta.commands),
-            host_command_path=shutil.which(meta.commands[0]) if meta.commands else None,
             setup_state=setup_state,
             detail=detail,
             state_paths=state_paths,
             existing_state_paths=existing_state_paths,
-            setup_command=meta.setup_command,
-            setup_hint=meta.setup_hint,
-            update_command=meta.update_command,
-            update_hint=meta.update_hint,
         )
 
     def _status_for_hermes(self, meta: ProviderMetadata) -> ProviderHostStatus:
@@ -294,6 +302,19 @@ class ProviderHostService:
         hermes_dir = self.home_dir / ".hermes"
         env_file = hermes_dir / ".env"
         config_file = hermes_dir / "config.yaml"
+        profiles_dir = hermes_dir / "profiles"
+        profile_dirs = (
+            [path for path in profiles_dir.iterdir() if path.is_dir()]
+            if profiles_dir.exists()
+            else []
+        )
+        active_profile_path = hermes_dir / "active_profile"
+        active_profile = ""
+        if active_profile_path.exists():
+            try:
+                active_profile = active_profile_path.read_text().strip()
+            except OSError:
+                active_profile = ""
         claude_credentials = [
             self.storage_dir / "claude-linux" / ".credentials.json",
             self.home_dir / ".claude" / ".credentials.json",
@@ -321,23 +342,23 @@ class ProviderHostService:
             detail = (
                 f"{detail} OpenClaw migration source is available at {openclaw_dir}."
             )
+        if profile_dirs:
+            detail = (
+                f"{detail} Detected {len(profile_dirs)} Hermes profile"
+                f"{'' if len(profile_dirs) == 1 else 's'} under {profiles_dir}."
+            )
+        if active_profile:
+            detail = f"{detail} Active Hermes profile: {active_profile}."
 
         return ProviderHostStatus(
-            provider=meta.name,
-            title=meta.title,
+            **self._status_kwargs(meta),
             enabled=self.provider_manager.is_enabled(meta.name),
             default_enabled=meta.default_enabled,
             explicit=self.provider_manager.has_explicit_state(meta.name),
-            commands=list(meta.commands),
-            host_command_path=shutil.which(meta.commands[0]) if meta.commands else None,
             setup_state=setup_state,
             detail=detail,
             state_paths=state_paths,
             existing_state_paths=existing_state_paths,
-            setup_command=meta.setup_command,
-            setup_hint=meta.setup_hint,
-            update_command=meta.update_command,
-            update_hint=meta.update_hint,
         )
 
     def get_status(self, provider: str) -> ProviderHostStatus:
@@ -413,4 +434,51 @@ class ProviderHostService:
             status.provider,
             status.update_command,
             rebuild=rebuild,
+        )
+
+    def run_provider_command(
+        self,
+        provider: str,
+        args: List[str],
+        *,
+        rebuild: bool = False,
+        interactive: bool = False,
+        mount_docker_socket: bool = True,
+    ) -> int:
+        """Run a provider CLI command inside the cuti cloud container."""
+
+        status = self.get_status(provider)
+        if not status.commands:
+            raise ValueError(f"Provider '{status.provider}' does not define a CLI command")
+
+        self.ensure_enabled(status.provider)
+        command = shlex.join([status.commands[0], *args])
+        return self._devcontainer_service().run_in_container(
+            command=command,
+            rebuild=rebuild,
+            interactive=interactive,
+            mount_docker_socket=mount_docker_socket,
+        )
+
+    def run_provider_shell_command(
+        self,
+        provider: str,
+        command: str,
+        *,
+        rebuild: bool = False,
+        interactive: bool = False,
+        mount_docker_socket: bool = True,
+    ) -> int:
+        """Run a provider-specific shell command inside the cuti cloud container."""
+
+        status = self.get_status(provider)
+        if not status.commands:
+            raise ValueError(f"Provider '{status.provider}' does not define a CLI command")
+
+        self.ensure_enabled(status.provider)
+        return self._devcontainer_service().run_in_container(
+            command=command,
+            rebuild=rebuild,
+            interactive=interactive,
+            mount_docker_socket=mount_docker_socket,
         )

@@ -26,11 +26,13 @@ def test_generate_dockerfile_uses_provider_installers(tmp_path: Path) -> None:
         "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path"
         in dockerfile
     )
-    assert "npm-original install -g openclaw@latest" in dockerfile
+    assert "https://openclaw.ai/install-cli.sh" in dockerfile
+    assert "npm-original install -g --prefix \"$OPENCLAW_PREFIX\" openclaw@latest" in dockerfile
     assert (
         "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
         in dockerfile
     )
+    assert "/usr/local/bin/cuti-update-hermes" in dockerfile
     assert 'OPENCODE_CLI="/home/cuti/.opencode/bin/opencode"' in dockerfile
     assert (
         'HERMES_CLI="${HERMES_CLI:-$HERMES_HOME/hermes-agent/venv/bin/hermes}"'
@@ -147,9 +149,10 @@ def test_run_in_container_sets_provider_envs(monkeypatch, tmp_path: Path) -> Non
     assert "CUTI_AGENT_PROVIDERS=claude,codex,opencode" in docker_args
     assert "CUTI_PRIMARY_AGENT_PROVIDER=claude" in docker_args
     assert "CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin" in docker_args
+    assert "OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_args
     assert any(
         arg.startswith(
-            "PATH=/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:"
+            "PATH=/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:"
         )
         for arg in docker_args
     )
@@ -195,7 +198,7 @@ def test_run_in_container_init_script_handles_runtime_provider_installs(
     assert exit_code == 0
     full_command = captured_args["args"][-1]
     assert (
-        'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"'
+        'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"'
         in full_command
     )
     assert "ensure_provider_runtime_shell_path" in full_command
@@ -203,8 +206,12 @@ def test_run_in_container_init_script_handles_runtime_provider_installs(
     assert "cuti_provider_selected codex" in full_command
     assert "cuti_provider_selected opencode" in full_command
     assert "cuti_provider_selected openclaw" in full_command
+    assert "OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in full_command
+    assert "openclaw doctor --non-interactive" in full_command
     assert "cuti_provider_selected hermes" in full_command
     assert "cuti-install-hermes" in full_command
+    assert "cuti_restore_hermes_profile_wrappers" in full_command
+    assert 'exec hermes -p $PROFILE_NAME "\\$@"' in full_command
     assert "hash -r 2>/dev/null || true" in full_command
 
 
@@ -297,7 +304,7 @@ def test_run_provider_update_configures_hermes_home(
     monkeypatch.setattr(service, "_run_command", _fake_run_command)
 
     exit_code = service.run_provider_update(
-        "hermes", "/usr/local/bin/cuti-install-hermes"
+        "hermes", "/usr/local/bin/cuti-update-hermes"
     )
 
     assert exit_code == 0
@@ -305,11 +312,49 @@ def test_run_provider_update_configures_hermes_home(
     assert f"{tmp_path / '.hermes'}:/home/cuti/.hermes:rw" in docker_run
     assert "export HERMES_HOME=/home/cuti/.hermes" in docker_run[-1]
     assert "export HERMES_INSTALL_DIR=/home/cuti/.hermes/hermes-agent" in docker_run[-1]
-    assert "/usr/local/bin/cuti-install-hermes" in docker_run[-1]
-    assert (
-        "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
-        in docker_run[-1]
+    assert "/usr/local/bin/cuti-update-hermes" in docker_run[-1]
+    assert "hermes update" in docker_run[-1]
+
+
+def test_run_provider_update_configures_openclaw_persistent_runtime(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    service = DevContainerService(tmp_path, provider_storage_dir=tmp_path / ".cuti")
+    service.is_macos = False
+    service.provider_manager.set_enabled("openclaw", True)
+    service._selected_providers_cache = None
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(service, "_check_tool_available", lambda name: True)
+    monkeypatch.setattr(
+        service, "_build_container_image", lambda image_name, rebuild: True
     )
+
+    def _fake_run_command(cmd, timeout=30, show_output=False):
+        commands.append(cmd)
+        if cmd[:2] == ["docker", "ps"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(service, "_run_command", _fake_run_command)
+
+    exit_code = service.run_provider_update(
+        "openclaw", "/usr/local/bin/cuti-install-openclaw"
+    )
+
+    assert exit_code == 0
+    docker_run = next(cmd for cmd in commands if cmd[:2] == ["docker", "run"])
+    assert f"{tmp_path / '.openclaw'}:/home/cuti/.openclaw:rw" in docker_run
+    assert (
+        f"{tmp_path / '.cuti' / 'provider-runtimes'}:/home/cuti/.cuti-providers:rw"
+        in docker_run
+    )
+    assert "export OPENCLAW_STATE_DIR=/home/cuti/.openclaw" in docker_run[-1]
+    assert "export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json" in docker_run[-1]
+    assert "export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_run[-1]
+    assert "/usr/local/bin/cuti-install-openclaw" in docker_run[-1]
+    assert "openclaw doctor --non-interactive" in docker_run[-1]
 
 
 def test_build_container_image_places_no_cache_before_context(

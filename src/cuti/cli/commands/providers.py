@@ -31,37 +31,67 @@ def _setup_state_label(status: ProviderHostStatus) -> str:
     return "needs setup"
 
 
-def _print_provider_panel(status: ProviderHostStatus) -> None:
+def _provider_label(status: ProviderHostStatus) -> str:
+    label = f"{status.title} ({status.provider})"
+    if status.experimental:
+        return f"{label} [experimental]"
+    return label
+
+
+def _selection_label(status: ProviderHostStatus) -> str:
     enabled_label = "enabled" if status.enabled else "disabled"
     if not status.explicit:
         enabled_label = f"{enabled_label} (default)"
+    if status.experimental:
+        enabled_label = f"{enabled_label}; experimental"
+    return enabled_label
 
+
+def _print_provider_panel(status: ProviderHostStatus) -> None:
     state_paths = "\n".join(f"  - {path}" for path in status.state_paths) or "  - none"
-    existing_paths = "\n".join(f"  - {path}" for path in status.existing_state_paths) or "  - none detected"
+    existing_paths = (
+        "\n".join(f"  - {path}" for path in status.existing_state_paths)
+        or "  - none detected"
+    )
 
     lines = [
-        f"[bold]selection:[/bold] {enabled_label}",
+        f"[bold]selection:[/bold] {_selection_label(status)}",
         f"[bold]setup state:[/bold] {_setup_state_label(status)}",
         f"[bold]detail:[/bold] {status.detail}",
+        f"[bold]release track:[/bold] {'experimental' if status.experimental else 'standard'}",
         f"[bold]container command:[/bold] {', '.join(status.commands) or '(none)'}",
         f"[bold]host command:[/bold] {status.host_command_path or 'not installed on host'}",
         f"[bold]setup flow:[/bold] {status.setup_hint or 'n/a'}",
         f"[bold]setup command:[/bold] {status.setup_command or 'n/a'}",
         f"[bold]update flow:[/bold] {status.update_hint or 'n/a'}",
         f"[bold]update command:[/bold] {status.update_command or 'n/a'}",
-        "[bold]state paths:[/bold]",
-        state_paths,
-        "[bold]existing paths:[/bold]",
-        existing_paths,
-        f"[bold]host actions:[/bold] cuti providers auth {status.provider} --login",
-        f"                cuti providers update {status.provider}",
     ]
-    console.print(Panel("\n".join(lines), title=f"{status.title} ({status.provider})", border_style="cyan"))
+    if status.experimental_note:
+        lines.extend(
+            [
+                f"[bold]experimental note:[/bold] {status.experimental_note}",
+            ]
+        )
+    lines.extend(
+        [
+            "[bold]state paths:[/bold]",
+            state_paths,
+            "[bold]existing paths:[/bold]",
+            existing_paths,
+            f"[bold]host actions:[/bold] cuti providers auth {status.provider} --login",
+            f"                cuti providers update {status.provider}",
+        ]
+    )
+    console.print(
+        Panel("\n".join(lines), title=_provider_label(status), border_style="cyan")
+    )
 
 
 @app.command("list")
 def list_providers(
-    enabled_only: bool = typer.Option(False, "--enabled-only", help="Show only enabled providers"),
+    enabled_only: bool = typer.Option(
+        False, "--enabled-only", help="Show only enabled providers"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON"),
 ) -> None:
     """List known providers with host-side setup status."""
@@ -74,18 +104,17 @@ def list_providers(
 
     table = Table(title="Agent Providers", show_header=True)
     table.add_column("Provider", style="cyan")
+    table.add_column("Track", style="magenta")
     table.add_column("Selected", style="green")
     table.add_column("Setup", style="yellow")
     table.add_column("Host CLI", style="dim")
     table.add_column("Summary")
 
     for status in statuses:
-        selected = "enabled" if status.enabled else "disabled"
-        if not status.explicit:
-            selected = f"{selected} (default)"
         table.add_row(
-            f"{status.title} ({status.provider})",
-            selected,
+            _provider_label(status),
+            "experimental" if status.experimental else "standard",
+            _selection_label(status),
             _setup_state_label(status),
             status.host_command_path or "container-managed",
             status.detail,
@@ -101,8 +130,12 @@ def enable(name: str = typer.Argument(..., callback=_validate_provider)) -> None
 
     manager = ProviderManager()
     canonical = manager.get_metadata(name).name
+    meta = manager.get_metadata(canonical)
     manager.set_enabled(canonical, True)
-    console.print(f"[green]Provider '{canonical}' enabled.[/green]")
+    message = f"Provider '{canonical}' enabled."
+    if meta.experimental:
+        message = f"{message} This integration is experimental."
+    console.print(f"[green]{message}[/green]")
 
 
 @app.command()
@@ -132,7 +165,9 @@ def status(
 
 @app.command()
 def doctor(
-    enabled_only: bool = typer.Option(False, "--enabled-only", help="Check only enabled providers"),
+    enabled_only: bool = typer.Option(
+        False, "--enabled-only", help="Check only enabled providers"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON"),
 ) -> None:
     """Run a host-side provider readiness check."""
@@ -161,14 +196,22 @@ def doctor(
         )
 
     console.print(table)
-    console.print("[dim]Run `cuti providers status <provider>` for path and setup details.[/dim]")
+    console.print(
+        "[dim]Run `cuti providers status <provider>` for path and setup details.[/dim]"
+    )
 
 
 @app.command()
 def auth(
     name: str = typer.Argument("claude", callback=_validate_provider),
-    login: bool = typer.Option(False, "--login", help="Run the provider's interactive setup flow inside the container"),
-    rebuild: bool = typer.Option(False, "--rebuild", help="Rebuild the container image first"),
+    login: bool = typer.Option(
+        False,
+        "--login",
+        help="Run the provider's interactive setup flow inside the container",
+    ),
+    rebuild: bool = typer.Option(
+        False, "--rebuild", help="Rebuild the container image first"
+    ),
 ) -> None:
     """Show or run provider authentication/onboarding from the host."""
 
@@ -176,12 +219,16 @@ def auth(
     provider_status = service.get_status(name)
     _print_provider_panel(provider_status)
     if not login:
-        console.print(f"[dim]Run `cuti providers auth {provider_status.provider} --login` to start setup inside the container.[/dim]")
+        console.print(
+            f"[dim]Run `cuti providers auth {provider_status.provider} --login` to start setup inside the container.[/dim]"
+        )
         return
 
     changed = service.ensure_enabled(provider_status.provider)
     if changed:
-        console.print(f"[yellow]Enabled provider '{provider_status.provider}' for this setup flow.[/yellow]")
+        console.print(
+            f"[yellow]Enabled provider '{provider_status.provider}' for this setup flow.[/yellow]"
+        )
 
     exit_code = service.run_setup(provider_status.provider, rebuild=rebuild)
     if exit_code != 0:
@@ -190,8 +237,12 @@ def auth(
 
 @app.command()
 def update(
-    name: str = typer.Argument(None, help="Provider name (default: all enabled providers)"),
-    rebuild: bool = typer.Option(False, "--rebuild", help="Rebuild the container image first"),
+    name: str = typer.Argument(
+        None, help="Provider name (default: all enabled providers)"
+    ),
+    rebuild: bool = typer.Option(
+        False, "--rebuild", help="Rebuild the container image first"
+    ),
 ) -> None:
     """Update one provider, or all enabled providers, from the host."""
 
@@ -199,9 +250,13 @@ def update(
     if name:
         targets = [_validate_provider(name)]
     else:
-        targets = [status.provider for status in service.list_statuses(enabled_only=True)]
+        targets = [
+            status.provider for status in service.list_statuses(enabled_only=True)
+        ]
         if not targets:
-            console.print("[yellow]No enabled providers selected. Enable one with `cuti providers enable <name>` first.[/yellow]")
+            console.print(
+                "[yellow]No enabled providers selected. Enable one with `cuti providers enable <name>` first.[/yellow]"
+            )
             raise typer.Exit(1)
 
     for provider in targets:
@@ -209,7 +264,9 @@ def update(
         console.print(f"[cyan]Updating {status_info.title} ({provider})...[/cyan]")
         changed = service.ensure_enabled(provider)
         if changed:
-            console.print(f"[yellow]Enabled provider '{provider}' for this update flow.[/yellow]")
+            console.print(
+                f"[yellow]Enabled provider '{provider}' for this update flow.[/yellow]"
+            )
         exit_code = service.run_update(provider, rebuild=rebuild)
         if exit_code != 0:
             raise typer.Exit(exit_code)

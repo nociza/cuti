@@ -1,6 +1,6 @@
 # Dev Container Documentation
 
-The cuti dev container provides a fully configured development environment with cuti, Claude as the default agent provider, and optional provider wiring for additional CLIs such as Codex, OpenCode, OpenClaw, and Hermes Agent.
+The cuti dev container provides a fully configured development environment with cuti, Claude as the default agent provider, and optional provider wiring for additional CLIs such as Codex, OpenCode, OpenClaw, and the experimental Hermes Agent integration.
 
 ## Quick Start
 
@@ -26,6 +26,7 @@ cuti container --command "claude 'Explain this project'"
 - Additional providers can be enabled together with `cuti providers enable ...`
 - Provider-specific auth, config, and skills directories are mounted automatically
 - Provider CLIs are installed through their current standalone/native install paths at container startup
+- Hermes is available as an experimental provider track in cuti
 
 ### 🎯 Smart Container Selection
 - **Universal Container** (`cuti-dev-universal`): Used when running from any project directory
@@ -171,15 +172,19 @@ cuti providers enable opencode
 cuti providers enable openclaw
 cuti providers enable hermes
 cuti providers auth claude --login
+qt-openclaw onboard
+qt-openclaw up
 cuti container --rebuild
 cuti providers update codex
+cuti providers update openclaw
+cuti providers update hermes
 ```
 
 The standard cloud profile exports provider metadata into the container:
 
 - `CUTI_AGENT_PROVIDERS` contains the enabled provider IDs
 - `CUTI_PRIMARY_AGENT_PROVIDER` prefers `claude` when enabled
-- `CODEX_HOME`, `HERMES_HOME`, `XDG_CONFIG_HOME`, and `XDG_DATA_HOME` are set for provider state
+- `CODEX_HOME`, `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`, `OPENCLAW_PREFIX`, `HERMES_HOME`, `XDG_CONFIG_HOME`, and `XDG_DATA_HOME` are set for provider state
 
 Provider-specific mounts are added automatically when the provider is enabled:
 
@@ -192,7 +197,7 @@ Provider-specific mounts are added automatically when the provider is enabled:
 | OpenCode | `~/.opencode/` | `/home/cuti/.opencode` | CLI install and provider state |
 | OpenCode | `~/.config/opencode/` | `/home/cuti/.config/opencode` | Config |
 | OpenCode | `~/.local/share/opencode/` | `/home/cuti/.local/share/opencode` | Data |
-| OpenClaw | `~/.openclaw/` | `/home/cuti/.openclaw` | Runtime state |
+| OpenClaw | `~/.openclaw/` | `/home/cuti/.openclaw` | Gateway config, credentials, agents, plugins, browser, voice-call, logs, media |
 | Hermes Agent | `~/.hermes/` | `/home/cuti/.hermes` | Config, `.env`, memory, skills, sessions, gateway state |
 | Hermes/OpenClaw migration | `~/.openclaw/` | `/home/cuti/.openclaw` | Read-only migration source when Hermes is enabled without OpenClaw |
 | Hermes Claude auth reuse | `~/.claude/` | `/home/cuti/.claude` | Read-only Claude Code credentials for Hermes native Anthropic auth |
@@ -203,15 +208,30 @@ Install behavior is provider-specific:
 - Claude uses the official native installer
 - Codex uses the official standalone installer
 - OpenCode uses the official install script
-- OpenClaw uses its published npm package and wrapper
+- OpenClaw uses the official local-prefix installer when available, falls back to npm prefix install, stores the CLI under `~/.cuti/provider-runtimes/openclaw/`, and runs `openclaw doctor --non-interactive` after install/update/bootstrap
 - Hermes Agent uses the official NousResearch installer with `HERMES_HOME=/home/cuti/.hermes`
+
+OpenClaw-specific notes:
+
+- `qt-openclaw ...` and `qt-OpenClaw ...` run the same dedicated OpenClaw command group from the host.
+- `qt-openclaw onboard` runs `openclaw onboard --install-daemon` in the container, then runs `openclaw doctor --non-interactive`.
+- `qt-openclaw up` runs onboarding if no OpenClaw state is detected, runs doctor, then starts the gateway in the foreground.
+- Channel, browser, plugin, voice-call, and dashboard surfaces are exposed as direct wrappers: `qt-openclaw channels-login`, `qt-openclaw channels ...`, `qt-openclaw browser ...`, `qt-openclaw plugins ...`, `qt-openclaw voice-setup`, `qt-openclaw voicecall ...`, and `qt-openclaw dashboard ...`.
+- Source-backed OpenClaw command families are also exposed directly: setup/config/configure, backup/reset/uninstall, message/agent/agents, status/health/sessions, tasks/flows/cron, models/infer/capability, ACP/MCP, approvals/exec-policy, nodes/devices/node, sandbox, TUI/chat/terminal, DNS/docs/proxy, hooks/webhooks, QR/pairing/directory, security/secrets/skills, update/completion, memory, and wiki.
+- Future plugin command roots remain supported through `qt-openclaw run <command> ...`, which forwards raw arguments to the installed OpenClaw CLI after cuti has enabled the provider and mounted state.
+- Managed OpenClaw state persists under `~/.openclaw`; the CLI/runtime install persists separately under `~/.cuti/provider-runtimes/openclaw`.
+- cuti sets OpenClaw's container environment to the mounted state tree: `OPENCLAW_HOME=/home/cuti`, `OPENCLAW_STATE_DIR=/home/cuti/.openclaw`, `OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json`, `OPENCLAW_OAUTH_DIR=/home/cuti/.openclaw/credentials`, `OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw`, and `PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers`.
+- Containerized browser automation works best with OpenClaw-managed or remote-CDP browser profiles. Attaching to an already signed-in host browser still depends on host-local browser access.
+- Voice-call setup installs/enables the official `@openclaw/voice-call` plugin, but telephony providers still require their own credentials and reachable webhook/tunnel setup.
 
 Hermes-specific notes:
 
-- `cuti providers auth hermes --login` runs `hermes setup`
-- `cuti providers update hermes` refreshes the persisted Hermes install under `~/.hermes/hermes-agent`
+- Hermes is marked experimental in `cuti providers list` / `status`
+- `cuti providers auth hermes --login` runs `hermes setup`, which follows the upstream first-run wizard and can detect OpenClaw state for migration
+- `cuti providers update hermes` follows Hermes' native `hermes update` flow inside the container, so upstream dependency refresh, config checks, and bundled skill sync happen the same way Hermes documents them
 - If `~/.openclaw` exists, run `hermes claw migrate --dry-run` inside the container to preview migration of OpenClaw persona, memory, skills, messaging settings, API keys, and workspace instructions before applying it
 - Hermes project context uses `.hermes.md`, `HERMES.md`, `AGENTS.md`, and `CLAUDE.md`; durable personality belongs in `~/.hermes/SOUL.md`
+- Hermes profiles persist under `~/.hermes/profiles`, and cuti recreates the lightweight `~/.local/bin/<profile>` wrappers on container startup so profile aliases continue to work after container restarts
 
 Host-side provider commands:
 
@@ -220,26 +240,6 @@ Host-side provider commands:
 - `cuti providers doctor` checks readiness across providers
 - `cuti providers auth <provider> --login` launches the provider's interactive setup flow inside the container
 - `cuti providers update <provider>` refreshes that provider in persistent provider runtime storage and updates active cuti cloud containers in place
-
-### 🦞 Legacy Clawdbot Sandbox
-
-`cuti clawdbot ...` remains available, but it is a separate sandboxed runtime profile rather than an agent provider. It keeps its own persistent storage and security policy:
-
-```bash
-cuti clawdbot onboard
-cuti clawdbot gateway --port 18789
-cuti clawdbot channels-login
-cuti clawdbot send --to +15551234567 --message "Hello"
-```
-
-Exposed host mounts:
-
-| Host Path | Container Path | Purpose |
-|-----------|----------------|---------|
-| `~/.cuti/clawdbot/config/` | `/home/cuti/.clawdbot` | Gateway config + channel credentials |
-| `~/.cuti/clawdbot/workspaces/<project-id>/` | `/home/cuti/clawd` | Agent workspace + history for that project |
-
-See [docs/clawdbot.md](clawdbot.md) for the legacy gateway workflow.
 
 ### Docker-in-Docker Usage
 ```bash
@@ -338,7 +338,6 @@ When generating dev containers, cuti automatically detects:
 
 Previous versions had an issue where exiting the container would break the Docker socket connection on macOS with Colima. This has been fixed by:
 - Using `--init` flag for proper signal handling
-- Isolating `cuti clawdbot ...` into a separate sandbox profile that never mounts the Docker socket
 - Installing only Docker CLI (not the full Docker engine)
 - Adding proper signal traps for clean exit
 
@@ -585,7 +584,6 @@ docker exec -it [container-name] bash
 ### Security Considerations
 
 - Containers do **not** run with `--privileged`
-- `cuti clawdbot ...` uses a hardened `clawdbot_sandbox` runtime profile with fail-closed security checks
 - Claude automatically uses `--dangerously-skip-permissions` via alias (see [Claude CLI Configuration](#claude-cli-configuration))
 - Config directories mounted with appropriate permissions
 - No telemetry or external connections

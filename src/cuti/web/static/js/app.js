@@ -148,6 +148,7 @@ function renderProviders(summary) {
                     <div class="badge-row">
                         <span class="badge mono">${escapeHtml(item.provider)}</span>
                         <span class="badge">${item.enabled ? 'selected' : 'available'}</span>
+                        ${item.experimental ? '<span class="badge">experimental</span>' : ''}
                         ${item.host_command_path ? `<span class="badge mono">${escapeHtml(item.host_command_path)}</span>` : ''}
                     </div>
                 </div>

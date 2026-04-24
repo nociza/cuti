@@ -16,6 +16,8 @@ class ProviderMetadata:
     name: str
     title: str
     description: str
+    experimental: bool = False
+    experimental_note: str = ""
     default_enabled: bool = False
     instruction_files: Tuple[str, ...] = ()
     commands: Tuple[str, ...] = ()
@@ -53,23 +55,34 @@ KNOWN_PROVIDERS: Dict[str, ProviderMetadata] = {
         name="openclaw",
         title="OpenClaw",
         description="OpenClaw's personal agent/gateway runtime, with persisted state and workspace prompt files wired into the container.",
-        instruction_files=("AGENTS.md", "SOUL.md", "TOOLS.md"),
+        instruction_files=(
+            "AGENTS.md",
+            "SOUL.md",
+            "TOOLS.md",
+            "IDENTITY.md",
+            "USER.md",
+            "HEARTBEAT.md",
+            "BOOTSTRAP.md",
+            "MEMORY.md",
+        ),
         commands=("openclaw",),
         setup_command="openclaw onboard --install-daemon",
         setup_hint="Run OpenClaw onboarding in the cuti container to initialize credentials, daemon state, and workspace prompts.",
         update_command="/usr/local/bin/cuti-install-openclaw",
-        update_hint="Refresh OpenClaw inside the cuti container from the published npm package.",
+        update_hint="Refresh OpenClaw in cuti's persistent provider runtime, then run OpenClaw doctor checks.",
     ),
     "hermes": ProviderMetadata(
         name="hermes",
         title="Hermes Agent",
-        description="Nous Research's Hermes Agent, with persisted HERMES_HOME state, skills, memory, gateway data, and OpenClaw migration support.",
+        description="Experimental cuti integration for Nous Research's Hermes Agent, with persisted HERMES_HOME state, profile-aware updates, and OpenClaw migration support.",
+        experimental=True,
+        experimental_note="Hermes is still evolving quickly upstream. cuti follows Hermes' native setup and update lifecycle and may adjust as upstream profile and gateway features change.",
         instruction_files=(".hermes.md", "HERMES.md", "AGENTS.md", "CLAUDE.md"),
         commands=("hermes",),
         setup_command="hermes setup",
-        setup_hint="Run the Hermes setup wizard in the cuti container to configure model/provider credentials under ~/.hermes.",
-        update_command="/usr/local/bin/cuti-install-hermes",
-        update_hint="Refresh Hermes Agent inside the cuti container using the official NousResearch installer.",
+        setup_hint="Run the Hermes setup wizard in the cuti container. It can detect OpenClaw state for migration, and `hermes model` remains the upstream path for later provider/model changes.",
+        update_command="/usr/local/bin/cuti-update-hermes",
+        update_hint="Run Hermes' native update flow inside the cuti container. This follows the upstream `hermes update` path: pull code, refresh dependencies, check config, and sync bundled skills across Hermes profiles.",
     ),
     "opencode": ProviderMetadata(
         name="opencode",

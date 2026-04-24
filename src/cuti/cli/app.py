@@ -57,9 +57,9 @@ try:
 except ImportError:
     providers_app = None
 try:
-    from .commands.clawdbot import app as clawdbot_app
+    from .commands.openclaw import app as openclaw_app
 except ImportError:
-    clawdbot_app = None
+    openclaw_app = None
 try:
     from .commands.history import history_app
 except ImportError:
@@ -180,8 +180,8 @@ if claude_app:
     app.add_typer(claude_app, name="claude", help="Manage Claude accounts and API keys")
 if providers_app:
     app.add_typer(providers_app, name="providers", help="Manage provider selection, setup, status, and updates")
-if clawdbot_app:
-    app.add_typer(clawdbot_app, name="clawdbot", help="Run Clawdbot commands inside the dev container")
+if openclaw_app:
+    app.add_typer(openclaw_app, name="openclaw", help="Run OpenClaw inside the Qt container")
 if history_app:
     app.add_typer(history_app, name="history", help="Browse Claude chat history and resume sessions")
 

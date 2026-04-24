@@ -3,18 +3,16 @@ DevContainer Service for cuti
 Automatically generates and manages dev containers for any project with Colima support.
 """
 
-import hashlib
 import json
 import os
 import platform
-import re
 import shlex
 import shutil
 import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 try:
     from rich.console import Console
@@ -32,75 +30,7 @@ class DevContainerService:
 
     IMAGE_NAME = "cuti-dev-universal"
     RUNTIME_PROFILE_CLOUD = "cloud"
-    RUNTIME_PROFILE_CLAWDBOT_SANDBOX = "clawdbot_sandbox"
-    CLAWDBOT_SECCOMP_FILENAME = "kuyuchi-clawdbot-seccomp.json"
-    CLAWDBOT_SECCOMP_DIR = Path.home() / ".cuti" / "seccomp"
     PROVIDER_RUNTIME_CONTAINER_DIR = "/home/cuti/.cuti-providers"
-
-    DEFAULT_CLAWDBOT_SECCOMP_PROFILE: Dict[str, Any] = {
-        "defaultAction": "SCMP_ACT_ALLOW",
-        "architectures": [
-            "SCMP_ARCH_X86_64",
-            "SCMP_ARCH_X86",
-            "SCMP_ARCH_X32",
-            "SCMP_ARCH_AARCH64",
-            "SCMP_ARCH_ARM",
-        ],
-        "syscalls": [
-            {
-                "names": [
-                    "add_key",
-                    "bpf",
-                    "delete_module",
-                    "finit_module",
-                    "init_module",
-                    "kexec_load",
-                    "keyctl",
-                    "open_by_handle_at",
-                    "perf_event_open",
-                    "process_vm_readv",
-                    "process_vm_writev",
-                    "ptrace",
-                    "request_key",
-                    "userfaultfd",
-                ],
-                "action": "SCMP_ACT_ERRNO",
-                "args": [],
-            }
-        ],
-    }
-
-    # Security checklist derived from docs/kuyuchi-threat-model.md
-    RUNTIME_SECURITY_CHECKLIST: Dict[str, Dict[str, Any]] = {
-        RUNTIME_PROFILE_CLAWDBOT_SANDBOX: {
-            "required_flags": [
-                ("--cap-drop", "ALL"),
-                ("--security-opt", "no-new-privileges:true"),
-                ("--pids-limit", "256"),
-                ("--read-only", None),
-            ],
-            "required_tmpfs_prefixes": [
-                "/tmp:",
-                "/run:",
-            ],
-            "required_security_opt_prefixes": [
-                "seccomp=",
-            ],
-            "allowed_mount_targets": {
-                "/workspace",
-                "/home/cuti/.clawdbot",
-                "/home/cuti/clawd",
-            },
-            "forbidden_mount_targets": {
-                "/var/run/docker.sock",
-                "/home/cuti/.cuti-shared",
-                "/home/cuti/.claude-linux",
-                "/home/cuti/.claude-macos",
-            },
-            "forbidden_network_values": {"host"},
-            "require_workspace_mount": True,
-        }
-    }
 
     # Simplified Dockerfile template
     DOCKERFILE_TEMPLATE = '''FROM python:3.11-bullseye
@@ -116,6 +46,9 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \\
         curl ca-certificates git sudo zsh wget build-essential \\
         procps lsb-release locales fontconfig gnupg2 jq \\
         ripgrep fd-find bat ffmpeg \\
+        libnspr4 libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \\
+        libcups2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 \\
+        libxfixes3 libxrandr2 libgbm1 libasound2 libgtk-3-0 \\
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Docker CLI and docker-compose for Docker-in-Docker support
@@ -170,8 +103,8 @@ ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 # Install Node.js and pnpm
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \\
     && apt-get install -y nodejs \\
-    && npm install -g npm@latest \\
-    && npm install -g pnpm@latest \\
+    && corepack enable \\
+    && corepack prepare pnpm@latest --activate \\
     && echo '#!/bin/bash' > /usr/local/bin/npm-original \\
     && echo 'exec /usr/bin/npm "$@"' >> /usr/local/bin/npm-original \\
     && chmod +x /usr/local/bin/npm-original \\
@@ -228,7 +161,23 @@ RUN { \
             '#!/bin/bash' \
             'set -euo pipefail' \
             'export HOME="${HOME:-/home/cuti}"' \
-            '/usr/local/bin/npm-original install -g openclaw@latest "$@"'; \
+            'export OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME}"' \
+            'export OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"' \
+            'export OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-$OPENCLAW_STATE_DIR/openclaw.json}"' \
+            'export OPENCLAW_OAUTH_DIR="${OPENCLAW_OAUTH_DIR:-$OPENCLAW_STATE_DIR/credentials}"' \
+            'export OPENCLAW_PREFIX="${OPENCLAW_PREFIX:-${CUTI_OPENCLAW_INSTALL_PREFIX:-$HOME/.cuti-providers/openclaw}}"' \
+            'export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$OPENCLAW_STATE_DIR/browser/browsers}"' \
+            'mkdir -p "$OPENCLAW_PREFIX" "$OPENCLAW_STATE_DIR" "$OPENCLAW_STATE_DIR/credentials"' \
+            'if curl -fsSL --proto '"'"'=https'"'"' --tlsv1.2 https://openclaw.ai/install-cli.sh | bash -s -- --prefix "$OPENCLAW_PREFIX" --no-onboard "$@"; then' \
+            '    true' \
+            'else' \
+            '    echo "OpenClaw installer failed; falling back to npm prefix install" >&2' \
+            '    /usr/local/bin/npm-original install -g --prefix "$OPENCLAW_PREFIX" openclaw@latest "$@"' \
+            'fi' \
+            'hash -r 2>/dev/null || true' \
+            'if [ -x "$OPENCLAW_PREFIX/bin/openclaw" ]; then' \
+            '    "$OPENCLAW_PREFIX/bin/openclaw" doctor --non-interactive || true' \
+            'fi'; \
     } > /usr/local/bin/cuti-install-openclaw \
     && chmod +x /usr/local/bin/cuti-install-openclaw
 
@@ -242,6 +191,20 @@ RUN { \
             'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup --hermes-home "$HERMES_HOME" --dir "$HERMES_INSTALL_DIR" "$@"'; \
     } > /usr/local/bin/cuti-install-hermes \
     && chmod +x /usr/local/bin/cuti-install-hermes
+
+RUN { \
+        printf '%s\\n' \
+            '#!/bin/bash' \
+            'set -euo pipefail' \
+            'export HOME="${HOME:-/home/cuti}"' \
+            'export HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"' \
+            'export HERMES_INSTALL_DIR="${HERMES_INSTALL_DIR:-$HERMES_HOME/hermes-agent}"' \
+            'if [ -x "$HERMES_INSTALL_DIR/venv/bin/hermes" ] || [ -x "$HOME/.local/bin/hermes" ]; then' \
+            '    exec /usr/local/bin/hermes update "$@"' \
+            'fi' \
+            'exec /usr/local/bin/cuti-install-hermes "$@"'; \
+    } > /usr/local/bin/cuti-update-hermes \
+    && chmod +x /usr/local/bin/cuti-update-hermes
 
 RUN { \
         printf '%s\\n' \
@@ -297,13 +260,26 @@ RUN { \
         printf '%s\\n' \
             '#!/bin/bash' \
             'set -euo pipefail' \
-            'OPENCLAW_PACKAGE_ROOT="$(/usr/local/bin/npm-original root -g 2>/dev/null || true)/openclaw"' \
-            'OPENCLAW_ENTRY="$OPENCLAW_PACKAGE_ROOT/openclaw.mjs"' \
-            'if [ ! -f "$OPENCLAW_ENTRY" ]; then' \
-            '    echo "OpenClaw CLI not found. Enable the openclaw provider or run: /usr/local/bin/cuti-install-openclaw" >&2' \
-            '    exit 1' \
-            'fi' \
-            'exec node "$OPENCLAW_ENTRY" "$@"'; \
+            'export HOME="${HOME:-/home/cuti}"' \
+            'export OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME}"' \
+            'export OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"' \
+            'export OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-$OPENCLAW_STATE_DIR/openclaw.json}"' \
+            'export OPENCLAW_OAUTH_DIR="${OPENCLAW_OAUTH_DIR:-$OPENCLAW_STATE_DIR/credentials}"' \
+            'export OPENCLAW_PREFIX="${OPENCLAW_PREFIX:-${CUTI_OPENCLAW_INSTALL_PREFIX:-$HOME/.cuti-providers/openclaw}}"' \
+            'export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$OPENCLAW_STATE_DIR/browser/browsers}"' \
+            'export PATH="$OPENCLAW_PREFIX/bin:$HOME/.openclaw/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
+            'for OPENCLAW_CLI in "$OPENCLAW_PREFIX/bin/openclaw" "$HOME/.openclaw/bin/openclaw"; do' \
+            '    if [ -x "$OPENCLAW_CLI" ]; then' \
+            '        exec "$OPENCLAW_CLI" "$@"' \
+            '    fi' \
+            'done' \
+            'for OPENCLAW_ENTRY in "$OPENCLAW_PREFIX/lib/node_modules/openclaw/openclaw.mjs" "$OPENCLAW_PREFIX/node_modules/openclaw/openclaw.mjs" "$(/usr/local/bin/npm-original root -g 2>/dev/null || true)/openclaw/openclaw.mjs"; do' \
+            '    if [ -f "$OPENCLAW_ENTRY" ]; then' \
+            '        exec node "$OPENCLAW_ENTRY" "$@"' \
+            '    fi' \
+            'done' \
+            'echo "OpenClaw CLI not found. Enable the openclaw provider or run: /usr/local/bin/cuti-install-openclaw" >&2' \
+            'exit 1'; \
     } > /usr/local/bin/openclaw \
     && chmod +x /usr/local/bin/openclaw
 
@@ -332,14 +308,14 @@ USER $USERNAME
 
 # Install uv for the non-root user
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.local/bin:${PATH}"
+ENV PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.local/bin:${PATH}"
 
 # Install Claude Code via the native installer
 RUN HOME=/home/cuti /usr/local/bin/cuti-install-claude
 
 # Install oh-my-zsh with simple configuration
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
-    && echo 'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
+    && echo 'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
     && echo 'export PYTHONPATH="/workspace/src:$PYTHONPATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
@@ -348,6 +324,12 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'export CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin' >> ~/.zshrc \\
     && echo 'export HERMES_HOME=/home/cuti/.hermes' >> ~/.zshrc \\
     && echo 'export HERMES_INSTALL_DIR=/home/cuti/.hermes/hermes-agent' >> ~/.zshrc \\
+    && echo 'export OPENCLAW_HOME=/home/cuti' >> ~/.zshrc \\
+    && echo 'export OPENCLAW_STATE_DIR=/home/cuti/.openclaw' >> ~/.zshrc \\
+    && echo 'export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json' >> ~/.zshrc \\
+    && echo 'export OPENCLAW_OAUTH_DIR=/home/cuti/.openclaw/credentials' >> ~/.zshrc \\
+    && echo 'export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw' >> ~/.zshrc \\
+    && echo 'export PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers' >> ~/.zshrc \\
     && echo 'export XDG_CONFIG_HOME=/home/cuti/.config' >> ~/.zshrc \\
     && echo 'export XDG_DATA_HOME=/home/cuti/.local/share' >> ~/.zshrc \\
     && echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.zshrc \\
@@ -461,50 +443,6 @@ CMD ["/bin/zsh", "-l"]
             return "claude"
         return providers[0]
 
-    def _clawdbot_workspace_slug(self) -> str:
-        """Return a stable slug for the current project to scope Clawdbot history."""
-
-        resolved = self.working_dir.resolve()
-        digest = hashlib.sha1(str(resolved).encode("utf-8")).hexdigest()[:8]
-        base_name = resolved.name or "workspace"
-        sanitized = re.sub(r"[^a-zA-Z0-9_-]", "-", base_name).strip("-") or "workspace"
-        return f"{sanitized}-{digest}"
-
-    def _prepare_clawdbot_storage(self) -> Tuple[Path, Path]:
-        """Ensure Clawdbot config/workspace live under ~/.cuti/clawdbot."""
-
-        root = Path.home() / ".cuti" / "clawdbot"
-        root.mkdir(parents=True, exist_ok=True)
-
-        config_dir = root / "config"
-        workspaces_root = root / "workspaces"
-        workspaces_root.mkdir(parents=True, exist_ok=True)
-        workspace_dir = workspaces_root / self._clawdbot_workspace_slug()
-
-        self._migrate_legacy_dir(
-            Path.home() / ".clawdbot", config_dir, "Clawdbot config"
-        )
-        self._migrate_legacy_dir(
-            Path.home() / "clawd", workspace_dir, "Clawdbot workspace"
-        )
-
-        config_dir.mkdir(parents=True, exist_ok=True)
-        workspace_dir.mkdir(parents=True, exist_ok=True)
-
-        return config_dir, workspace_dir
-
-    def _migrate_legacy_dir(
-        self, legacy_path: Path, new_path: Path, label: str
-    ) -> None:
-        """Move/copy legacy directories into the new ~/.cuti hierarchy."""
-
-        try:
-            if legacy_path.exists() and not new_path.exists():
-                shutil.move(str(legacy_path), str(new_path))
-                print(f"🔁 Migrated legacy {label} to {new_path}")
-        except Exception as exc:
-            print(f"⚠️  Could not migrate {label}: {exc}")
-
     def _prepare_agents_storage(self) -> Path:
         """Ensure shared AGENTS-based personal skill storage exists."""
 
@@ -536,8 +474,38 @@ CMD ["/bin/zsh", "-l"]
         """Ensure OpenClaw state storage exists on the host."""
 
         openclaw_dir = Path.home() / ".openclaw"
-        openclaw_dir.mkdir(parents=True, exist_ok=True)
-        (openclaw_dir / "credentials").mkdir(parents=True, exist_ok=True)
+        for relative in [
+            "",
+            "agents/main/agent",
+            "agents/main/sessions",
+            "backups",
+            "browser",
+            "browser/browsers",
+            "cache",
+            "cron",
+            "credentials",
+            "devices",
+            "directory",
+            "extensions",
+            "flows",
+            "hooks",
+            "logs",
+            "mcp",
+            "media",
+            "memory",
+            "nodes",
+            "pairing",
+            "plugins",
+            "sandbox",
+            "secrets",
+            "settings",
+            "skills",
+            "tasks",
+            "voice-calls",
+            "webhooks",
+            "wiki",
+        ]:
+            (openclaw_dir / relative).mkdir(parents=True, exist_ok=True)
         return openclaw_dir
 
     def _prepare_hermes_storage(self) -> Path:
@@ -550,6 +518,7 @@ CMD ["/bin/zsh", "-l"]
             "sessions",
             "logs",
             "memories",
+            "profiles",
             "skills",
             "pairing",
             "hooks",
@@ -615,6 +584,7 @@ CMD ["/bin/zsh", "-l"]
         return [
             f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/claude/.local/bin",
             f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/codex/bin",
+            f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/openclaw/bin",
         ]
 
     def _container_path_value(self) -> str:
@@ -1127,158 +1097,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         else:
             return "general"
 
-    @staticmethod
-    def _extract_mount_target(volume_spec: str) -> Optional[str]:
-        """Extract target path from a docker -v/--volume spec."""
-        parts = volume_spec.split(":")
-        if len(parts) < 2:
-            return None
-        return parts[1]
-
-    def _collect_mount_targets(self, docker_args: List[str]) -> Set[str]:
-        """Collect all bind mount targets from docker args."""
-        targets: Set[str] = set()
-        for idx, arg in enumerate(docker_args):
-            if arg in ("-v", "--volume") and idx + 1 < len(docker_args):
-                target = self._extract_mount_target(docker_args[idx + 1])
-                if target:
-                    targets.add(target)
-        return targets
-
-    @staticmethod
-    def _remove_flag_value_pair(args: List[str], flag: str, value: str) -> List[str]:
-        """Return args with the first matching flag/value pair removed."""
-        new_args = list(args)
-        for idx in range(len(new_args) - 1):
-            if new_args[idx] == flag and new_args[idx + 1] == value:
-                del new_args[idx : idx + 2]
-                break
-        return new_args
-
-    @staticmethod
-    def _flag_has_value(docker_args: List[str], flag: str, expected: str) -> bool:
-        """Return True if docker args contain a flag with the expected value."""
-        for idx, arg in enumerate(docker_args[:-1]):
-            if arg == flag and docker_args[idx + 1] == expected:
-                return True
-        return False
-
-    @staticmethod
-    def _security_opt_values(docker_args: List[str]) -> List[str]:
-        """Return all --security-opt values in docker args."""
-        values: List[str] = []
-        for idx, arg in enumerate(docker_args[:-1]):
-            if arg == "--security-opt":
-                values.append(docker_args[idx + 1])
-        return values
-
-    def _repository_seccomp_profile_path(self) -> Optional[Path]:
-        """Locate repository seccomp profile when available."""
-        try:
-            repo_root = Path(__file__).resolve().parents[3]
-        except IndexError:
-            return None
-
-        candidate = repo_root / "docker" / "seccomp" / self.CLAWDBOT_SECCOMP_FILENAME
-        if candidate.exists():
-            return candidate
-        return None
-
-    def _ensure_clawdbot_seccomp_profile(self) -> Optional[Path]:
-        """Ensure the clawdbot seccomp profile exists and return an absolute host path."""
-        override = os.environ.get("CUTI_CLAWDBOT_SECCOMP_PROFILE")
-        if override:
-            override_path = Path(override).expanduser().resolve()
-            if override_path.exists():
-                return override_path
-            print(f"❌ CUTI_CLAWDBOT_SECCOMP_PROFILE does not exist: {override_path}")
-            return None
-
-        self.CLAWDBOT_SECCOMP_DIR.mkdir(parents=True, exist_ok=True)
-        target_path = (
-            self.CLAWDBOT_SECCOMP_DIR / self.CLAWDBOT_SECCOMP_FILENAME
-        ).resolve()
-
-        source_path = self._repository_seccomp_profile_path()
-        if source_path:
-            content = source_path.read_text(encoding="utf-8")
-        else:
-            content = json.dumps(self.DEFAULT_CLAWDBOT_SECCOMP_PROFILE, indent=2) + "\n"
-
-        if (
-            not target_path.exists()
-            or target_path.read_text(encoding="utf-8") != content
-        ):
-            target_path.write_text(content, encoding="utf-8")
-
-        return target_path
-
-    def _validate_runtime_profile_args(
-        self, runtime_profile: str, docker_args: List[str]
-    ) -> List[str]:
-        """Validate runtime args against the profile security checklist."""
-        checklist = self.RUNTIME_SECURITY_CHECKLIST.get(runtime_profile)
-        if not checklist:
-            return []
-
-        errors: List[str] = []
-        mount_targets = self._collect_mount_targets(docker_args)
-
-        required_flags = checklist.get("required_flags", [])
-        for flag, expected in required_flags:
-            if expected is None:
-                if flag not in docker_args:
-                    errors.append(f"missing required flag '{flag}'")
-                continue
-            if not self._flag_has_value(docker_args, flag, expected):
-                errors.append(f"missing required flag/value '{flag} {expected}'")
-
-        required_tmpfs_prefixes = checklist.get("required_tmpfs_prefixes", [])
-        tmpfs_values = []
-        for idx, arg in enumerate(docker_args[:-1]):
-            if arg == "--tmpfs":
-                tmpfs_values.append(docker_args[idx + 1])
-        for prefix in required_tmpfs_prefixes:
-            if not any(value.startswith(prefix) for value in tmpfs_values):
-                errors.append(f"missing required tmpfs mount with prefix '{prefix}'")
-
-        required_security_opt_prefixes = checklist.get(
-            "required_security_opt_prefixes", []
-        )
-        security_opt_values = self._security_opt_values(docker_args)
-        for prefix in required_security_opt_prefixes:
-            if not any(value.startswith(prefix) for value in security_opt_values):
-                errors.append(
-                    f"missing required --security-opt value with prefix '{prefix}'"
-                )
-
-        forbidden_network_values = checklist.get("forbidden_network_values", set())
-        for idx, arg in enumerate(docker_args[:-1]):
-            if arg == "--network" and docker_args[idx + 1] in forbidden_network_values:
-                errors.append(f"forbidden network mode '{docker_args[idx + 1]}'")
-
-        forbidden_targets = checklist.get("forbidden_mount_targets", set())
-        for target in sorted(mount_targets):
-            if target in forbidden_targets:
-                errors.append(f"forbidden mount target '{target}'")
-
-        allowed_targets = checklist.get("allowed_mount_targets")
-        if allowed_targets is not None:
-            allowed = set(allowed_targets)
-            for target in sorted(mount_targets):
-                if target not in allowed:
-                    errors.append(
-                        f"mount target '{target}' is not allowed for profile '{runtime_profile}'"
-                    )
-
-        if (
-            checklist.get("require_workspace_mount", False)
-            and "/workspace" not in mount_targets
-        ):
-            errors.append("missing required workspace mount '/workspace'")
-
-        return errors
-
     def _provider_update_shell_command(
         self,
         provider: str,
@@ -1291,14 +1109,12 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         provider_runtime_dir = self.PROVIDER_RUNTIME_CONTAINER_DIR
         path_value = self._container_path_value()
         shell_update_command = update_command
-        if provider == "openclaw" and not update_command.lstrip().startswith("sudo "):
-            shell_update_command = f"sudo {update_command}"
         fallback_update_commands = {
             "claude": "curl -fsSL https://claude.ai/install.sh | bash",
             "codex": "curl -fsSL https://github.com/openai/codex/releases/latest/download/install.sh | sh",
             "opencode": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
-            "openclaw": "sudo /usr/local/bin/npm-original install -g openclaw@latest",
-            "hermes": "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup --hermes-home /home/cuti/.hermes --dir /home/cuti/.hermes/hermes-agent",
+            "openclaw": f"/usr/local/bin/npm-original install -g --prefix {provider_runtime_dir}/openclaw openclaw@latest",
+            "hermes": 'if command -v hermes >/dev/null 2>&1; then hermes update; else curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup --hermes-home /home/cuti/.hermes --dir /home/cuti/.hermes/hermes-agent; fi',
         }
 
         lines = [
@@ -1360,7 +1176,10 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             lines.extend(
                 [
                     "export HOME=/home/cuti",
-                    "mkdir -p /home/cuti/.openclaw /home/cuti/.agents/skills 2>/dev/null || true",
+                    "export OPENCLAW_STATE_DIR=/home/cuti/.openclaw",
+                    "export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json",
+                    f"export OPENCLAW_PREFIX={provider_runtime_dir}/openclaw",
+                    "mkdir -p /home/cuti/.openclaw/agents/main/agent /home/cuti/.openclaw/agents/main/sessions /home/cuti/.openclaw/browser /home/cuti/.openclaw/credentials /home/cuti/.openclaw/hooks /home/cuti/.openclaw/logs /home/cuti/.openclaw/media /home/cuti/.openclaw/plugins /home/cuti/.openclaw/settings /home/cuti/.openclaw/tasks /home/cuti/.openclaw/voice-calls /home/cuti/.agents/skills /home/cuti/.cuti-providers/openclaw 2>/dev/null || true",
                 ]
             )
         elif provider == "hermes":
@@ -1369,7 +1188,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                     "export HOME=/home/cuti",
                     "export HERMES_HOME=/home/cuti/.hermes",
                     "export HERMES_INSTALL_DIR=/home/cuti/.hermes/hermes-agent",
-                    "mkdir -p /home/cuti/.hermes/cron /home/cuti/.hermes/sessions /home/cuti/.hermes/logs /home/cuti/.hermes/memories /home/cuti/.hermes/skills /home/cuti/.hermes/pairing /home/cuti/.hermes/hooks /home/cuti/.hermes/image_cache /home/cuti/.hermes/audio_cache /home/cuti/.hermes/whatsapp/session /home/cuti/.agents/skills 2>/dev/null || true",
+                    "mkdir -p /home/cuti/.hermes/cron /home/cuti/.hermes/sessions /home/cuti/.hermes/logs /home/cuti/.hermes/memories /home/cuti/.hermes/profiles /home/cuti/.hermes/skills /home/cuti/.hermes/pairing /home/cuti/.hermes/hooks /home/cuti/.hermes/image_cache /home/cuti/.hermes/audio_cache /home/cuti/.hermes/whatsapp/session /home/cuti/.agents/skills 2>/dev/null || true",
                     "touch /home/cuti/.hermes/.env 2>/dev/null || true",
                 ]
             )
@@ -1377,7 +1196,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             lines.append("export HOME=/home/cuti")
 
         if (
-            update_command.startswith("/usr/local/bin/cuti-install-")
+            update_command.startswith("/usr/local/bin/cuti-")
             and provider in fallback_update_commands
         ):
             installer_path = shlex.quote(update_command)
@@ -1406,6 +1225,13 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 [
                     f"if command -v {command} >/dev/null 2>&1; then",
                     f"    {command} --version || true",
+                    *(
+                        [
+                            "    openclaw doctor --non-interactive || true",
+                        ]
+                        if provider == "openclaw"
+                        else []
+                    ),
                     "fi",
                 ]
             )
@@ -1584,7 +1410,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         *,
         mount_docker_socket: bool = True,
         runtime_profile: str = RUNTIME_PROFILE_CLOUD,
-        published_ports: Optional[List[int]] = None,
     ) -> int:
         """Run command in dev container.
 
@@ -1593,23 +1418,10 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             rebuild: Force rebuild of the container image
             interactive: Run in interactive mode with TTY
             mount_docker_socket: Whether to mount host docker socket
-            runtime_profile: Runtime profile (`cloud` or `clawdbot_sandbox`)
-            published_ports: Host/container ports to publish (same port number)
+            runtime_profile: Runtime profile (`cloud`)
         """
-        if runtime_profile not in {
-            self.RUNTIME_PROFILE_CLOUD,
-            self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX,
-        }:
+        if runtime_profile != self.RUNTIME_PROFILE_CLOUD:
             print(f"❌ Unknown runtime profile: {runtime_profile}")
-            return 1
-
-        if (
-            runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX
-            and mount_docker_socket
-        ):
-            print(
-                "❌ Security policy violation: clawdbot sandbox profile cannot mount docker socket"
-            )
             return 1
 
         # Ensure Docker is available
@@ -1659,185 +1471,84 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 mount_options = "rw,cached"  # Docker Desktop on macOS needs cached mode
 
         primary_provider = self._primary_provider()
-        _linux_claude_dir: Optional[Path] = None
-        provider_mount_args: List[str] = []
-        if runtime_profile == self.RUNTIME_PROFILE_CLOUD:
-            _linux_claude_dir, provider_mount_args = (
-                self._prepare_cloud_provider_mounts()
-            )
-
-        clawdbot_enabled = False
-        clawdbot_config_subpath: Optional[str] = None
-        clawdbot_workspace_subpath: Optional[str] = None
-        clawdbot_config_dir: Optional[Path] = None
-        clawdbot_workspace_dir: Optional[Path] = None
-        if runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX:
-            clawdbot_enabled = True
-            # Ensure host-side config/workspace directories exist
-            clawdbot_config_dir, clawdbot_workspace_dir = (
-                self._prepare_clawdbot_storage()
-            )
-            cuti_root = Path.home() / ".cuti"
-            try:
-                clawdbot_config_subpath = str(
-                    clawdbot_config_dir.relative_to(cuti_root)
-                )
-                clawdbot_workspace_subpath = str(
-                    clawdbot_workspace_dir.relative_to(cuti_root)
-                )
-            except ValueError:
-                clawdbot_config_subpath = clawdbot_workspace_subpath = None
-
-        if runtime_profile == self.RUNTIME_PROFILE_CLOUD:
-            docker_args = [
-                "docker",
-                "run",
-                "--rm",
-                "--init",
-                "-v",
-                f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
-                "-v",
-                f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
-                "--label",
-                f"cuti.runtime_profile={runtime_profile}",
-                "--label",
-                f"cuti.workspace={current_dir}",
-                "-w",
-                "/workspace",
-                "--env",
-                "CUTI_IN_CONTAINER=true",
-                "--env",
-                f"CUTI_RUNTIME_PROFILE={runtime_profile}",
-                # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
-                "--env",
-                "IS_SANDBOX=1",
-                "--env",
-                "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
-                # Don't set CLAUDE_CONFIG_DIR here - let the init script decide based on writability
-                "--env",
-                "PYTHONUNBUFFERED=1",
-                "--env",
-                "PYTHONPATH=/workspace/src",
-                "--env",
-                "TERM=xterm-256color",
-                "--env",
-                f"PATH={self._container_path_value()}",
-                "--env",
-                "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
-                "--env",
-                "CODEX_HOME=/home/cuti/.codex",
-                "--env",
-                f"CODEX_INSTALL_DIR={self.PROVIDER_RUNTIME_CONTAINER_DIR}/codex/bin",
-                "--env",
-                "HERMES_HOME=/home/cuti/.hermes",
-                "--env",
-                "HERMES_INSTALL_DIR=/home/cuti/.hermes/hermes-agent",
-                "--env",
-                "XDG_CONFIG_HOME=/home/cuti/.config",
-                "--env",
-                "XDG_DATA_HOME=/home/cuti/.local/share",
-                "--env",
-                f"CUTI_AGENT_PROVIDERS={self._selected_providers_env_value()}",
-                "--env",
-                f"CUTI_PRIMARY_AGENT_PROVIDER={primary_provider or ''}",
-                "--network",
-                "host",
-            ]
-            docker_args.extend(provider_mount_args)
-
-            if mount_docker_socket:
-                docker_args.extend(
-                    [
-                        "-v",
-                        "/var/run/docker.sock:/var/run/docker.sock",  # Allow Docker-in-Docker when explicitly requested
-                    ]
-                )
-
-            if clawdbot_config_subpath and clawdbot_workspace_subpath:
-                docker_args.extend(
-                    [
-                        "--env",
-                        f"CUTI_CLAWDBOT_CONFIG_SUBPATH={clawdbot_config_subpath}",
-                        "--env",
-                        f"CUTI_CLAWDBOT_WORKSPACE_SUBPATH={clawdbot_workspace_subpath}",
-                    ]
-                )
-        else:
-            # Hardened clawdbot sandbox runtime: workspace + explicit clawdbot mounts only.
-            if not clawdbot_config_dir or not clawdbot_workspace_dir:
-                print("❌ Failed to initialize Clawdbot config/workspace directories")
-                return 1
-
-            seccomp_profile_path = self._ensure_clawdbot_seccomp_profile()
-            if not seccomp_profile_path:
-                print("❌ Failed to prepare clawdbot seccomp profile")
-                return 1
-
-            docker_args = [
-                "docker",
-                "run",
-                "--rm",
-                "--init",
-                "-v",
-                f"{current_dir}:/workspace:{mount_options}",
-                "-v",
-                f"{clawdbot_config_dir}:/home/cuti/.clawdbot:rw",
-                "-v",
-                f"{clawdbot_workspace_dir}:/home/cuti/clawd:rw",
-                "--label",
-                f"cuti.runtime_profile={runtime_profile}",
-                "--label",
-                f"cuti.workspace={current_dir}",
-                "--label",
-                "cuti.mode=clawdbot",
-                "-w",
-                "/workspace",
-                "--env",
-                "CUTI_IN_CONTAINER=true",
-                "--env",
-                f"CUTI_RUNTIME_PROFILE={runtime_profile}",
-                "--env",
-                "CUTI_ENABLE_CLAWDBOT_ADDON=true",
-                "--env",
-                "IS_SANDBOX=1",
-                "--env",
-                "PYTHONUNBUFFERED=1",
-                "--env",
-                "TERM=xterm-256color",
-                "--env",
-                "PATH=/home/cuti/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
-                "--env",
-                "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
-                "--cap-drop",
-                "ALL",
-                "--security-opt",
-                "no-new-privileges:true",
-                "--security-opt",
-                f"seccomp={seccomp_profile_path}",
-                "--pids-limit",
-                "256",
-                "--read-only",
-                "--tmpfs",
-                "/tmp:rw,noexec,nosuid,nodev",
-                "--tmpfs",
-                "/run:rw,nosuid,nodev",
-            ]
-
-            unique_ports = sorted(set(published_ports or []))
-            for port in unique_ports:
-                docker_args.extend(["-p", f"127.0.0.1:{port}:{port}"])
-
-        security_errors = self._validate_runtime_profile_args(
-            runtime_profile, docker_args
+        _linux_claude_dir, provider_mount_args = (
+            self._prepare_cloud_provider_mounts()
         )
-        if security_errors:
-            print(
-                f"❌ Runtime security policy validation failed for profile '{runtime_profile}'."
+        docker_args = [
+            "docker",
+            "run",
+            "--rm",
+            "--init",
+            "-v",
+            f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
+            "-v",
+            f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
+            "--label",
+            f"cuti.runtime_profile={runtime_profile}",
+            "--label",
+            f"cuti.workspace={current_dir}",
+            "-w",
+            "/workspace",
+            "--env",
+            "CUTI_IN_CONTAINER=true",
+            "--env",
+            f"CUTI_RUNTIME_PROFILE={runtime_profile}",
+            # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
+            "--env",
+            "IS_SANDBOX=1",
+            "--env",
+            "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
+            # Don't set CLAUDE_CONFIG_DIR here - let the init script decide based on writability
+            "--env",
+            "PYTHONUNBUFFERED=1",
+            "--env",
+            "PYTHONPATH=/workspace/src",
+            "--env",
+            "TERM=xterm-256color",
+            "--env",
+            f"PATH={self._container_path_value()}",
+            "--env",
+            "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
+            "--env",
+            "CODEX_HOME=/home/cuti/.codex",
+            "--env",
+            f"CODEX_INSTALL_DIR={self.PROVIDER_RUNTIME_CONTAINER_DIR}/codex/bin",
+            "--env",
+            "OPENCLAW_HOME=/home/cuti",
+            "--env",
+            "OPENCLAW_STATE_DIR=/home/cuti/.openclaw",
+            "--env",
+            "OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json",
+            "--env",
+            "OPENCLAW_OAUTH_DIR=/home/cuti/.openclaw/credentials",
+            "--env",
+            f"OPENCLAW_PREFIX={self.PROVIDER_RUNTIME_CONTAINER_DIR}/openclaw",
+            "--env",
+            "PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers",
+            "--env",
+            "HERMES_HOME=/home/cuti/.hermes",
+            "--env",
+            "HERMES_INSTALL_DIR=/home/cuti/.hermes/hermes-agent",
+            "--env",
+            "XDG_CONFIG_HOME=/home/cuti/.config",
+            "--env",
+            "XDG_DATA_HOME=/home/cuti/.local/share",
+            "--env",
+            f"CUTI_AGENT_PROVIDERS={self._selected_providers_env_value()}",
+            "--env",
+            f"CUTI_PRIMARY_AGENT_PROVIDER={primary_provider or ''}",
+            "--network",
+            "host",
+        ]
+        docker_args.extend(provider_mount_args)
+
+        if mount_docker_socket:
+            docker_args.extend(
+                [
+                    "-v",
+                    "/var/run/docker.sock:/var/run/docker.sock",  # Allow Docker-in-Docker when explicitly requested
+                ]
             )
-            for error in security_errors:
-                print(f"   - {error}")
-            print("🛑 Refusing to start container (fail-closed).")
-            return 1
 
         docker_args.append(image_name)
 
@@ -1997,14 +1708,63 @@ if cuti_provider_selected opencode; then
 fi
 
 if cuti_provider_selected openclaw; then
-    mkdir -p /home/cuti/.openclaw /home/cuti/.agents/skills
-    OPENCLAW_PACKAGE_ROOT="$(npm-original root -g 2>/dev/null || true)/openclaw"
-    if [ -f "$OPENCLAW_PACKAGE_ROOT/openclaw.mjs" ]; then
+    export OPENCLAW_HOME=/home/cuti
+    export OPENCLAW_STATE_DIR=/home/cuti/.openclaw
+    export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json
+    export OPENCLAW_OAUTH_DIR=/home/cuti/.openclaw/credentials
+    export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw
+    export PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers
+    mkdir -p \
+        /home/cuti/.openclaw/agents/main/agent \
+        /home/cuti/.openclaw/agents/main/sessions \
+        /home/cuti/.openclaw/backups \
+        /home/cuti/.openclaw/browser \
+        /home/cuti/.openclaw/browser/browsers \
+        /home/cuti/.openclaw/cache \
+        /home/cuti/.openclaw/cron \
+        /home/cuti/.openclaw/credentials \
+        /home/cuti/.openclaw/devices \
+        /home/cuti/.openclaw/directory \
+        /home/cuti/.openclaw/extensions \
+        /home/cuti/.openclaw/flows \
+        /home/cuti/.openclaw/hooks \
+        /home/cuti/.openclaw/logs \
+        /home/cuti/.openclaw/mcp \
+        /home/cuti/.openclaw/media \
+        /home/cuti/.openclaw/memory \
+        /home/cuti/.openclaw/nodes \
+        /home/cuti/.openclaw/pairing \
+        /home/cuti/.openclaw/plugins \
+        /home/cuti/.openclaw/sandbox \
+        /home/cuti/.openclaw/secrets \
+        /home/cuti/.openclaw/settings \
+        /home/cuti/.openclaw/skills \
+        /home/cuti/.openclaw/tasks \
+        /home/cuti/.openclaw/voice-calls \
+        /home/cuti/.openclaw/webhooks \
+        /home/cuti/.openclaw/wiki \
+        /home/cuti/.agents/skills \
+        "$OPENCLAW_PREFIX" 2>/dev/null || true
+
+    cuti_openclaw_cli_available() {
+        for OPENCLAW_CLI in "$OPENCLAW_PREFIX/bin/openclaw" /home/cuti/.openclaw/bin/openclaw; do
+            [ -x "$OPENCLAW_CLI" ] && return 0
+        done
+        for OPENCLAW_ENTRY in \
+            "$OPENCLAW_PREFIX/lib/node_modules/openclaw/openclaw.mjs" \
+            "$OPENCLAW_PREFIX/node_modules/openclaw/openclaw.mjs" \
+            "$(/usr/local/bin/npm-original root -g 2>/dev/null || true)/openclaw/openclaw.mjs"; do
+            [ -f "$OPENCLAW_ENTRY" ] && return 0
+        done
+        return 1
+    }
+
+    if cuti_openclaw_cli_available; then
         echo "✅ OpenClaw CLI already installed"
     else
-        echo "🦞 Installing OpenClaw CLI..."
+        echo "🦞 Installing OpenClaw CLI into persistent provider runtime..."
         export HOME=/home/cuti
-        if sudo /usr/local/bin/cuti-install-openclaw > /tmp/openclaw-install.log 2>&1; then
+        if /usr/local/bin/cuti-install-openclaw > /tmp/openclaw-install.log 2>&1; then
             echo "✅ OpenClaw CLI installed"
             hash -r 2>/dev/null || true
         else
@@ -2013,10 +1773,22 @@ if cuti_provider_selected openclaw; then
         fi
     fi
 
+    if [ -L /home/cuti/.openclaw/workspace ] && [ "$(readlink /home/cuti/.openclaw/workspace 2>/dev/null)" != "/workspace" ]; then
+        rm -f /home/cuti/.openclaw/workspace 2>/dev/null || true
+    fi
     if [ ! -e /home/cuti/.openclaw/workspace ]; then
         ln -s /workspace /home/cuti/.openclaw/workspace 2>/dev/null || true
         if [ -L /home/cuti/.openclaw/workspace ]; then
             echo "🔗 OpenClaw workspace bootstrapped to /workspace"
+        fi
+    fi
+
+    if cuti_openclaw_cli_available; then
+        if openclaw doctor --non-interactive > /tmp/openclaw-doctor.log 2>&1; then
+            echo "✅ OpenClaw doctor passed"
+        else
+            echo "⚠️  OpenClaw doctor reported issues"
+            tail -n 20 /tmp/openclaw-doctor.log 2>/dev/null || true
         fi
     fi
 fi
@@ -2027,6 +1799,7 @@ if cuti_provider_selected hermes; then
         /home/cuti/.hermes/sessions \
         /home/cuti/.hermes/logs \
         /home/cuti/.hermes/memories \
+        /home/cuti/.hermes/profiles \
         /home/cuti/.hermes/skills \
         /home/cuti/.hermes/pairing \
         /home/cuti/.hermes/hooks \
@@ -2053,6 +1826,44 @@ if cuti_provider_selected hermes; then
         fi
     fi
 
+    cuti_restore_hermes_profile_wrappers() {
+        local PROFILES_DIR=/home/cuti/.hermes/profiles
+        local WRAPPER_DIR=/home/cuti/.local/bin
+        local RESTORED_COUNT=0
+
+        [ -d "$PROFILES_DIR" ] || return 0
+        mkdir -p "$WRAPPER_DIR" 2>/dev/null || true
+
+        for PROFILE_DIR in "$PROFILES_DIR"/*; do
+            [ -d "$PROFILE_DIR" ] || continue
+
+            local PROFILE_NAME
+            PROFILE_NAME=$(basename "$PROFILE_DIR")
+            case "$PROFILE_NAME" in
+                [a-z0-9][a-z0-9_-]*) ;;
+                *) continue ;;
+            esac
+
+            local WRAPPER_PATH="$WRAPPER_DIR/$PROFILE_NAME"
+            if [ -f "$WRAPPER_PATH" ] && ! grep -q 'exec hermes -p ' "$WRAPPER_PATH" 2>/dev/null; then
+                continue
+            fi
+
+            cat > "$WRAPPER_PATH" <<CUTI_HERMES_PROFILE_EOF
+#!/bin/sh
+exec hermes -p $PROFILE_NAME "\\$@"
+CUTI_HERMES_PROFILE_EOF
+            chmod +x "$WRAPPER_PATH" 2>/dev/null || true
+            RESTORED_COUNT=$((RESTORED_COUNT + 1))
+        done
+
+        if [ "$RESTORED_COUNT" -gt 0 ]; then
+            echo "🔁 Restored $RESTORED_COUNT Hermes profile command wrapper(s)"
+        fi
+    }
+
+    cuti_restore_hermes_profile_wrappers
+
     if [ -d /home/cuti/.openclaw ]; then
         echo "🔁 Hermes OpenClaw migration source available at /home/cuti/.openclaw"
         echo "   Run: hermes claw migrate --dry-run"
@@ -2073,43 +1884,6 @@ if [ -d /home/cuti/.cuti-shared ]; then
         ln -sf /home/cuti/.cuti-shared /home/cuti/.cuti
     fi
     echo "🔗 Global .cuti directory mounted and accessible for account management"
-fi
-
-# Ensure Clawdbot config/workspace point to the host-persistent ~/.cuti storage
-if [ "${CUTI_ENABLE_CLAWDBOT_ADDON:-false}" = "true" ] && [ -d /home/cuti/.cuti ]; then
-    CLAWDBOT_CONFIG_SUBPATH=${CUTI_CLAWDBOT_CONFIG_SUBPATH:-clawdbot/config}
-    CLAWDBOT_WORKSPACE_SUBPATH=${CUTI_CLAWDBOT_WORKSPACE_SUBPATH:-clawdbot/workspace}
-    CLAWDBOT_CONFIG_TARGET=/home/cuti/.cuti/$CLAWDBOT_CONFIG_SUBPATH
-    CLAWDBOT_WORKSPACE_TARGET=/home/cuti/.cuti/$CLAWDBOT_WORKSPACE_SUBPATH
-
-    mkdir -p "$CLAWDBOT_CONFIG_TARGET" "$CLAWDBOT_WORKSPACE_TARGET" 2>/dev/null || true
-    sudo chown -R cuti:cuti "$CLAWDBOT_CONFIG_TARGET" "$CLAWDBOT_WORKSPACE_TARGET" 2>/dev/null || true
-
-    cuti_link_clawdbot_path() {
-        local LINK_PATH="$1"
-        local TARGET_PATH="$2"
-        if [ -e "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ]; then
-            if rm -rf "$LINK_PATH" 2>/dev/null; then
-                :
-            else
-                sudo rm -rf "$LINK_PATH" 2>/dev/null || true
-            fi
-        fi
-
-        ln -sfn "$TARGET_PATH" "$LINK_PATH" 2>/dev/null || \
-            sudo ln -sfn "$TARGET_PATH" "$LINK_PATH" 2>/dev/null || true
-
-        if [ ! -L "$LINK_PATH" ]; then
-            echo "⚠️  Failed to link $LINK_PATH -> $TARGET_PATH (check permissions)"
-            return 1
-        fi
-    }
-
-    cuti_link_clawdbot_path "/home/cuti/.clawdbot" "$CLAWDBOT_CONFIG_TARGET"
-    cuti_link_clawdbot_path "/home/cuti/clawd" "$CLAWDBOT_WORKSPACE_TARGET"
-
-    echo "🔗 Clawdbot config linked to ~/.cuti/$CLAWDBOT_CONFIG_SUBPATH"
-    echo "🔗 Clawdbot workspace linked to ~/.cuti/$CLAWDBOT_WORKSPACE_SUBPATH"
 fi
 
 # Ensure the cuti CLI is available inside the container via `uv tool install`
@@ -2162,7 +1936,7 @@ PY
 ensure_cuti_cli
 
 # Keep runtime-installed CLIs ahead of system paths in the login shell.
-export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 hash -r 2>/dev/null || true
 
 ensure_provider_runtime_shell_path() {
@@ -2178,7 +1952,7 @@ ensure_provider_runtime_shell_path() {
 
 # cuti-provider-runtime-path
 # Keep host-updated provider CLIs ahead of image-local installs in login shells.
-export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 hash -r 2>/dev/null || true
 CUTI_PROVIDER_PATH_EOF
     fi
@@ -2319,39 +2093,6 @@ COMPOSE_EOF
 else
     echo "⚠️  Docker socket not found - Docker commands won't work in container"
 fi
-"""
-
-        if runtime_profile == self.RUNTIME_PROFILE_CLAWDBOT_SANDBOX:
-            init_script = """
-# Set up signal handlers to ensure clean exit
-trap 'echo "Container exiting cleanly..."; exit 0' SIGTERM SIGINT
-
-if [ ! -d /home/cuti/.clawdbot ]; then
-    echo "❌ Clawdbot config mount missing at /home/cuti/.clawdbot"
-    exit 1
-fi
-
-if [ ! -d /home/cuti/clawd ]; then
-    echo "❌ Clawdbot workspace mount missing at /home/cuti/clawd"
-    exit 1
-fi
-
-if ! command -v clawdbot >/dev/null 2>&1; then
-    echo "🦞 Installing legacy Clawdbot CLI for sandbox mode..."
-    if sudo npm-original install -g clawdbot@latest >/tmp/clawdbot-install.log 2>&1; then
-        echo "✅ Clawdbot CLI installed"
-        hash -r 2>/dev/null || true
-    else
-        echo "❌ Failed to install Clawdbot CLI"
-        cat /tmp/clawdbot-install.log
-        exit 1
-    fi
-fi
-
-echo "🔒 Running clawdbot sandbox profile"
-echo "📁 Workspace: /workspace"
-echo "🗂️  Clawdbot config: /home/cuti/.clawdbot"
-echo "🦞 Clawdbot CLI: $(command -v clawdbot)"
 """
 
         # Add interactive flags when needed

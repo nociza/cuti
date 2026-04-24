@@ -16,6 +16,7 @@ def test_known_providers_default_to_claude_only(tmp_path) -> None:
     assert KNOWN_PROVIDERS["codex"].default_enabled is False
     assert KNOWN_PROVIDERS["openclaw"].default_enabled is False
     assert KNOWN_PROVIDERS["hermes"].default_enabled is False
+    assert KNOWN_PROVIDERS["hermes"].experimental is True
     assert KNOWN_PROVIDERS["opencode"].default_enabled is False
 
 
@@ -30,6 +31,11 @@ def test_provider_instruction_files_follow_enabled_selection(tmp_path) -> None:
         "AGENTS.md",
         "SOUL.md",
         "TOOLS.md",
+        "IDENTITY.md",
+        "USER.md",
+        "HEARTBEAT.md",
+        "BOOTSTRAP.md",
+        "MEMORY.md",
     ]
 
 
@@ -50,5 +56,5 @@ def test_hermes_instruction_files_include_project_context_files(tmp_path) -> Non
 def test_unknown_provider_raises_clean_error(tmp_path) -> None:
     manager = ProviderManager(storage_dir=tmp_path)
 
-    with pytest.raises(ValueError, match="Unknown provider 'clawdbot'"):
-        manager.get_metadata("clawdbot")
+    with pytest.raises(ValueError, match="Unknown provider 'unknown-provider'"):
+        manager.get_metadata("unknown-provider")
