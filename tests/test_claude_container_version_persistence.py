@@ -333,7 +333,7 @@ def test_openclaw_container_mode_does_not_expose_default_claude_path(
 
 
 def test_run_provider_update_updates_persistent_runtime_and_active_containers(
-    monkeypatch, tmp_path: Path
+    monkeypatch, capsys, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     service = DevContainerService(tmp_path, provider_storage_dir=tmp_path / ".cuti")
@@ -363,6 +363,13 @@ def test_run_provider_update_updates_persistent_runtime_and_active_containers(
     )
 
     assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Updating claude target 1/2: persistent runtime" in output
+    assert "Updating claude target 2/2: active container 1/1 (abc123)" in output
+    assert (
+        "Updated claude in 2 target(s): persistent runtime and 1 active cuti "
+        "container(s)."
+    ) in output
     docker_run = next(cmd for cmd in commands if cmd[:2] == ["docker", "run"])
     assert (
         f"{tmp_path / '.cuti' / 'provider-runtimes'}:/home/cuti/.cuti-providers:rw"

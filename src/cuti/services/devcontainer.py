@@ -1462,21 +1462,32 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         if not self._build_container_image(self.IMAGE_NAME, rebuild):
             return 1
 
-        print(f"🔄 Updating {provider} for future cuti containers...")
+        active_container_ids = self._running_cloud_cuti_container_ids()
+        total_targets = 1 + len(active_container_ids)
+
+        print(
+            f"🔄 Updating {provider} target 1/{total_targets}: "
+            "persistent runtime for future containers..."
+        )
         exit_code = self._run_provider_update_container(provider, update_command)
         if exit_code != 0:
             print(f"❌ Failed to update {provider} in persistent provider runtime")
             return exit_code
 
-        active_container_ids = self._running_cloud_cuti_container_ids()
         if not active_container_ids:
-            print("✅ No active cuti containers need in-place provider updates")
+            print(
+                f"✅ Updated {provider} target 1/1: persistent runtime. "
+                "No active cuti containers need in-place updates."
+            )
             return 0
 
-        print(
-            f"🔄 Updating {provider} inside {len(active_container_ids)} active cuti container(s)..."
-        )
-        for container_id in active_container_ids:
+        for active_index, container_id in enumerate(active_container_ids, start=1):
+            target_index = active_index + 1
+            print(
+                f"🔄 Updating {provider} target {target_index}/{total_targets}: "
+                f"active container {active_index}/{len(active_container_ids)} "
+                f"({container_id})..."
+            )
             exit_code = self._run_provider_update_in_active_container(
                 container_id,
                 provider,
@@ -1488,7 +1499,11 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 )
                 return exit_code
 
-        print(f"✅ Updated {provider} in persistent runtime and active cuti containers")
+        print(
+            f"✅ Updated {provider} in {total_targets} target(s): "
+            f"persistent runtime and {len(active_container_ids)} active cuti "
+            "container(s)."
+        )
         return 0
 
     def run_in_container(
