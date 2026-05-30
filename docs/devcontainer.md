@@ -1,6 +1,6 @@
 # Dev Container Documentation
 
-The cuti dev container provides a fully configured development environment with cuti, Claude as the default agent provider, and optional provider wiring for additional CLIs such as Codex, OpenCode, OpenClaw, and the experimental Hermes Agent integration.
+The cuti dev container provides a fully configured development environment with cuti, Claude Code mode as the default, and an explicit OpenClaw mode for the OpenClaw runtime plus configured add-ons.
 
 ## Quick Start
 
@@ -9,8 +9,8 @@ The cuti dev container provides a fully configured development environment with 
 cuti container
 
 # Run a specific command in the container
-cuti container --command "cuti web"
-cuti container --command "claude 'Explain this project'"
+cuti container "cuti web"
+cuti container "claude 'Explain this project'"
 ```
 
 ## Key Features
@@ -22,10 +22,12 @@ cuti container --command "claude 'Explain this project'"
 - 📚 [Complete Authentication Guide](claude-container-auth.md)
 
 ### 🤖 Agent Providers
-- Claude is enabled by default
-- Additional providers can be enabled together with `cuti providers enable ...`
+- Claude Code mode is enabled by default for `cuti container`
+- OpenClaw mode is opt-in with `cuti container --openclaw` or `cuti container --claw`
+- OpenClaw mode starts with OpenClaw only; add-ons are read from `cuti providers enable ...`
 - Provider-specific auth, config, and skills directories are mounted automatically
 - Provider CLIs are installed through their current standalone/native install paths at container startup
+- Claude Code mode refreshes Claude Code into the persistent provider runtime on each `cuti container` startup
 - Hermes is available as an experimental provider track in cuti
 
 ### 🎯 Smart Container Selection
@@ -103,34 +105,41 @@ claude --help     # Use Claude CLI (already authenticated)
 ### Non-Interactive Commands
 ```bash
 # Run cuti commands
-cuti container --command "cuti add 'Review this code and suggest improvements'"
-cuti container --command "cuti start"
-cuti container --command "cuti status"
+cuti container "cuti add 'Review this code and suggest improvements'"
+cuti container "cuti start"
+cuti container "cuti status"
 
 # Run Claude directly
-cuti container --command "claude 'What does this project do?'"
+cuti container "claude 'What does this project do?'"
 
-# Enable more providers for the same container profile
+# Add providers to the default Claude Code container mode
 cuti providers enable codex
 cuti providers enable opencode
-cuti providers enable openclaw
 cuti providers enable hermes
 cuti container --rebuild
-cuti container --command "codex --version && opencode --version && openclaw --version && hermes version"
+cuti container "codex --version && opencode --version && hermes version"
+
+# Start OpenClaw mode explicitly
+cuti container --openclaw
+
+# OpenClaw add-ons come from explicit provider config
+cuti providers enable claude
+cuti providers enable codex
+cuti container --openclaw "openclaw --version && claude --version && codex --version"
 
 # Run Python scripts
-cuti container --command "python script.py"
+cuti container "python script.py"
 ```
 
 ### Ops Console
 ```bash
 # Start the read-only ops console in container (accessible from host)
-cuti container --command "cuti web"
+cuti container "cuti web"
 # Then open http://localhost:8000 in your browser
 
 # Run development servers
-cuti container --command "npm run dev"
-cuti container --command "python manage.py runserver"
+cuti container "npm run dev"
+cuti container "python manage.py runserver"
 ```
 
 ### Claude CLI Configuration
@@ -162,19 +171,28 @@ cuti container --rebuild
 
 ### 🤖 Agent Providers
 
-Claude remains the default CLI in the standard cloud container profile. Additional providers are opt-in and can be enabled together:
+Claude Code mode is the default for `cuti container`. OpenClaw mode is explicit and does not join the default container just because OpenClaw has been enabled in provider config:
 
 ```bash
 cuti providers list
 cuti providers doctor
+
+# Default Claude Code mode. Claude Code is refreshed for subsequent containers.
+cuti container
+
+# Explicit OpenClaw mode.
+cuti container --openclaw
+
+# OpenClaw mode add-ons.
+cuti providers enable claude
 cuti providers enable codex
 cuti providers enable opencode
-cuti providers enable openclaw
 cuti providers enable hermes
+cuti container --openclaw
+
 cuti providers auth claude --login
 qt-openclaw onboard
 qt-openclaw up
-cuti container --rebuild
 cuti providers update codex
 cuti providers update openclaw
 cuti providers update hermes
@@ -182,8 +200,9 @@ cuti providers update hermes
 
 The standard cloud profile exports provider metadata into the container:
 
+- `CUTI_CONTAINER_MODE` is `claude-code` or `openclaw`
 - `CUTI_AGENT_PROVIDERS` contains the enabled provider IDs
-- `CUTI_PRIMARY_AGENT_PROVIDER` prefers `claude` when enabled
+- `CUTI_PRIMARY_AGENT_PROVIDER` is `claude` in Claude Code mode and `openclaw` in OpenClaw mode
 - `CODEX_HOME`, `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`, `OPENCLAW_PREFIX`, `HERMES_HOME`, `XDG_CONFIG_HOME`, and `XDG_DATA_HOME` are set for provider state
 
 Provider-specific mounts are added automatically when the provider is enabled:
@@ -244,14 +263,14 @@ Host-side provider commands:
 ### Docker-in-Docker Usage
 ```bash
 # Build Docker images inside the container
-cuti container --command "docker build -t myapp ."
+cuti container "docker build -t myapp ."
 
 # Run containers from within the container
-cuti container --command "docker run -d redis:latest"
-cuti container --command "docker ps"
+cuti container "docker run -d redis:latest"
+cuti container "docker ps"
 
 # Use docker-compose
-cuti container --command "docker-compose up -d"
+cuti container "docker-compose up -d"
 
 # Interactive container with Docker support
 cuti container
@@ -429,7 +448,7 @@ If port 8000 is already in use:
 lsof -i :8000
 
 # Kill the process or use different port
-cuti container --command "cuti web --port 8001"
+cuti container "cuti web --port 8001"
 ```
 
 ### Docker-in-Docker Access
@@ -506,13 +525,13 @@ docker build -t my-custom-cuti -f .devcontainer/Dockerfile .
 
 ```bash
 # Database in background
-cuti container --command "docker run -d postgres:15"
+cuti container "docker run -d postgres:15"
 
 # Redis
-cuti container --command "docker run -d redis:7"
+cuti container "docker run -d redis:7"
 
 # Your app
-cuti container --command "cuti web"
+cuti container "cuti web"
 ```
 
 ### Persistent Data
@@ -535,7 +554,7 @@ docker run -v myproject-data:/data ...
 cuti container
 
 # Run specific command
-cuti container --command "COMMAND"
+cuti container "COMMAND"
 
 # Generate dev container files
 cuti devcontainer generate [--type TYPE]

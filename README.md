@@ -40,7 +40,7 @@ That's it! You now have a fully configured AI-powered coding environment with:
 - ✅ **Custom prompt** showing `cuti:~/path $`
 - ✅ **Auto-mounts** current directory for seamless workflow
 
-The Docker container provides isolated, reproducible AI-assisted development with Claude as the default agent provider.
+The Docker container provides isolated, reproducible AI-assisted development with Claude Code mode as the default. Each `cuti container` run refreshes Claude Code in the persistent container runtime when Claude Code mode is active, so subsequent containers pick up the newest available Claude CLI without a rebuild.
 
 ## 🌟 Key Features - AI Agent Orchestration & Automation
 
@@ -51,7 +51,7 @@ Build with multiple AI models and intelligent task management:
 - **Smart rate limiting** - Automatic retry & backoff
 - **Task automation** - Built-in todo system for AI agents
 - **Claude version switching** - Easy CLI version management
-- **Agent providers** - Enable Codex, OpenCode, OpenClaw, the experimental Hermes Agent integration, and future providers alongside Claude with `cuti providers ...`
+- **Agent providers** - Run Claude Code mode by default, switch to OpenClaw mode with `cuti container --openclaw`, and add Codex, Claude Code, OpenCode, or other providers through `cuti providers ...`
 - **Provider-aware setup** - cuti mounts provider auth/config/skills, persistent CLI runtimes, and workspace instruction files for enabled tools
 - **Turnkey OpenClaw** - Run the current OpenClaw gateway, channels, browser, plugins, and voice-call flows with `qt-openclaw ...` or `qt-OpenClaw ...`
 - **Claude chat history** - `cuti history` shows transcripts and reopens old Claude Code sessions
@@ -60,25 +60,35 @@ Perfect for AI-powered development, automation workflows, and LLM orchestration.
 
 ## 🤖 Agent Providers
 
-Claude is enabled by default. Additional providers are opt-in and can be enabled together:
+Claude Code mode is the default for `cuti container`. OpenClaw is a separate mode, started explicitly with `cuti container --openclaw` or `cuti container --claw`.
 
 ```bash
 cuti providers list
 cuti providers doctor
+
+# Default mode: Claude Code. This also refreshes Claude Code for future containers.
+cuti container
+
+# OpenClaw mode: OpenClaw only unless add-ons are explicitly enabled.
+cuti container --openclaw
+
+# Add-ons for OpenClaw mode are read from provider config.
+cuti providers enable claude
 cuti providers enable codex
 cuti providers enable opencode
-cuti providers enable openclaw
 cuti providers enable hermes
+cuti container --openclaw
+
+# Provider setup/update helpers still run in the right mode automatically.
 cuti providers auth claude --login
 qt-openclaw onboard
 qt-openclaw up
-cuti container --rebuild
 cuti providers update codex
 cuti providers update openclaw
 cuti providers update hermes
 ```
 
-When selected, `cuti` handles the provider-specific container wiring for auth, config mounts, persistent CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `.hermes.md`, `HERMES.md`, `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, `USER.md`, and `HEARTBEAT.md`. OpenClaw installs under `~/.cuti/provider-runtimes/openclaw`, keeps runtime state under `~/.openclaw`, and runs `openclaw doctor --non-interactive` during install/update/bootstrap. Hermes is currently marked experimental in cuti, but its state persists under `~/.hermes`, including Hermes profiles under `~/.hermes/profiles`. `~/.openclaw` is mounted when available so `hermes claw migrate --dry-run` can inspect OpenClaw data before migration, and `cuti providers update hermes` now follows Hermes' native `hermes update` path so bundled skills and profile state stay aligned with upstream behavior.
+When selected for the current mode, `cuti` handles the provider-specific container wiring for auth, config mounts, persistent CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `.hermes.md`, `HERMES.md`, `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, `USER.md`, and `HEARTBEAT.md`. OpenClaw installs under `~/.cuti/provider-runtimes/openclaw`, keeps runtime state under `~/.openclaw`, and runs `openclaw doctor --non-interactive` during install/update/bootstrap. Hermes is currently marked experimental in cuti, but its state persists under `~/.hermes`, including Hermes profiles under `~/.hermes/profiles`. `~/.openclaw` is mounted when available so `hermes claw migrate --dry-run` can inspect OpenClaw data before migration, and `cuti providers update hermes` follows Hermes' native `hermes update` path so bundled skills and profile state stay aligned with upstream behavior.
 
 ### OpenClaw Qt Container
 
@@ -95,7 +105,7 @@ qt-openclaw voicecall status
 qt-openclaw dashboard --no-open
 ```
 
-The command enables the OpenClaw provider automatically and runs inside the standard provider-aware Qt container, with `~/.openclaw`, `~/.agents`, and the persistent OpenClaw CLI runtime mounted for reuse.
+The command enables the OpenClaw provider automatically and runs inside OpenClaw mode, with `~/.openclaw`, `~/.agents`, and the persistent OpenClaw CLI runtime mounted for reuse.
 OpenClaw's source-backed command families are exposed directly (`models`, `mcp`, `sandbox`, `memory`, `wiki`, `approvals`, `nodes`, `devices`, `hooks`, `webhooks`, `tasks`, `cron`, `security`, `secrets`, and more). For plugin commands added by future OpenClaw releases, use `qt-openclaw run <command> ...`; it forwards raw arguments to the installed OpenClaw CLI without requiring a cuti release.
 
 ## 📚 Documentation

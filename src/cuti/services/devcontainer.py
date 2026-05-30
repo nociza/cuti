@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import Iterable, List, Optional, Set, Tuple
 
 try:
     from rich.console import Console
@@ -22,7 +22,12 @@ try:
 except ImportError:
     _RICH_AVAILABLE = False
 
-from .providers import ProviderManager
+from .providers import (
+    CONTAINER_MODE_CLAUDE as PROVIDER_CONTAINER_MODE_CLAUDE,
+    CONTAINER_MODE_OPENCLAW as PROVIDER_CONTAINER_MODE_OPENCLAW,
+    KNOWN_CONTAINER_MODES,
+    ProviderManager,
+)
 
 
 class DevContainerService:
@@ -30,6 +35,8 @@ class DevContainerService:
 
     IMAGE_NAME = "cuti-dev-universal"
     RUNTIME_PROFILE_CLOUD = "cloud"
+    CONTAINER_MODE_CLAUDE = PROVIDER_CONTAINER_MODE_CLAUDE
+    CONTAINER_MODE_OPENCLAW = PROVIDER_CONTAINER_MODE_OPENCLAW
     PROVIDER_RUNTIME_CONTAINER_DIR = "/home/cuti/.cuti-providers"
 
     # Simplified Dockerfile template
@@ -216,6 +223,12 @@ RUN { \
             'export IS_SANDBOX=1' \
             'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' \
             'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' \
+            'if [ "${CUTI_ENFORCE_SELECTED_PROVIDERS:-false}" = "true" ]; then' \
+            '    case ",${CUTI_AGENT_PROVIDERS:-}," in' \
+            '        *,claude,*) ;;' \
+            '        *) echo "Claude provider is not selected for this container mode." >&2; exit 1 ;;' \
+            '    esac' \
+            'fi' \
             'CLAUDE_CLI="${CUTI_CLAUDE_CLI:-/home/cuti/.cuti-providers/claude/.local/bin/claude}"' \
             'if [ ! -x "$CLAUDE_CLI" ]; then' \
             '    CLAUDE_CLI="/home/cuti/.local/bin/claude"' \
@@ -233,6 +246,12 @@ RUN { \
             '#!/bin/bash' \
             'set -euo pipefail' \
             'export PATH="/home/cuti/.cuti-providers/codex/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
+            'if [ "${CUTI_ENFORCE_SELECTED_PROVIDERS:-false}" = "true" ]; then' \
+            '    case ",${CUTI_AGENT_PROVIDERS:-}," in' \
+            '        *,codex,*) ;;' \
+            '        *) echo "Codex provider is not selected for this container mode." >&2; exit 1 ;;' \
+            '    esac' \
+            'fi' \
             'CODEX_CLI="${CUTI_CODEX_CLI:-/home/cuti/.cuti-providers/codex/bin/codex}"' \
             'if [ ! -x "$CODEX_CLI" ]; then' \
             '    CODEX_CLI="/home/cuti/.local/bin/codex"' \
@@ -250,6 +269,12 @@ RUN { \
             '#!/bin/bash' \
             'set -euo pipefail' \
             'export PATH="/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
+            'if [ "${CUTI_ENFORCE_SELECTED_PROVIDERS:-false}" = "true" ]; then' \
+            '    case ",${CUTI_AGENT_PROVIDERS:-}," in' \
+            '        *,opencode,*) ;;' \
+            '        *) echo "OpenCode provider is not selected for this container mode." >&2; exit 1 ;;' \
+            '    esac' \
+            'fi' \
             'OPENCODE_CLI="/home/cuti/.opencode/bin/opencode"' \
             'if [ ! -x "$OPENCODE_CLI" ]; then' \
             '    echo "OpenCode CLI not found. Enable the opencode provider or run: /usr/local/bin/cuti-install-opencode" >&2' \
@@ -271,6 +296,12 @@ RUN { \
             'export OPENCLAW_PREFIX="${OPENCLAW_PREFIX:-${CUTI_OPENCLAW_INSTALL_PREFIX:-$HOME/.cuti-providers/openclaw}}"' \
             'export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$OPENCLAW_STATE_DIR/browser/browsers}"' \
             'export PATH="$OPENCLAW_PREFIX/bin:$HOME/.openclaw/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"' \
+            'if [ "${CUTI_ENFORCE_SELECTED_PROVIDERS:-false}" = "true" ]; then' \
+            '    case ",${CUTI_AGENT_PROVIDERS:-}," in' \
+            '        *,openclaw,*) ;;' \
+            '        *) echo "OpenClaw provider is not selected for this container mode." >&2; exit 1 ;;' \
+            '    esac' \
+            'fi' \
             'for OPENCLAW_CLI in "$OPENCLAW_PREFIX/bin/openclaw" "$HOME/.openclaw/bin/openclaw"; do' \
             '    if [ -x "$OPENCLAW_CLI" ]; then' \
             '        exec "$OPENCLAW_CLI" "$@"' \
@@ -292,6 +323,12 @@ RUN { \
             'set -euo pipefail' \
             'export HOME="${HOME:-/home/cuti}"' \
             'export HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"' \
+            'if [ "${CUTI_ENFORCE_SELECTED_PROVIDERS:-false}" = "true" ]; then' \
+            '    case ",${CUTI_AGENT_PROVIDERS:-}," in' \
+            '        *,hermes,*) ;;' \
+            '        *) echo "Hermes provider is not selected for this container mode." >&2; exit 1 ;;' \
+            '    esac' \
+            'fi' \
             'HERMES_CLI="${HERMES_CLI:-$HERMES_HOME/hermes-agent/venv/bin/hermes}"' \
             'if [ ! -x "$HERMES_CLI" ]; then' \
             '    HERMES_CLI="$HOME/.local/bin/hermes"' \
@@ -311,14 +348,11 @@ USER $USERNAME
 
 # Install uv for the non-root user
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.local/bin:${PATH}"
-
-# Install Claude Code via the native installer
-RUN HOME=/home/cuti /usr/local/bin/cuti-install-claude
+ENV PATH="/home/cuti/.local/bin:${PATH}"
 
 # Install oh-my-zsh with simple configuration
 RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \\
-    && echo 'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/usr/local/bin:/home/cuti/.local/bin:/root/.local/share/uv/tools/cuti/bin:$PATH"' >> ~/.zshrc \\
+    && echo 'if [ -n "${CUTI_CONTAINER_PATH:-}" ]; then export PATH="$CUTI_CONTAINER_PATH:$PATH"; else export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; fi' >> ~/.zshrc \\
     && echo 'export PYTHONPATH="/workspace/src:$PYTHONPATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
     && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
@@ -378,12 +412,20 @@ CMD ["/bin/zsh", "-l"]
         working_directory: Optional[str] = None,
         *,
         provider_storage_dir: Optional[Path] = None,
+        container_mode: str = PROVIDER_CONTAINER_MODE_CLAUDE,
     ):
         """Initialize the dev container service."""
+        if container_mode not in KNOWN_CONTAINER_MODES:
+            available = ", ".join(KNOWN_CONTAINER_MODES)
+            raise ValueError(
+                f"Unknown container mode '{container_mode}'. Available modes: {available}"
+            )
+
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
         self.devcontainer_dir = self.working_dir / ".devcontainer"
         self.is_macos = platform.system() == "Darwin"
         self.provider_manager = ProviderManager(storage_dir=provider_storage_dir)
+        self.container_mode = container_mode
         self._selected_providers_cache: Optional[List[str]] = None
 
         # Check tool availability (cached for CLI compatibility)
@@ -430,7 +472,9 @@ CMD ["/bin/zsh", "-l"]
         """Return the enabled provider IDs for the cloud container profile."""
 
         if self._selected_providers_cache is None:
-            self._selected_providers_cache = self.provider_manager.selected_providers()
+            self._selected_providers_cache = (
+                self.provider_manager.selected_providers_for_mode(self.container_mode)
+            )
         return list(self._selected_providers_cache)
 
     def _is_provider_enabled(self, provider: str) -> bool:
@@ -444,9 +488,22 @@ CMD ["/bin/zsh", "-l"]
         providers = self._selected_providers()
         if not providers:
             return None
+        if (
+            self.container_mode == self.CONTAINER_MODE_OPENCLAW
+            and "openclaw" in providers
+        ):
+            return "openclaw"
         if "claude" in providers:
             return "claude"
         return providers[0]
+
+    def _auto_update_claude_on_start(self) -> bool:
+        """Return True when Claude mode should refresh Claude Code at startup."""
+
+        return (
+            self.container_mode == self.CONTAINER_MODE_CLAUDE
+            and self._is_provider_enabled("claude")
+        )
 
     def _prepare_agents_storage(self) -> Path:
         """Ensure shared AGENTS-based personal skill storage exists."""
@@ -583,22 +640,38 @@ CMD ["/bin/zsh", "-l"]
         self._make_tree_container_writable(runtime_dir)
         return runtime_dir
 
-    def _provider_runtime_path_entries(self) -> List[str]:
+    def _provider_runtime_path_entries(
+        self, providers: Optional[Iterable[str]] = None
+    ) -> List[str]:
         """Return persistent provider binary directories in PATH order."""
 
-        return [
-            f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/claude/.local/bin",
-            f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/codex/bin",
-            f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/openclaw/bin",
-        ]
+        selected = set(providers or self._selected_providers())
+        entries: List[str] = []
+        if "claude" in selected:
+            entries.append(f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/claude/.local/bin")
+        if "codex" in selected:
+            entries.append(f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/codex/bin")
+        if "openclaw" in selected:
+            entries.append(f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/openclaw/bin")
+        return entries
 
-    def _container_path_value(self) -> str:
+    def _container_path_value(
+        self, extra_providers: Optional[Iterable[str]] = None
+    ) -> str:
         """Return the PATH used for cloud provider containers and updates."""
 
+        providers = set(self._selected_providers())
+        if extra_providers:
+            providers.update(extra_providers)
+
         entries = [
-            *self._provider_runtime_path_entries(),
-            "/home/cuti/.hermes/hermes-agent/venv/bin",
-            "/home/cuti/.opencode/bin",
+            *self._provider_runtime_path_entries(providers),
+            *(
+                ["/home/cuti/.hermes/hermes-agent/venv/bin"]
+                if "hermes" in providers
+                else []
+            ),
+            *(["/home/cuti/.opencode/bin"] if "opencode" in providers else []),
             "/home/cuti/.local/bin",
             "/usr/local/bin",
             "/usr/local/sbin",
@@ -614,10 +687,14 @@ CMD ["/bin/zsh", "-l"]
 
         return ",".join(self._selected_providers())
 
-    def _prepare_cloud_provider_mounts(self) -> Tuple[Optional[Path], List[str]]:
+    def _prepare_cloud_provider_mounts(
+        self, extra_providers: Optional[Iterable[str]] = None
+    ) -> Tuple[Optional[Path], List[str]]:
         """Prepare host storage and mount specs for selected cloud providers."""
 
         providers = set(self._selected_providers())
+        if extra_providers:
+            providers.update(extra_providers)
         mount_args: List[str] = []
         linux_claude_dir: Optional[Path] = None
 
@@ -1112,7 +1189,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         """Return a shell command that updates a provider in the right install root."""
 
         provider_runtime_dir = self.PROVIDER_RUNTIME_CONTAINER_DIR
-        path_value = self._container_path_value()
+        path_value = self._container_path_value(extra_providers=[provider])
         shell_update_command = update_command
         fallback_update_commands = {
             "claude": "curl -fsSL https://claude.ai/install.sh | bash",
@@ -1285,7 +1362,9 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
     def _run_provider_update_container(self, provider: str, update_command: str) -> int:
         """Run a provider update in a disposable container backed by persistent mounts."""
 
-        _linux_claude_dir, provider_mount_args = self._prepare_cloud_provider_mounts()
+        _linux_claude_dir, provider_mount_args = self._prepare_cloud_provider_mounts(
+            extra_providers=[provider]
+        )
         container_name = (
             f"cuti-provider-update-{provider}-{os.getpid()}-"
             f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
@@ -1302,11 +1381,13 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--env",
             f"CUTI_RUNTIME_PROFILE={self.RUNTIME_PROFILE_CLOUD}",
             "--env",
+            f"CUTI_CONTAINER_MODE={self.container_mode}",
+            "--env",
             "PYTHONUNBUFFERED=1",
             "--env",
             "TERM=xterm-256color",
             "--env",
-            f"PATH={self._container_path_value()}",
+            f"PATH={self._container_path_value(extra_providers=[provider])}",
             "--env",
             "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
             "--env",
@@ -1479,9 +1560,9 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 mount_options = "rw,cached"  # Docker Desktop on macOS needs cached mode
 
         primary_provider = self._primary_provider()
-        _linux_claude_dir, provider_mount_args = (
-            self._prepare_cloud_provider_mounts()
-        )
+        auto_update_claude = self._auto_update_claude_on_start()
+        container_path = self._container_path_value()
+        _linux_claude_dir, provider_mount_args = self._prepare_cloud_provider_mounts()
         docker_args = [
             "docker",
             "run",
@@ -1494,6 +1575,8 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--label",
             f"cuti.runtime_profile={runtime_profile}",
             "--label",
+            f"cuti.container_mode={self.container_mode}",
+            "--label",
             f"cuti.workspace={current_dir}",
             "-w",
             "/workspace",
@@ -1501,6 +1584,12 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "CUTI_IN_CONTAINER=true",
             "--env",
             f"CUTI_RUNTIME_PROFILE={runtime_profile}",
+            "--env",
+            f"CUTI_CONTAINER_MODE={self.container_mode}",
+            "--env",
+            f"CUTI_CLAUDE_AUTO_UPDATE={'true' if auto_update_claude else 'false'}",
+            "--env",
+            "CUTI_ENFORCE_SELECTED_PROVIDERS=true",
             # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
             "--env",
             "IS_SANDBOX=1",
@@ -1514,7 +1603,9 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--env",
             "TERM=xterm-256color",
             "--env",
-            f"PATH={self._container_path_value()}",
+            f"PATH={container_path}",
+            "--env",
+            f"CUTI_CONTAINER_PATH={container_path}",
             "--env",
             "NODE_PATH=/usr/lib/node_modules:/usr/local/lib/node_modules",
             "--env",
@@ -1604,8 +1695,10 @@ cuti_provider_selected() {
 }
 
 if [ -n "${CUTI_AGENT_PROVIDERS:-}" ]; then
+    echo "🎛️  Container mode: ${CUTI_CONTAINER_MODE:-claude-code}"
     echo "🧩 Selected providers: ${CUTI_AGENT_PROVIDERS}"
 else
+    echo "🎛️  Container mode: ${CUTI_CONTAINER_MODE:-claude-code}"
     echo "🧩 No agent providers selected"
 fi
 
@@ -1662,13 +1755,32 @@ fi
 
 if cuti_provider_selected claude; then
     CUTI_CLAUDE_RUNTIME_BIN=/home/cuti/.cuti-providers/claude/.local/bin/claude
-    if [ -x "$CUTI_CLAUDE_RUNTIME_BIN" ]; then
+    if [ "${CUTI_CLAUDE_AUTO_UPDATE:-false}" = "true" ] && [ -d /home/cuti/.cuti-providers/claude ]; then
+        echo "🧠 Updating Claude Code in persistent provider runtime..."
+        export HOME=/home/cuti/.cuti-providers/claude
+        export XDG_DATA_HOME=/home/cuti/.cuti-providers/claude/.local/share
+        export XDG_STATE_HOME=/home/cuti/.cuti-providers/claude/.local/state
+        export XDG_CACHE_HOME=/home/cuti/.cuti-providers/claude/.cache
+        mkdir -p "$HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME" 2>/dev/null || true
+        if /usr/local/bin/cuti-install-claude > /tmp/claude-install.log 2>&1; then
+            echo "✅ Claude Code is up to date for subsequent containers"
+            hash -r 2>/dev/null || true
+        else
+            echo "⚠️  Failed to update Claude Code"
+            cat /tmp/claude-install.log
+        fi
+        export HOME=/home/cuti
+        export XDG_DATA_HOME=/home/cuti/.local/share
+        export XDG_STATE_HOME=/home/cuti/.local/state
+        export XDG_CACHE_HOME=/home/cuti/.cache
+    elif [ -x "$CUTI_CLAUDE_RUNTIME_BIN" ]; then
         echo "✅ Claude CLI already installed in persistent provider runtime"
     elif [ ! -x /home/cuti/.local/bin/claude ]; then
         echo "🧠 Installing Claude Code native build..."
         export HOME=/home/cuti
         if /usr/local/bin/cuti-install-claude > /tmp/claude-install.log 2>&1; then
             echo "✅ Claude Code installed"
+            hash -r 2>/dev/null || true
         else
             echo "⚠️  Failed to install Claude Code"
             cat /tmp/claude-install.log
@@ -1949,8 +2061,12 @@ PY
 
 ensure_cuti_cli
 
-# Keep runtime-installed CLIs ahead of system paths in the login shell.
-export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+# Keep selected runtime-installed CLIs ahead of system paths in the login shell.
+if [ -n "${CUTI_CONTAINER_PATH:-}" ]; then
+    export PATH="${CUTI_CONTAINER_PATH}:$PATH"
+else
+    export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+fi
 hash -r 2>/dev/null || true
 
 ensure_provider_runtime_shell_path() {
@@ -1965,8 +2081,12 @@ ensure_provider_runtime_shell_path() {
         cat >> "$ZSHRC_PATH" <<'CUTI_PROVIDER_PATH_EOF'
 
 # cuti-provider-runtime-path
-# Keep host-updated provider CLIs ahead of image-local installs in login shells.
-export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+# Keep selected host-updated provider CLIs ahead of image-local installs in login shells.
+if [ -n "${CUTI_CONTAINER_PATH:-}" ]; then
+    export PATH="${CUTI_CONTAINER_PATH}:$PATH"
+else
+    export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+fi
 hash -r 2>/dev/null || true
 CUTI_PROVIDER_PATH_EOF
     fi
@@ -2007,8 +2127,8 @@ if cuti_provider_selected claude; then
         echo "   Note: Linux credentials are separate from macOS keychain."
     fi
 
-    if [ -x /home/cuti/.local/bin/claude ]; then
-        echo "✅ Claude CLI is available at: $(which claude)"
+    if command -v claude > /dev/null 2>&1; then
+        echo "✅ Claude CLI is available at: $(command -v claude)"
         if claude --version > /dev/null 2>&1; then
             echo "✅ Claude CLI verified: $(claude --version 2>&1 | head -n1)"
         else

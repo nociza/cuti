@@ -27,7 +27,10 @@ def test_generate_dockerfile_uses_provider_installers(tmp_path: Path) -> None:
         in dockerfile
     )
     assert "https://openclaw.ai/install-cli.sh" in dockerfile
-    assert "npm-original install -g --prefix \"$OPENCLAW_PREFIX\" openclaw@latest" in dockerfile
+    assert (
+        "npm-original install -g --prefix \"$OPENCLAW_PREFIX\" openclaw@latest"
+        in dockerfile
+    )
     assert 'export npm_config_prefix="$OPENCLAW_PREFIX"' in dockerfile
     assert (
         "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
@@ -39,13 +42,20 @@ def test_generate_dockerfile_uses_provider_installers(tmp_path: Path) -> None:
         'HERMES_CLI="${HERMES_CLI:-$HERMES_HOME/hermes-agent/venv/bin/hermes}"'
         in dockerfile
     )
+    assert "Claude provider is not selected for this container mode" in dockerfile
+    assert "RUN HOME=/home/cuti /usr/local/bin/cuti-install-claude" not in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
 
 
 def test_prepare_cloud_provider_mounts_includes_selected_provider_dirs(
     monkeypatch, tmp_path: Path
 ) -> None:
-    service = DevContainerService(tmp_path, provider_storage_dir=tmp_path / ".cuti")
+    service = DevContainerService(
+        tmp_path,
+        provider_storage_dir=tmp_path / ".cuti",
+        container_mode=DevContainerService.CONTAINER_MODE_OPENCLAW,
+    )
+    service.provider_manager.set_enabled("claude", True)
     service.provider_manager.set_enabled("codex", True)
     service.provider_manager.set_enabled("opencode", True)
     service.provider_manager.set_enabled("openclaw", True)
@@ -149,13 +159,22 @@ def test_run_in_container_sets_provider_envs(monkeypatch, tmp_path: Path) -> Non
     docker_args = captured_args["args"]
     assert "CUTI_AGENT_PROVIDERS=claude,codex,opencode" in docker_args
     assert "CUTI_PRIMARY_AGENT_PROVIDER=claude" in docker_args
+    assert "CUTI_CONTAINER_MODE=claude-code" in docker_args
+    assert "CUTI_CLAUDE_AUTO_UPDATE=true" in docker_args
+    assert "CUTI_ENFORCE_SELECTED_PROVIDERS=true" in docker_args
     assert "CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin" in docker_args
     assert "OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_args
     assert "NPM_CONFIG_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_args
     assert "npm_config_prefix=/home/cuti/.cuti-providers/openclaw" in docker_args
     assert any(
         arg.startswith(
-            "PATH=/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:"
+            "PATH=/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.opencode/bin:"
+        )
+        for arg in docker_args
+    )
+    assert any(
+        arg.startswith(
+            "CUTI_CONTAINER_PATH=/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.opencode/bin:"
         )
         for arg in docker_args
     )
@@ -200,10 +219,10 @@ def test_run_in_container_init_script_handles_runtime_provider_installs(
 
     assert exit_code == 0
     full_command = captured_args["args"][-1]
-    assert (
-        'export PATH="/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:/home/cuti/.hermes/hermes-agent/venv/bin:/home/cuti/.opencode/bin:/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"'
-        in full_command
-    )
+    assert "Updating Claude Code in persistent provider runtime" in full_command
+    assert "export HOME=/home/cuti/.cuti-providers/claude" in full_command
+    assert "Claude Code is up to date for subsequent containers" in full_command
+    assert 'export PATH="${CUTI_CONTAINER_PATH}:$PATH"' in full_command
     assert "ensure_provider_runtime_shell_path" in full_command
     assert "cuti-provider-runtime-path" in full_command
     assert "cuti_provider_selected codex" in full_command
@@ -217,6 +236,100 @@ def test_run_in_container_init_script_handles_runtime_provider_installs(
     assert "cuti_restore_hermes_profile_wrappers" in full_command
     assert 'exec hermes -p $PROFILE_NAME "\\$@"' in full_command
     assert "hash -r 2>/dev/null || true" in full_command
+
+
+def test_openclaw_container_mode_uses_flagged_mode_and_explicit_addons(
+    monkeypatch, tmp_path: Path
+) -> None:
+    service = DevContainerService(
+        tmp_path,
+        provider_storage_dir=tmp_path / ".cuti",
+        container_mode=DevContainerService.CONTAINER_MODE_OPENCLAW,
+    )
+    service.is_macos = False
+    service.provider_manager.set_enabled("codex", True)
+    service.provider_manager.set_enabled("claude", True)
+    service._selected_providers_cache = None
+
+    captured_args = {}
+
+    monkeypatch.setattr(service, "_check_tool_available", lambda name: True)
+    monkeypatch.setattr(
+        service, "_build_container_image", lambda image_name, rebuild: True
+    )
+    monkeypatch.setattr(
+        service,
+        "_prepare_cloud_provider_mounts",
+        lambda: (tmp_path / "claude-linux", []),
+    )
+
+    def _fake_subprocess_run(args):
+        captured_args["args"] = args
+        return _RunResult(0)
+
+    monkeypatch.setattr(
+        "cuti.services.devcontainer.subprocess.run", _fake_subprocess_run
+    )
+
+    exit_code = service.run_in_container(command="openclaw --version", rebuild=False)
+
+    assert exit_code == 0
+    docker_args = captured_args["args"]
+    assert "CUTI_CONTAINER_MODE=openclaw" in docker_args
+    assert "CUTI_AGENT_PROVIDERS=openclaw,claude,codex" in docker_args
+    assert "CUTI_PRIMARY_AGENT_PROVIDER=openclaw" in docker_args
+    assert "CUTI_CLAUDE_AUTO_UPDATE=false" in docker_args
+    assert "CUTI_ENFORCE_SELECTED_PROVIDERS=true" in docker_args
+    assert "cuti.container_mode=openclaw" in docker_args
+    assert any(
+        arg.startswith(
+            "CUTI_CONTAINER_PATH=/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:"
+        )
+        for arg in docker_args
+    )
+
+
+def test_openclaw_container_mode_does_not_expose_default_claude_path(
+    monkeypatch, tmp_path: Path
+) -> None:
+    service = DevContainerService(
+        tmp_path,
+        provider_storage_dir=tmp_path / ".cuti",
+        container_mode=DevContainerService.CONTAINER_MODE_OPENCLAW,
+    )
+    service.is_macos = False
+    captured_args = {}
+
+    monkeypatch.setattr(service, "_check_tool_available", lambda name: True)
+    monkeypatch.setattr(
+        service, "_build_container_image", lambda image_name, rebuild: True
+    )
+    monkeypatch.setattr(
+        service,
+        "_prepare_cloud_provider_mounts",
+        lambda: (None, []),
+    )
+
+    def _fake_subprocess_run(args):
+        captured_args["args"] = args
+        return _RunResult(0)
+
+    monkeypatch.setattr(
+        "cuti.services.devcontainer.subprocess.run", _fake_subprocess_run
+    )
+
+    exit_code = service.run_in_container(command="openclaw --version", rebuild=False)
+
+    assert exit_code == 0
+    docker_args = captured_args["args"]
+    container_path = next(
+        arg.removeprefix("CUTI_CONTAINER_PATH=")
+        for arg in docker_args
+        if arg.startswith("CUTI_CONTAINER_PATH=")
+    )
+    assert "/home/cuti/.cuti-providers/openclaw/bin" in container_path
+    assert "/home/cuti/.cuti-providers/claude/.local/bin" not in container_path
+    assert "/home/cuti/.cuti-providers/codex/bin" not in container_path
 
 
 def test_run_provider_update_updates_persistent_runtime_and_active_containers(
@@ -355,9 +468,16 @@ def test_run_provider_update_configures_openclaw_persistent_runtime(
         in docker_run
     )
     assert "export OPENCLAW_STATE_DIR=/home/cuti/.openclaw" in docker_run[-1]
-    assert "export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json" in docker_run[-1]
-    assert "export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_run[-1]
-    assert "export npm_config_prefix=/home/cuti/.cuti-providers/openclaw" in docker_run[-1]
+    assert (
+        "export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json"
+        in docker_run[-1]
+    )
+    assert (
+        "export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_run[-1]
+    )
+    assert (
+        "export npm_config_prefix=/home/cuti/.cuti-providers/openclaw" in docker_run[-1]
+    )
     assert "/usr/local/bin/cuti-install-openclaw" in docker_run[-1]
     assert "openclaw doctor --non-interactive" in docker_run[-1]
 

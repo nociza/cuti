@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 
+CONTAINER_MODE_CLAUDE = "claude-code"
+CONTAINER_MODE_OPENCLAW = "openclaw"
+KNOWN_CONTAINER_MODES = (CONTAINER_MODE_CLAUDE, CONTAINER_MODE_OPENCLAW)
+
+
 @dataclass(frozen=True)
 class ProviderMetadata:
     """Metadata for a known agent provider."""
@@ -168,6 +173,32 @@ class ProviderManager:
 
     def selected_providers(self) -> List[str]:
         return [name for name in KNOWN_PROVIDERS if self.is_enabled(name)]
+
+    def selected_providers_for_mode(self, mode: str) -> List[str]:
+        """Return provider IDs that should be wired into a container mode."""
+
+        if mode not in KNOWN_CONTAINER_MODES:
+            available = ", ".join(KNOWN_CONTAINER_MODES)
+            raise ValueError(
+                f"Unknown container mode '{mode}'. Available modes: {available}"
+            )
+
+        if mode == CONTAINER_MODE_OPENCLAW:
+            providers = ["openclaw"]
+            providers.extend(
+                name
+                for name in KNOWN_PROVIDERS
+                if name != "openclaw"
+                and self.has_explicit_state(name)
+                and self.is_enabled(name)
+            )
+            return providers
+
+        return [
+            name
+            for name in KNOWN_PROVIDERS
+            if name != "openclaw" and self.is_enabled(name)
+        ]
 
     def primary_provider(self) -> Optional[str]:
         selected = self.selected_providers()

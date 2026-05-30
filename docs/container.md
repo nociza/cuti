@@ -1,6 +1,6 @@
 # Container Management
 
-The `cuti container` command provides a seamless development environment with all dependencies pre-installed, including Claude CLI, Python tools, and cuti itself.
+The `cuti container` command provides a seamless development environment with all dependencies pre-installed, including Claude Code, Python tools, and cuti itself.
 
 ## Quick Start
 
@@ -14,6 +14,9 @@ cuti container
 # Subsequent runs - instant launch
 cuti container
 
+# OpenClaw mode is explicit
+cuti container --openclaw
+
 # Clean all Docker resources
 cuti container clean --all --force
 ```
@@ -25,9 +28,25 @@ Launches an interactive development container with your current directory mounte
 
 **Features:**
 - Automatic Docker/Colima setup
-- Pre-installed tools (Claude CLI, Python, Node.js, uv, etc.)
+- Claude Code mode by default
+- Automatic Claude Code refresh for subsequent containers when Claude Code mode is active
+- OpenClaw mode with `--openclaw` or `--claw`
+- Pre-installed tools (Claude Code, Python, Node.js, uv, etc.)
 - Persistent Claude authentication (see [Authentication Guide](claude-container-auth.md))
 - Current directory mounted as workspace
+
+### `cuti container --openclaw`
+Launches OpenClaw mode. This mode wires in OpenClaw and only the add-ons explicitly selected in provider config.
+
+```bash
+# OpenClaw only
+cuti container --openclaw
+
+# Add Claude Code and Codex as OpenClaw-mode add-ons
+cuti providers enable claude
+cuti providers enable codex
+cuti container --openclaw
+```
 
 ### `cuti container clean`
 Manages Docker cleanup and resource removal.

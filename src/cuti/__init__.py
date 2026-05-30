@@ -1,6 +1,6 @@
 """cuti - Production-ready Claude Code utilities with queuing and a read-only ops console."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.73"
 __author__ = "claude-code, nociza"
 __description__ = "Production-ready Claude Code utilities with command queuing, prompt aliases, and a read-only ops console."
 

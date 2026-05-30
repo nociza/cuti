@@ -11,6 +11,8 @@ def test_known_providers_default_to_claude_only(tmp_path) -> None:
     manager = ProviderManager(storage_dir=tmp_path)
 
     assert manager.selected_providers() == ["claude"]
+    assert manager.selected_providers_for_mode("claude-code") == ["claude"]
+    assert manager.selected_providers_for_mode("openclaw") == ["openclaw"]
     assert manager.primary_provider() == "claude"
     assert KNOWN_PROVIDERS["claude"].default_enabled is True
     assert KNOWN_PROVIDERS["codex"].default_enabled is False
@@ -18,6 +20,31 @@ def test_known_providers_default_to_claude_only(tmp_path) -> None:
     assert KNOWN_PROVIDERS["hermes"].default_enabled is False
     assert KNOWN_PROVIDERS["hermes"].experimental is True
     assert KNOWN_PROVIDERS["opencode"].default_enabled is False
+
+
+def test_openclaw_mode_uses_explicit_provider_addons(tmp_path) -> None:
+    manager = ProviderManager(storage_dir=tmp_path)
+
+    manager.set_enabled("codex", True)
+    manager.set_enabled("claude", True)
+
+    assert manager.selected_providers_for_mode("openclaw") == [
+        "openclaw",
+        "claude",
+        "codex",
+    ]
+
+
+def test_claude_mode_does_not_include_openclaw_without_flag(tmp_path) -> None:
+    manager = ProviderManager(storage_dir=tmp_path)
+
+    manager.set_enabled("openclaw", True)
+    manager.set_enabled("codex", True)
+
+    assert manager.selected_providers_for_mode("claude-code") == [
+        "claude",
+        "codex",
+    ]
 
 
 def test_provider_instruction_files_follow_enabled_selection(tmp_path) -> None:

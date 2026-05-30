@@ -11,10 +11,12 @@ from rich.console import Console
 # Version information - dynamically imported from package
 try:
     from importlib.metadata import version
+
     __version__ = version("cuti")
 except ImportError:
     # Fallback for Python < 3.8
     from importlib_metadata import version
+
     __version__ = version("cuti")
 
 from ..services.queue_service import QueueManager
@@ -24,6 +26,7 @@ from .commands.queue import queue_app
 from .commands.alias import alias_app
 from .commands.agent import agent_app
 from .commands.todo import app as todo_app
+
 try:
     from .commands.devcontainer import app as devcontainer_app
 except ImportError:
@@ -94,7 +97,7 @@ def main(
 ):
     """
     cuti - Production-ready AI command queue and orchestration system
-    
+
     Use --help with any command for more information.
     """
     pass
@@ -149,13 +152,15 @@ def show_version():
 
 # Add sub-applications
 app.add_typer(queue_app, name="queue", help="Queue management commands")
-app.add_typer(alias_app, name="alias", help="Alias management commands")  
+app.add_typer(alias_app, name="alias", help="Alias management commands")
 app.add_typer(agent_app, name="agent", help="Agent system commands")
 app.add_typer(todo_app, name="todo", help="Todo list management commands")
 if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
 if container_app:
-    app.add_typer(container_app, name="containers", help="Container management commands")
+    app.add_typer(
+        container_app, name="containers", help="Container management commands"
+    )
 if tools_app:
     app.add_typer(tools_app, name="tools", help="CLI tools management")
 if settings_app:
@@ -179,11 +184,21 @@ if sync_app:
 if claude_app:
     app.add_typer(claude_app, name="claude", help="Manage Claude accounts and API keys")
 if providers_app:
-    app.add_typer(providers_app, name="providers", help="Manage provider selection, setup, status, and updates")
+    app.add_typer(
+        providers_app,
+        name="providers",
+        help="Manage provider selection, setup, status, and updates",
+    )
 if openclaw_app:
-    app.add_typer(openclaw_app, name="openclaw", help="Run OpenClaw inside the Qt container")
+    app.add_typer(
+        openclaw_app, name="openclaw", help="Run OpenClaw inside the Qt container"
+    )
 if history_app:
-    app.add_typer(history_app, name="history", help="Browse Claude chat history and resume sessions")
+    app.add_typer(
+        history_app,
+        name="history",
+        help="Browse Claude chat history and resume sessions",
+    )
 
 # Add top-level commands for convenience
 from .commands.queue import start_queue, add_prompt, show_status
@@ -196,43 +211,64 @@ app.command("status")(show_status)
 @app.command()
 def container(
     init: bool = typer.Option(False, "--init", help="Initialize devcontainer"),
-    rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild the container image"),
-    command: Optional[str] = typer.Argument(None, help="Command to run in container (or 'start' for interactive shell)"),
-    skip_colima: bool = typer.Option(False, "--skip-colima", help="Skip Colima auto-setup"),
-    status: bool = typer.Option(False, "--status", help="Show status of all containers")
+    rebuild: bool = typer.Option(
+        False, "--rebuild", help="Force rebuild the container image"
+    ),
+    command: Optional[str] = typer.Argument(
+        None, help="Command to run in container (or 'start' for interactive shell)"
+    ),
+    skip_colima: bool = typer.Option(
+        False, "--skip-colima", help="Skip Colima auto-setup"
+    ),
+    status: bool = typer.Option(
+        False, "--status", help="Show status of all containers"
+    ),
+    openclaw_mode: bool = typer.Option(
+        False,
+        "--openclaw",
+        "--claw",
+        help="Start in OpenClaw mode instead of the default Claude Code mode",
+    ),
 ):
     """Run cuti in a dev container with automatic setup."""
     from ..services.devcontainer import DevContainerService, is_running_in_container
-    
+
     # Handle status flag
     if status:
         from .commands.container import status as show_container_status
+
         show_container_status(verbose=False, json_output=False)
         return
-    
+
     # Handle 'start' as a special case - treat it as no command (interactive mode)
     if command == "start":
         command = None
-    
+
     if is_running_in_container():
         console.print("[yellow]Already running in a container![/yellow]")
         if command:
             import subprocess
+
             subprocess.run(command, shell=True)
         return
-    
-    service = DevContainerService()
-    
+
+    container_mode = (
+        DevContainerService.CONTAINER_MODE_OPENCLAW
+        if openclaw_mode
+        else DevContainerService.CONTAINER_MODE_CLAUDE
+    )
+    service = DevContainerService(container_mode=container_mode)
+
     # Ensure dependencies are installed on macOS
     console.print("[cyan]Checking container dependencies...[/cyan]")
     if not service.ensure_dependencies():
         console.print("[red]Container dependencies not available[/red]")
         raise typer.Exit(1)
-    
+
     # Re-check availability after potential installation
     service.colima_available = service._check_colima()
     service.docker_available = service._check_docker()
-    
+
     # The container command should work without creating any local devcontainer files
     # Skip devcontainer initialization entirely - use embedded minimal container
     if init:
@@ -240,7 +276,7 @@ def container(
         if not service.generate_devcontainer():
             console.print("[red]Failed to initialize dev container[/red]")
             raise typer.Exit(1)
-    
+
     # Check Docker availability
     if not service.docker_available:
         if service.colima_available and not skip_colima:
@@ -259,12 +295,13 @@ def container(
                 console.print("Install Colima: [cyan]brew install colima[/cyan]")
             console.print("Or start Docker Desktop")
             raise typer.Exit(1)
-    
+
     # Run in container
-    console.print("[green]Starting dev container...[/green]")
+    mode_label = "OpenClaw" if openclaw_mode else "Claude Code"
+    console.print(f"[green]Starting dev container in {mode_label} mode...[/green]")
     # If no command provided, just start an interactive shell
     exit_code = service.run_in_container(command, rebuild=rebuild)
-    
+
     if exit_code != 0:
         console.print(f"[red]Container exited with code {exit_code}[/red]")
         raise typer.Exit(exit_code)
@@ -274,32 +311,39 @@ def container(
 def web(
     host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind to"),
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
-    storage_dir: str = typer.Option("~/.cuti", "--storage-dir", help="Storage directory"),
-    working_directory: Optional[str] = typer.Option(None, "--working-dir", "-w", help="Working directory"),
+    storage_dir: str = typer.Option(
+        "~/.cuti", "--storage-dir", help="Storage directory"
+    ),
+    working_directory: Optional[str] = typer.Option(
+        None, "--working-dir", "-w", help="Working directory"
+    ),
 ):
     """Start the read-only ops console."""
     import sys
     import os
     from pathlib import Path
-    
+
     # Set environment variables for the web app
     if working_directory:
         os.environ["CUTI_WORKING_DIR"] = str(Path(working_directory).resolve())
-    
+
     # Import and run the web app
     from ..web.app import main as web_main
-    
+
     # Override sys.argv for the web main function
     sys.argv = [
         "cuti-web",
-        "--host", host,
-        "--port", str(port),
-        "--storage-dir", storage_dir,
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--storage-dir",
+        storage_dir,
     ]
-    
+
     if working_directory:
         sys.argv.extend(["--working-directory", working_directory])
-    
+
     try:
         web_main()
     except KeyboardInterrupt:

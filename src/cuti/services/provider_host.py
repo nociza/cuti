@@ -11,7 +11,12 @@ from typing import Any, Dict, List, Optional
 
 from .claude_account_manager import ClaudeAccountManager
 from .devcontainer import DevContainerService
-from .providers import ProviderManager, ProviderMetadata
+from .providers import (
+    CONTAINER_MODE_CLAUDE,
+    CONTAINER_MODE_OPENCLAW,
+    ProviderManager,
+    ProviderMetadata,
+)
 
 
 @dataclass
@@ -259,8 +264,12 @@ class ProviderHostService:
         openclaw_dir = self.home_dir / ".openclaw"
         credentials_dir = openclaw_dir / "credentials"
         config_file = openclaw_dir / "openclaw.json"
-        auth_profile_file = openclaw_dir / "agents" / "main" / "agent" / "auth-profiles.json"
-        runtime_bin = self.storage_dir / "provider-runtimes" / "openclaw" / "bin" / "openclaw"
+        auth_profile_file = (
+            openclaw_dir / "agents" / "main" / "agent" / "auth-profiles.json"
+        )
+        runtime_bin = (
+            self.storage_dir / "provider-runtimes" / "openclaw" / "bin" / "openclaw"
+        )
 
         if (
             self._path_has_files(credentials_dir)
@@ -273,14 +282,10 @@ class ProviderHostService:
                 detail = f"{detail}; persistent runtime installed at {runtime_bin}"
         elif config_file.exists():
             setup_state = "partial"
-            detail = (
-                f"OpenClaw config exists at {config_file}, but no credential or auth profile files were detected."
-            )
+            detail = f"OpenClaw config exists at {config_file}, but no credential or auth profile files were detected."
         elif any(self._path_has_files(path) for path in state_paths):
             setup_state = "partial"
-            detail = (
-                "OpenClaw state/runtime files exist, but no credential or auth profile files were detected."
-            )
+            detail = "OpenClaw state/runtime files exist, but no credential or auth profile files were detected."
         else:
             setup_state = "missing"
             detail = "No OpenClaw state detected yet."
@@ -400,10 +405,18 @@ class ProviderHostService:
         )
         return True
 
-    def _devcontainer_service(self) -> DevContainerService:
+    def _container_mode_for_provider(self, provider: str) -> str:
+        if provider == "openclaw":
+            return CONTAINER_MODE_OPENCLAW
+        return CONTAINER_MODE_CLAUDE
+
+    def _devcontainer_service(
+        self, *, container_mode: str = CONTAINER_MODE_CLAUDE
+    ) -> DevContainerService:
         return DevContainerService(
             self.working_directory,
             provider_storage_dir=self.storage_dir,
+            container_mode=container_mode,
         )
 
     def run_setup(self, provider: str, *, rebuild: bool = False) -> int:
@@ -415,7 +428,9 @@ class ProviderHostService:
                 f"Provider '{status.provider}' does not define a setup command"
             )
         self.ensure_enabled(status.provider)
-        return self._devcontainer_service().run_in_container(
+        return self._devcontainer_service(
+            container_mode=self._container_mode_for_provider(status.provider)
+        ).run_in_container(
             command=status.setup_command,
             rebuild=rebuild,
             interactive=True,
@@ -430,7 +445,9 @@ class ProviderHostService:
                 f"Provider '{status.provider}' does not define an update command"
             )
         self.ensure_enabled(status.provider)
-        return self._devcontainer_service().run_provider_update(
+        return self._devcontainer_service(
+            container_mode=self._container_mode_for_provider(status.provider)
+        ).run_provider_update(
             status.provider,
             status.update_command,
             rebuild=rebuild,
@@ -449,11 +466,15 @@ class ProviderHostService:
 
         status = self.get_status(provider)
         if not status.commands:
-            raise ValueError(f"Provider '{status.provider}' does not define a CLI command")
+            raise ValueError(
+                f"Provider '{status.provider}' does not define a CLI command"
+            )
 
         self.ensure_enabled(status.provider)
         command = shlex.join([status.commands[0], *args])
-        return self._devcontainer_service().run_in_container(
+        return self._devcontainer_service(
+            container_mode=self._container_mode_for_provider(status.provider)
+        ).run_in_container(
             command=command,
             rebuild=rebuild,
             interactive=interactive,
@@ -473,10 +494,14 @@ class ProviderHostService:
 
         status = self.get_status(provider)
         if not status.commands:
-            raise ValueError(f"Provider '{status.provider}' does not define a CLI command")
+            raise ValueError(
+                f"Provider '{status.provider}' does not define a CLI command"
+            )
 
         self.ensure_enabled(status.provider)
-        return self._devcontainer_service().run_in_container(
+        return self._devcontainer_service(
+            container_mode=self._container_mode_for_provider(status.provider)
+        ).run_in_container(
             command=command,
             rebuild=rebuild,
             interactive=interactive,

@@ -88,7 +88,9 @@ def test_openclaw_status_reports_runtime_and_auth_profile(
     monkeypatch.setenv("HOME", str(tmp_path))
     openclaw_dir = tmp_path / ".openclaw"
     auth_profile = openclaw_dir / "agents" / "main" / "agent" / "auth-profiles.json"
-    runtime_bin = tmp_path / ".cuti" / "provider-runtimes" / "openclaw" / "bin" / "openclaw"
+    runtime_bin = (
+        tmp_path / ".cuti" / "provider-runtimes" / "openclaw" / "bin" / "openclaw"
+    )
     auth_profile.parent.mkdir(parents=True)
     runtime_bin.parent.mkdir(parents=True)
     auth_profile.write_text("{}")
@@ -109,11 +111,14 @@ def test_run_setup_enables_provider_and_invokes_container(
     calls: list[dict[str, object]] = []
 
     class _FakeDevContainerService:
-        def __init__(self, working_directory=None, provider_storage_dir=None):
+        def __init__(
+            self, working_directory=None, provider_storage_dir=None, container_mode=None
+        ):
             calls.append(
                 {
                     "working_directory": working_directory,
                     "provider_storage_dir": provider_storage_dir,
+                    "container_mode": container_mode,
                 }
             )
 
@@ -145,6 +150,7 @@ def test_run_setup_enables_provider_and_invokes_container(
     assert calls[-1]["command"] == "codex"
     assert calls[-1]["interactive"] is True
     assert calls[-1]["rebuild"] is True
+    assert calls[0]["container_mode"] == "claude-code"
 
 
 def test_run_update_uses_provider_installer(monkeypatch, tmp_path: Path) -> None:
@@ -152,7 +158,10 @@ def test_run_update_uses_provider_installer(monkeypatch, tmp_path: Path) -> None
     calls: list[dict[str, object]] = []
 
     class _FakeDevContainerService:
-        def __init__(self, working_directory=None, provider_storage_dir=None):
+        def __init__(
+            self, working_directory=None, provider_storage_dir=None, container_mode=None
+        ):
+            calls.append({"container_mode": container_mode})
             pass
 
         def run_provider_update(self, provider, update_command, rebuild=False):
@@ -175,10 +184,13 @@ def test_run_update_uses_provider_installer(monkeypatch, tmp_path: Path) -> None
     assert exit_code == 0
     assert calls == [
         {
+            "container_mode": "claude-code",
+        },
+        {
             "provider": "claude",
             "update_command": "/usr/local/bin/cuti-install-claude",
             "rebuild": False,
-        }
+        },
     ]
 
 
@@ -189,8 +201,10 @@ def test_run_provider_command_invokes_container_with_provider_cli(
     calls: list[dict[str, object]] = []
 
     class _FakeDevContainerService:
-        def __init__(self, working_directory=None, provider_storage_dir=None):
-            pass
+        def __init__(
+            self, working_directory=None, provider_storage_dir=None, container_mode=None
+        ):
+            calls.append({"container_mode": container_mode})
 
         def run_in_container(
             self,
@@ -225,9 +239,12 @@ def test_run_provider_command_invokes_container_with_provider_cli(
     assert service.provider_manager.is_enabled("openclaw") is True
     assert calls == [
         {
+            "container_mode": "openclaw",
+        },
+        {
             "command": "openclaw channels login --channel whatsapp",
             "rebuild": True,
             "interactive": True,
             "mount_docker_socket": True,
-        }
+        },
     ]
