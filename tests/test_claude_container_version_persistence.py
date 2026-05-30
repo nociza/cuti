@@ -28,6 +28,7 @@ def test_generate_dockerfile_uses_provider_installers(tmp_path: Path) -> None:
     )
     assert "https://openclaw.ai/install-cli.sh" in dockerfile
     assert "npm-original install -g --prefix \"$OPENCLAW_PREFIX\" openclaw@latest" in dockerfile
+    assert 'export npm_config_prefix="$OPENCLAW_PREFIX"' in dockerfile
     assert (
         "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
         in dockerfile
@@ -150,6 +151,8 @@ def test_run_in_container_sets_provider_envs(monkeypatch, tmp_path: Path) -> Non
     assert "CUTI_PRIMARY_AGENT_PROVIDER=claude" in docker_args
     assert "CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin" in docker_args
     assert "OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_args
+    assert "NPM_CONFIG_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_args
+    assert "npm_config_prefix=/home/cuti/.cuti-providers/openclaw" in docker_args
     assert any(
         arg.startswith(
             "PATH=/home/cuti/.cuti-providers/claude/.local/bin:/home/cuti/.cuti-providers/codex/bin:/home/cuti/.cuti-providers/openclaw/bin:"
@@ -207,6 +210,7 @@ def test_run_in_container_init_script_handles_runtime_provider_installs(
     assert "cuti_provider_selected opencode" in full_command
     assert "cuti_provider_selected openclaw" in full_command
     assert "OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in full_command
+    assert 'export npm_config_prefix="$OPENCLAW_PREFIX"' in full_command
     assert "openclaw doctor --non-interactive" in full_command
     assert "cuti_provider_selected hermes" in full_command
     assert "cuti-install-hermes" in full_command
@@ -353,6 +357,7 @@ def test_run_provider_update_configures_openclaw_persistent_runtime(
     assert "export OPENCLAW_STATE_DIR=/home/cuti/.openclaw" in docker_run[-1]
     assert "export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json" in docker_run[-1]
     assert "export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_run[-1]
+    assert "export npm_config_prefix=/home/cuti/.cuti-providers/openclaw" in docker_run[-1]
     assert "/usr/local/bin/cuti-install-openclaw" in docker_run[-1]
     assert "openclaw doctor --non-interactive" in docker_run[-1]
 

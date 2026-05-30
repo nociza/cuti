@@ -167,6 +167,9 @@ RUN { \
             'export OPENCLAW_OAUTH_DIR="${OPENCLAW_OAUTH_DIR:-$OPENCLAW_STATE_DIR/credentials}"' \
             'export OPENCLAW_PREFIX="${OPENCLAW_PREFIX:-${CUTI_OPENCLAW_INSTALL_PREFIX:-$HOME/.cuti-providers/openclaw}}"' \
             'export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$OPENCLAW_STATE_DIR/browser/browsers}"' \
+            'export NPM_CONFIG_PREFIX="$OPENCLAW_PREFIX"' \
+            'export npm_config_prefix="$OPENCLAW_PREFIX"' \
+            'export PATH="$OPENCLAW_PREFIX/bin:$PATH"' \
             'mkdir -p "$OPENCLAW_PREFIX" "$OPENCLAW_STATE_DIR" "$OPENCLAW_STATE_DIR/credentials"' \
             'if curl -fsSL --proto '"'"'=https'"'"' --tlsv1.2 https://openclaw.ai/install-cli.sh | bash -s -- --prefix "$OPENCLAW_PREFIX" --no-onboard "$@"; then' \
             '    true' \
@@ -329,6 +332,8 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json' >> ~/.zshrc \\
     && echo 'export OPENCLAW_OAUTH_DIR=/home/cuti/.openclaw/credentials' >> ~/.zshrc \\
     && echo 'export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw' >> ~/.zshrc \\
+    && echo 'export NPM_CONFIG_PREFIX="$OPENCLAW_PREFIX"' >> ~/.zshrc \\
+    && echo 'export npm_config_prefix="$OPENCLAW_PREFIX"' >> ~/.zshrc \\
     && echo 'export PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers' >> ~/.zshrc \\
     && echo 'export XDG_CONFIG_HOME=/home/cuti/.config' >> ~/.zshrc \\
     && echo 'export XDG_DATA_HOME=/home/cuti/.local/share' >> ~/.zshrc \\
@@ -1179,6 +1184,9 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                     "export OPENCLAW_STATE_DIR=/home/cuti/.openclaw",
                     "export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json",
                     f"export OPENCLAW_PREFIX={provider_runtime_dir}/openclaw",
+                    f"export NPM_CONFIG_PREFIX={provider_runtime_dir}/openclaw",
+                    f"export npm_config_prefix={provider_runtime_dir}/openclaw",
+                    f"export PATH={provider_runtime_dir}/openclaw/bin:$PATH",
                     "mkdir -p /home/cuti/.openclaw/agents/main/agent /home/cuti/.openclaw/agents/main/sessions /home/cuti/.openclaw/browser /home/cuti/.openclaw/credentials /home/cuti/.openclaw/hooks /home/cuti/.openclaw/logs /home/cuti/.openclaw/media /home/cuti/.openclaw/plugins /home/cuti/.openclaw/settings /home/cuti/.openclaw/tasks /home/cuti/.openclaw/voice-calls /home/cuti/.agents/skills /home/cuti/.cuti-providers/openclaw 2>/dev/null || true",
                 ]
             )
@@ -1524,6 +1532,10 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--env",
             f"OPENCLAW_PREFIX={self.PROVIDER_RUNTIME_CONTAINER_DIR}/openclaw",
             "--env",
+            f"NPM_CONFIG_PREFIX={self.PROVIDER_RUNTIME_CONTAINER_DIR}/openclaw",
+            "--env",
+            f"npm_config_prefix={self.PROVIDER_RUNTIME_CONTAINER_DIR}/openclaw",
+            "--env",
             "PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers",
             "--env",
             "HERMES_HOME=/home/cuti/.hermes",
@@ -1713,6 +1725,8 @@ if cuti_provider_selected openclaw; then
     export OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json
     export OPENCLAW_OAUTH_DIR=/home/cuti/.openclaw/credentials
     export OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw
+    export NPM_CONFIG_PREFIX="$OPENCLAW_PREFIX"
+    export npm_config_prefix="$OPENCLAW_PREFIX"
     export PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers
     mkdir -p \
         /home/cuti/.openclaw/agents/main/agent \
