@@ -2,76 +2,35 @@
 Main CLI application using Typer.
 """
 
-from typing import Optional
-from pathlib import Path
+from importlib.metadata import version as _pkg_version
 
 import typer
 from rich.console import Console
 
-# Version information - dynamically imported from package
 try:
-    from importlib.metadata import version
+    __version__ = _pkg_version("cuti")
+except Exception:  # pragma: no cover - metadata always present once installed
+    __version__ = "0.0.0"
 
-    __version__ = version("cuti")
-except ImportError:
-    # Fallback for Python < 3.8
-    from importlib_metadata import version
-
-    __version__ = version("cuti")
-
-from ..services.queue_service import QueueManager
-from ..services.aliases import PromptAliasManager
-from ..services.history import PromptHistoryManager
-from .commands.queue import queue_app
-from .commands.alias import alias_app
-from .commands.agent import agent_app
-from .commands.todo import app as todo_app
-
-try:
-    from .commands.devcontainer import app as devcontainer_app
-except ImportError:
-    devcontainer_app = None
-try:
-    from .commands.container import app as container_app
-except ImportError:
-    container_app = None
-try:
-    from .commands.tools import app as tools_app
-except ImportError:
-    tools_app = None
-try:
-    from .commands.settings import settings as settings_app
-except ImportError:
-    settings_app = None
-try:
-    from .commands.favorites import favorites as favorites_app
-except ImportError:
-    favorites_app = None
-try:
-    from .commands.sync import app as sync_app
-except ImportError:
-    sync_app = None
-try:
-    from .commands.claude_account import app as claude_app
-except ImportError:
-    claude_app = None
-try:
-    from .commands.providers import app as providers_app
-except ImportError:
-    providers_app = None
-try:
-    from .commands.openclaw import app as openclaw_app
-except ImportError:
-    openclaw_app = None
-try:
-    from .commands.history import history_app
-except ImportError:
-    history_app = None
+# First-party command groups are imported unconditionally so that a genuine
+# breakage surfaces loudly instead of silently dropping a command.
+from .commands.claude_account import app as claude_app
+from .commands.container import app as container_app
+from .commands.devcontainer import app as devcontainer_app
+from .commands.favorites import favorites as favorites_app
+from .commands.history import history_app
+from .commands.openclaw import app as openclaw_app
+from .commands.providers import app as providers_app
+from .commands.settings import settings as settings_app
+from .commands.sync import app as sync_app
+from .commands.tools import app as tools_app
 
 app = typer.Typer(
     name="cuti",
-    help="Production-ready AI command queue and orchestration system",
+    help="An instant, containerized Claude Code dev environment — plus provider, "
+    "account, history, and usage tooling.",
     rich_markup_mode="rich",
+    no_args_is_help=True,
 )
 
 console = Console()
@@ -96,51 +55,12 @@ def main(
     ),
 ):
     """
-    cuti - Production-ready AI command queue and orchestration system
+    [bold]cuti[/bold] — an instant, containerized Claude Code dev environment.
 
-    Use --help with any command for more information.
+    Get started: [cyan]cuti container[/cyan] launches a ready-to-use Claude Code
+    workspace in Docker. Run [cyan]cuti --help[/cyan] to see everything else.
     """
     pass
-
-
-# Global state
-_manager: Optional[QueueManager] = None
-_alias_manager: Optional[PromptAliasManager] = None
-_history_manager: Optional[PromptHistoryManager] = None
-
-
-def get_manager(
-    storage_dir: str = "~/.cuti",
-    claude_command: str = "claude",
-    check_interval: int = 30,
-    timeout: int = 3600,
-) -> QueueManager:
-    """Get or create queue manager instance."""
-    global _manager
-    if _manager is None:
-        _manager = QueueManager(
-            storage_dir=storage_dir,
-            claude_command=claude_command,
-            check_interval=check_interval,
-            timeout=timeout,
-        )
-    return _manager
-
-
-def get_alias_manager(storage_dir: str = "~/.cuti") -> PromptAliasManager:
-    """Get or create alias manager instance."""
-    global _alias_manager
-    if _alias_manager is None:
-        _alias_manager = PromptAliasManager(storage_dir)
-    return _alias_manager
-
-
-def get_history_manager(storage_dir: str = "~/.cuti") -> PromptHistoryManager:
-    """Get or create history manager instance."""
-    global _history_manager
-    if _history_manager is None:
-        _history_manager = PromptHistoryManager(storage_dir)
-    return _history_manager
 
 
 # Version command
@@ -150,71 +70,89 @@ def show_version():
     console.print(f"cuti version {__version__}")
 
 
-# Add sub-applications
-app.add_typer(queue_app, name="queue", help="Queue management commands")
-app.add_typer(alias_app, name="alias", help="Alias management commands")
-app.add_typer(agent_app, name="agent", help="Agent system commands")
-app.add_typer(todo_app, name="todo", help="Todo list management commands")
-if devcontainer_app:
-    app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
-if container_app:
-    app.add_typer(
-        container_app, name="containers", help="Container management commands"
-    )
-if tools_app:
-    app.add_typer(tools_app, name="tools", help="CLI tools management")
-if settings_app:
-    # Convert Click group to Typer app
-    settings_typer = typer.Typer()
-    for cmd in settings_app.commands.values():
-        settings_typer.command()(cmd.callback)
-    app.add_typer(settings_typer, name="settings", help="Global settings management")
-if favorites_app:
-    # Convert Click group to Typer app
-    favorites_typer = typer.Typer()
-    for cmd in favorites_app.commands.values():
-        favorites_typer.command()(cmd.callback)
-    app.add_typer(favorites_typer, name="favorites", help="Favorite prompts management")
+# --- Containers -----------------------------------------------------------
+app.add_typer(
+    container_app,
+    name="containers",
+    help="Manage running dev containers (status, stop, enter, cleanup).",
+    rich_help_panel="Containers",
+)
+app.add_typer(
+    devcontainer_app,
+    name="devcontainer",
+    help="Generate and manage .devcontainer configuration.",
+    rich_help_panel="Containers",
+)
 
-# Add sync commands if available
-if sync_app:
-    app.add_typer(sync_app, name="sync", help="Sync usage data")
+# --- Providers & accounts --------------------------------------------------
+app.add_typer(
+    providers_app,
+    name="providers",
+    help="Manage provider selection, setup, status, and updates.",
+    rich_help_panel="Providers & accounts",
+)
+app.add_typer(
+    claude_app,
+    name="claude",
+    help="Manage Claude accounts and API keys.",
+    rich_help_panel="Providers & accounts",
+)
+app.add_typer(
+    openclaw_app,
+    name="openclaw",
+    help="Run OpenClaw inside the Qt container.",
+    rich_help_panel="Providers & accounts",
+)
 
-# Add claude account commands if available
-if claude_app:
-    app.add_typer(claude_app, name="claude", help="Manage Claude accounts and API keys")
-if providers_app:
-    app.add_typer(
-        providers_app,
-        name="providers",
-        help="Manage provider selection, setup, status, and updates",
-    )
-if openclaw_app:
-    app.add_typer(
-        openclaw_app, name="openclaw", help="Run OpenClaw inside the Qt container"
-    )
-if history_app:
-    app.add_typer(
-        history_app,
-        name="history",
-        help="Browse Claude chat history and resume sessions",
-    )
+# --- Insight & tooling -----------------------------------------------------
+app.add_typer(
+    history_app,
+    name="history",
+    help="Browse Claude chat history and resume sessions.",
+    rich_help_panel="Insight & tooling",
+)
+app.add_typer(
+    sync_app,
+    name="sync",
+    help="Sync and inspect Claude usage data.",
+    rich_help_panel="Insight & tooling",
+)
+app.add_typer(
+    tools_app,
+    name="tools",
+    help="Manage workspace CLI tools.",
+    rich_help_panel="Insight & tooling",
+)
 
-# Add top-level commands for convenience
-from .commands.queue import start_queue, add_prompt, show_status
+# settings / favorites are Click groups — convert them to Typer apps.
+settings_typer = typer.Typer()
+for cmd in settings_app.commands.values():
+    settings_typer.command()(cmd.callback)
+app.add_typer(
+    settings_typer,
+    name="settings",
+    help="Global settings management.",
+    rich_help_panel="Insight & tooling",
+)
 
-app.command("start")(start_queue)
-app.command("add")(add_prompt)
-app.command("status")(show_status)
+favorites_typer = typer.Typer()
+for cmd in favorites_app.commands.values():
+    favorites_typer.command()(cmd.callback)
+app.add_typer(
+    favorites_typer,
+    name="favorites",
+    help="Favorite prompts management.",
+    rich_help_panel="Insight & tooling",
+)
 
 
-@app.command()
+@app.command(rich_help_panel="Getting started")
 def container(
     init: bool = typer.Option(False, "--init", help="Initialize devcontainer"),
     rebuild: bool = typer.Option(
         False, "--rebuild", help="Force rebuild the container image"
     ),
-    command: Optional[str] = typer.Argument(
+    command: str | None = typer.Argument(
         None, help="Command to run in container (or 'start' for interactive shell)"
     ),
     skip_colima: bool = typer.Option(
@@ -228,6 +166,13 @@ def container(
         "--openclaw",
         "--claw",
         help="Start in OpenClaw mode instead of the default Claude Code mode",
+    ),
+    docker_socket: bool = typer.Option(
+        False,
+        "--docker-socket",
+        help="Mount the host Docker socket for Docker-in-Docker. Off by default: "
+        "the socket is root-equivalent on the host, so only enable it when you "
+        "trust the workload and explicitly need Docker inside the container.",
     ),
 ):
     """Run cuti in a dev container with automatic setup."""
@@ -299,28 +244,35 @@ def container(
     # Run in container
     mode_label = "OpenClaw" if openclaw_mode else "Claude Code"
     console.print(f"[green]Starting dev container in {mode_label} mode...[/green]")
+    if docker_socket:
+        console.print(
+            "[yellow]⚠ Mounting the host Docker socket — this grants the container "
+            "root-equivalent access to the host.[/yellow]"
+        )
     # If no command provided, just start an interactive shell
-    exit_code = service.run_in_container(command, rebuild=rebuild)
+    exit_code = service.run_in_container(
+        command, rebuild=rebuild, mount_docker_socket=docker_socket
+    )
 
     if exit_code != 0:
         console.print(f"[red]Container exited with code {exit_code}[/red]")
         raise typer.Exit(exit_code)
 
 
-@app.command()
+@app.command(rich_help_panel="Getting started")
 def web(
     host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind to"),
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
     storage_dir: str = typer.Option(
         "~/.cuti", "--storage-dir", help="Storage directory"
     ),
-    working_directory: Optional[str] = typer.Option(
+    working_directory: str | None = typer.Option(
         None, "--working-dir", "-w", help="Working directory"
     ),
 ):
     """Start the read-only ops console."""
-    import sys
     import os
+    import sys
     from pathlib import Path
 
     # Set environment variables for the web app

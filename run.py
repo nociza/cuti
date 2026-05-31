@@ -1,267 +1,88 @@
 #!/usr/bin/env python3
-"""
-Main entry point for cuti.
-Supports both uvx and direct execution.
+"""Developer convenience shim for working on cuti from a source checkout.
+
+This is NOT the user-facing entry point. Once installed, use the console
+scripts instead:
+
+    cuti              # the full CLI (containers, providers, accounts, ...)
+    cuti-web          # the read-only ops console
+    python -m cuti    # the ops console (same as cuti-web)
+
+`run.py` only helps contributors bootstrap the editable install and delegate
+into those commands without installing first.
 """
 
-import sys
-import os
-from pathlib import Path
 import subprocess
-import argparse
+import sys
+from pathlib import Path
 
 
-def check_uv_available():
-    """Check if uv is available."""
+def check_uv_available() -> bool:
     try:
-        result = subprocess.run(['uv', '--version'], 
-                              capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            ["uv", "--version"], capture_output=True, text=True, timeout=10
+        )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
 
-def install_with_uv():
-    """Install the package with uv in development mode."""
-    try:
-        print("Installing cuti with uv...")
-        result = subprocess.run(['uv', 'pip', 'install', '-e', '.'], 
-                              check=True, cwd=Path(__file__).parent)
-        print("✓ Installation completed")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"✗ Installation failed: {e}")
-        return False
-
-
-def setup_environment():
-    """Set up the development environment."""
-    project_root = Path(__file__).parent
-    
-    # Check if we're in a virtual environment or can create one
+def setup_environment() -> bool:
+    """Install cuti in editable mode with uv."""
     if not check_uv_available():
-        print("❌ uv is not available. Please install uv first:")
+        print("uv is not available. Install it first:")
         print("   curl -LsSf https://astral.sh/uv/install.sh | sh")
-        print("   or visit: https://docs.astral.sh/uv/getting-started/installation/")
         return False
-    
-    # Install the package
-    if not install_with_uv():
+    try:
+        subprocess.run(
+            ["uv", "pip", "install", "-e", ".[dev]"],
+            check=True,
+            cwd=Path(__file__).parent,
+        )
+    except subprocess.CalledProcessError as exc:
+        print(f"Installation failed: {exc}")
         return False
-    
-    # Create workspace-specific configuration directory
-    workspace_dir = Path.cwd() / '.cuti'
-    workspace_dir.mkdir(exist_ok=True)
-    
-    # Also keep a global config for cross-project settings
-    global_config_dir = Path.home() / '.cuti'
-    global_config_dir.mkdir(exist_ok=True)
-    
-    print(f"✓ Workspace directory created: {workspace_dir}")
-    print(f"✓ Global configuration directory: {global_config_dir}")
+    print("cuti installed in editable mode. Try: cuti --help")
     return True
 
 
-def main():
-    """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="cuti - Production-ready queue system",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Set up the environment
-  python run.py setup
-  
-  # Start the web interface
-  python run.py web
-  
-  # Start the CLI
-  python run.py cli
-  
-  # Start queue processor
-  python run.py start
-  
-  # Show status
-  python run.py status
-        """
-    )
-    
-    subparsers = parser.add_subparsers(dest='command', help='Available commands')
-    
-    # Setup command
-    setup_parser = subparsers.add_parser('setup', help='Set up the environment')
-    
-    # Web command
-    web_parser = subparsers.add_parser('web', help='Start web interface')
-    web_parser.add_argument('--host', default='127.0.0.1', help='Host to bind to')
-    web_parser.add_argument('--port', type=int, default=8000, help='Port to bind to')
-    web_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
-    
-    # CLI command
-    cli_parser = subparsers.add_parser('cli', help='Start CLI interface')
-    cli_parser.add_argument('cli_args', nargs='*', help='CLI arguments to pass through')
-    
-    # Direct queue commands
-    start_parser = subparsers.add_parser('start', help='Start queue processor')
-    start_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
-    start_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
-    
-    status_parser = subparsers.add_parser('status', help='Show queue status')
-    status_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
-    status_parser.add_argument('--json', action='store_true', help='Output as JSON')
-    
-    # Add prompt command
-    add_parser = subparsers.add_parser('add', help='Add prompt to queue')
-    add_parser.add_argument('prompt', help='Prompt text or alias')
-    add_parser.add_argument('--priority', '-p', type=int, default=0, help='Priority')
-    add_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
-    
-    args = parser.parse_args()
-    
-    if not args.command:
-        parser.print_help()
-        return 1
-    
-    # Handle setup command
-    if args.command == 'setup':
-        success = setup_environment()
-        return 0 if success else 1
-    
-    # For other commands, ensure the package is importable
-    try:
-        # Add the src directory to Python path
-        src_path = Path(__file__).parent / 'src'
-        if src_path.exists():
-            sys.path.insert(0, str(src_path))
-        
-        # Try importing the package
-        import cuti
-        
-    except ImportError:
-        print("❌ cuti not installed. Run: python run.py setup")
-        return 1
-    
-    # Handle web command
-    if args.command == 'web':
-        try:
-            from cuti.web.app import create_app
-            import uvicorn
-            
-            app = create_app(args.storage_dir)
-            print(f"🚀 Starting web interface at http://{args.host}:{args.port}")
-            print(f"📁 Storage directory: {args.storage_dir}")
-            print("Press Ctrl+C to stop")
-            uvicorn.run(app, host=args.host, port=args.port, log_level="info")
-            
-        except ImportError as e:
-            print(f"❌ Web dependencies not available: {e}")
-            print("Run: python run.py setup")
-            return 1
-        except KeyboardInterrupt:
-            print("\n👋 Web interface stopped")
-            return 0
-    
-    # Handle CLI command
-    elif args.command == 'cli':
-        try:
-            from cuti.cli.app import app as cli_app
-            
-            # Pass through CLI arguments
-            if args.cli_args:
-                sys.argv = ['cuti'] + args.cli_args
-            else:
-                sys.argv = ['cuti', '--help']
-                
-            cli_app()
-            
-        except ImportError as e:
-            print(f"❌ CLI not available: {e}")
-            print("Run: python run.py setup")
-            return 1
-    
-    # Handle direct queue commands
-    else:
-        try:
-            from cuti.services.queue_service import QueueManager
-            from cuti.core.models import QueuedPrompt
-            from cuti.services.aliases import PromptAliasManager
-            
-            manager = QueueManager(storage_dir=args.storage_dir)
-            
-            if args.command == 'start':
-                print("🚀 Starting cuti processor...")
-                print(f"📁 Storage directory: {args.storage_dir}")
-                print("Press Ctrl+C to stop")
-                
-                def status_callback(state):
-                    if args.verbose:
-                        stats = state.get_stats()
-                        print(f"📊 Queue status: {stats['status_counts']}")
-                
-                try:
-                    manager.start(callback=status_callback if args.verbose else None)
-                except KeyboardInterrupt:
-                    print("\n👋 Queue processor stopped")
-                    return 0
-            
-            elif args.command == 'status':
-                state = manager.get_status()
-                stats = state.get_stats()
-                
-                if args.json:
-                    import json
-                    print(json.dumps(stats, indent=2))
-                else:
-                    print("📊 cuti Status")
-                    print("=" * 40)
-                    print(f"📝 Total prompts: {stats['total_prompts']}")
-                    print(f"✅ Completed: {stats['total_processed']}")
-                    print(f"❌ Failed: {stats['failed_count']}")
-                    print(f"⚠️  Rate limited: {stats['rate_limited_count']}")
-                    
-                    print("\n📈 Status breakdown:")
-                    for status, count in stats["status_counts"].items():
-                        if count > 0:
-                            emoji = {
-                                "queued": "⏳",
-                                "executing": "▶️", 
-                                "completed": "✅",
-                                "failed": "❌",
-                                "cancelled": "🚫",
-                                "rate_limited": "⚠️"
-                            }.get(status, "❓")
-                            print(f"  {emoji} {status}: {count}")
-            
-            elif args.command == 'add':
-                alias_manager = PromptAliasManager(args.storage_dir)
-                
-                # Resolve alias if needed
-                resolved_prompt = alias_manager.resolve_alias(args.prompt)
-                if resolved_prompt != args.prompt:
-                    print(f"🔗 Using alias: {args.prompt}")
-                
-                queued_prompt = QueuedPrompt(
-                    content=resolved_prompt,
-                    priority=args.priority
-                )
-                
-                success = manager.add_prompt(queued_prompt)
-                if success:
-                    print(f"✅ Added prompt {queued_prompt.id} to queue")
-                else:
-                    print("❌ Failed to add prompt")
-                    return 1
-                    
-        except ImportError as e:
-            print(f"❌ Required components not available: {e}")
-            print("Run: python run.py setup")
-            return 1
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            return 1
-    
-    return 0
+def main() -> int:
+    args = sys.argv[1:]
+    command = args[0] if args else None
+
+    if command in (None, "-h", "--help", "help"):
+        print(__doc__)
+        print("Usage:")
+        print("  python run.py setup        # editable install with uv")
+        print("  python run.py cli [args]   # run the cuti CLI from source")
+        print("  python run.py web [args]   # run the ops console from source")
+        return 0 if command else 1
+
+    if command == "setup":
+        return 0 if setup_environment() else 1
+
+    # Make the source tree importable without an install.
+    src_path = Path(__file__).parent / "src"
+    if src_path.exists():
+        sys.path.insert(0, str(src_path))
+
+    if command == "cli":
+        from cuti.cli.app import app as cli_app
+
+        sys.argv = ["cuti", *args[1:]] if len(args) > 1 else ["cuti", "--help"]
+        cli_app()
+        return 0
+
+    if command == "web":
+        from cuti.web.app import main as web_main
+
+        sys.argv = ["cuti-web", *args[1:]]
+        web_main()
+        return 0
+
+    print(f"Unknown command: {command}. Try 'python run.py --help'.")
+    return 1
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

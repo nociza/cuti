@@ -96,18 +96,16 @@ cuti container
 # cuti:/workspace $ 
 
 # Inside container, all commands work:
-cuti web          # Start read-only ops console (accessible at http://localhost:8000)
-cuti cli          # Start interactive CLI
-cuti agent list   # List available agents
-claude --help     # Use Claude CLI (already authenticated)
+cuti web              # Start read-only ops console (accessible at http://localhost:8000)
+cuti providers list   # List configured agent-CLI providers
+claude --help         # Use Claude CLI (already authenticated)
 ```
 
 ### Non-Interactive Commands
 ```bash
-# Run cuti commands
-cuti container "cuti add 'Review this code and suggest improvements'"
-cuti container "cuti start"
-cuti container "cuti status"
+# Run a command inside the container
+cuti container "claude 'Review this code and suggest improvements'"
+cuti container "cuti providers doctor"
 
 # Run Claude directly
 cuti container "claude 'What does this project do?'"
@@ -232,7 +230,7 @@ Install behavior is provider-specific:
 
 OpenClaw-specific notes:
 
-- `qt-openclaw ...` and `qt-OpenClaw ...` run the same dedicated OpenClaw command group from the host.
+- `qt-openclaw ...` runs the dedicated OpenClaw command group from the host.
 - `qt-openclaw onboard` runs `openclaw onboard --install-daemon` in the container, then runs `openclaw doctor --non-interactive`.
 - `qt-openclaw up` runs onboarding if no OpenClaw state is detected, runs doctor, then starts the gateway in the foreground.
 - Channel, browser, plugin, voice-call, and dashboard surfaces are exposed as direct wrappers: `qt-openclaw channels-login`, `qt-openclaw channels ...`, `qt-openclaw browser ...`, `qt-openclaw plugins ...`, `qt-openclaw voice-setup`, `qt-openclaw voicecall ...`, and `qt-openclaw dashboard ...`.
@@ -628,8 +626,8 @@ To improve dev container support:
 
 ## Related Documentation
 
-- [Todo System](todo-system.md) - Task management in cuti
-- [Rate Limit Handling](rate-limit-handling.md) - How cuti handles API limits
+- [Claude Authentication](claude-container-auth.md) - Anthropic API & Claude CLI setup
+- [Account Switching](claude-account-switching.md) - Manage multiple Claude accounts
 - [Main README](../README.md) - Project overview
 
 ## License

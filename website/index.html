@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuti - AI Development Environment & Multi-Agent Orchestration</title>
-    <meta name="description" content="Instant containerized development with Claude Code, Anthropic API integration, and intelligent multi-agent orchestration. Deploy AI-powered workflows in seconds.">
-    <meta name="keywords" content="AI development, Claude Code, Anthropic API, containerized development, multi-agent orchestration, LLM automation, Docker, AI agents">
+    <title>cuti — an instant, containerized Claude Code dev environment</title>
+    <meta name="description" content="One command for a ready-to-use, isolated Claude Code workspace in Docker, plus provider, account, history, and usage tooling.">
+    <meta name="keywords" content="AI development, Claude Code, Anthropic API, containerized development, devcontainer, Docker, provider management, Claude accounts">
     <meta name="author" content="Cuti">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://nociza.github.io/cuti/">
-    <meta property="og:title" content="Cuti - AI Development Environment & Multi-Agent Orchestration">
-    <meta property="og:description" content="Instant containerized development with Claude Code, Anthropic API integration, and intelligent multi-agent orchestration.">
+    <meta property="og:title" content="cuti — an instant, containerized Claude Code dev environment">
+    <meta property="og:description" content="One command for a ready-to-use, isolated Claude Code workspace in Docker.">
     <meta property="og:image" content="https://nociza.github.io/cuti/favicon.svg">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://nociza.github.io/cuti/">
-    <meta property="twitter:title" content="Cuti - AI Development Environment & Multi-Agent Orchestration">
-    <meta property="twitter:description" content="Instant containerized development with Claude Code, Anthropic API integration, and intelligent multi-agent orchestration.">
+    <meta property="twitter:title" content="cuti — an instant, containerized Claude Code dev environment">
+    <meta property="twitter:description" content="One command for a ready-to-use, isolated Claude Code workspace in Docker.">
     <meta property="twitter:image" content="https://nociza.github.io/cuti/favicon.svg">
     
     <!-- Canonical URL -->
@@ -35,7 +35,7 @@
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "Cuti",
-      "description": "AI Development Environment & Multi-Agent Orchestration tool with containerized Claude Code integration",
+      "description": "An instant, containerized Claude Code dev environment with provider, account, history, and usage tooling",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
       "offers": {
@@ -70,8 +70,8 @@
         <div class="container">
             <div class="hero-content">
                 <h1>Cuti</h1>
-                <p class="hero-subtitle">AI Development Environment & Multi-Agent Orchestration</p>
-                <p class="hero-description">Instant containerized development with Claude Code, Anthropic API integration, and intelligent agent orchestration</p>
+                <p class="hero-subtitle">An instant, containerized Claude Code dev environment</p>
+                <p class="hero-description">One command for a ready-to-use, isolated Claude Code workspace in Docker</p>
                 <div class="hero-buttons">
                     <a href="#quick-start" class="btn btn-primary">
                         <i class="fas fa-rocket"></i> Get Started
@@ -125,22 +125,22 @@ cuti container</code></pre>
                     <div class="feature-icon">
                         <i class="fas fa-users"></i>
                     </div>
-                    <h3>Multi-Agent Orchestration</h3>
-                    <p>Build with multiple AI models - Claude API and Gemini integration for intelligent task management</p>
+                    <h3>Provider Management</h3>
+                    <p>Manage agent-CLI providers (Claude, Codex, OpenCode, OpenClaw) and switch between multiple Claude accounts</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-layer-group"></i>
+                        <i class="fas fa-shield-halved"></i>
                     </div>
-                    <h3>Command Queuing</h3>
-                    <p>Smart task queuing system with priority execution and automatic rate limiting</p>
+                    <h3>Secure by Default</h3>
+                    <p>The host Docker socket and inactive-account credentials stay off-limits to the agent unless you explicitly opt in</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
                         <i class="fas fa-dashboard"></i>
                     </div>
-                    <h3>Web UI Dashboard</h3>
-                    <p>Launch with <code>cuti web</code> for a comprehensive dashboard to manage your AI agents</p>
+                    <h3>Read-only Ops Console</h3>
+                    <p>Launch <code>cuti web</code> to inspect provider readiness, Claude sessions, and workspace drift</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -151,10 +151,10 @@ cuti container</code></pre>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-tasks"></i>
+                        <i class="fas fa-clock-rotate-left"></i>
                     </div>
-                    <h3>Task Automation</h3>
-                    <p>Built-in todo system for AI agents with smart task expansion and tracking</p>
+                    <h3>History &amp; Usage</h3>
+                    <p>Browse and resume past Claude Code sessions with <code>cuti history</code> and track local usage analytics</p>
                 </div>
             </div>
         </div>
@@ -208,13 +208,13 @@ cuti container</code></pre>
                     <h3><i class="fas fa-lock"></i> API Keys</h3>
                     <p>Anthropic & AWS Bedrock API key management</p>
                 </a>
-                <a href="docs.html?doc=todo-system" class="doc-card">
-                    <h3><i class="fas fa-list-check"></i> Task Management</h3>
-                    <p>AI agent todo system</p>
+                <a href="docs.html?doc=claude-history" class="doc-card">
+                    <h3><i class="fas fa-clock-rotate-left"></i> Chat History</h3>
+                    <p>Browse and resume past Claude Code sessions</p>
                 </a>
-                <a href="docs.html?doc=rate-limit-handling" class="doc-card">
-                    <h3><i class="fas fa-gauge-high"></i> Rate Limit Handling</h3>
-                    <p>Smart API throttling & retry logic</p>
+                <a href="docs.html?doc=cli-tools-management" class="doc-card">
+                    <h3><i class="fas fa-screwdriver-wrench"></i> CLI Tools</h3>
+                    <p>Workspace tool catalog and activation</p>
                 </a>
             </div>
             <div class="text-center" style="margin-top: 2rem;">
@@ -238,7 +238,7 @@ cuti container</code></pre>
             <div class="footer-content">
                 <div class="footer-section">
                     <h4>Cuti</h4>
-                    <p>AI Development Environment & Multi-Agent Orchestration</p>
+                    <p>An instant, containerized Claude Code dev environment</p>
                 </div>
                 <div class="footer-section">
                     <h4>Links</h4>

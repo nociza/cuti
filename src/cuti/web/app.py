@@ -6,7 +6,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI
@@ -15,15 +14,21 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..services.claude_logs_reader import ClaudeLogsReader
-from ..services.history import PromptHistoryManager
-from ..services.queue_service import QueueManager
 from .api.ops import router as ops_router
 from .routes import main_router
 
 
+def _app_version() -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("cuti")
+    except PackageNotFoundError:  # pragma: no cover - source checkout
+        return "0.0.0"
+
 
 def _resolve_storage_dir(storage_dir: str, working_directory: Path) -> Path:
-    override = os.getenv("CLAUDE_QUEUE_STORAGE_DIR")
+    override = os.getenv("CUTI_STORAGE_DIR")
     if override:
         return Path(override).expanduser()
     if storage_dir and storage_dir != "~/.cuti":
@@ -31,41 +36,31 @@ def _resolve_storage_dir(storage_dir: str, working_directory: Path) -> Path:
     return working_directory / ".cuti"
 
 
-
 def create_app(
     storage_dir: str = "~/.cuti",
-    working_directory: Optional[str] = None,
+    working_directory: str | None = None,
 ) -> FastAPI:
     """Create the passive cuti ops console."""
 
     app = FastAPI(
         title="cuti Ops Console",
-        description="Read-only workspace operations console for provider readiness, queue state, and drift.",
-        version="0.1.0",
+        description="Read-only workspace operations console for provider readiness, "
+        "Claude sessions, tools, and instruction-file drift.",
+        version=_app_version(),
     )
+    # The console is read-only and binds to localhost by default. Allow only
+    # same-origin requests; do not echo arbitrary origins back with credentials.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
+        allow_origins=[],
+        allow_credentials=False,
+        allow_methods=["GET"],
         allow_headers=["*"],
     )
 
     working_path = Path(working_directory or Path.cwd()).resolve()
     resolved_storage_dir = _resolve_storage_dir(storage_dir, working_path)
 
-    queue_manager = None
-    queue_warning = None
-    try:
-        queue_manager = QueueManager(storage_dir=str(resolved_storage_dir))
-    except RuntimeError as exc:
-        queue_warning = str(exc)
-        print(f"Warning: {queue_warning}")
-        print("The ops console will still load, but queue inspection is limited until Claude is available.")
-
-    app.state.queue_manager = queue_manager
-    app.state.queue_warning = queue_warning
-    app.state.history_manager = PromptHistoryManager(str(resolved_storage_dir))
     app.state.claude_logs_reader = ClaudeLogsReader(working_directory=str(working_path))
     app.state.storage_dir = resolved_storage_dir
     app.state.working_directory = working_path
@@ -74,14 +69,15 @@ def create_app(
     app.state.templates = Jinja2Templates(directory=str(web_dir / "templates"))
 
     try:
-        app.mount("/static", StaticFiles(directory=str(web_dir / "static")), name="static")
+        app.mount(
+            "/static", StaticFiles(directory=str(web_dir / "static")), name="static"
+        )
     except RuntimeError:
         pass
 
     app.include_router(ops_router)
     app.include_router(main_router)
     return app
-
 
 
 def main() -> None:
@@ -94,14 +90,18 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
     parser.add_argument("--storage-dir", default="~/.cuti", help="Storage directory")
-    parser.add_argument("--working-directory", default=None, help="Workspace to inspect")
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    parser.add_argument(
+        "--working-directory", default=None, help="Workspace to inspect"
+    )
+    parser.add_argument(
+        "--reload", action="store_true", help="Enable auto-reload for development"
+    )
     args = parser.parse_args()
 
-    host = os.getenv("CLAUDE_QUEUE_WEB_HOST", args.host)
-    port_env = os.getenv("CLAUDE_QUEUE_WEB_PORT")
+    host = os.getenv("CUTI_WEB_HOST", args.host)
+    port_env = os.getenv("CUTI_WEB_PORT")
     port = int(port_env) if port_env else args.port
-    storage_dir = os.getenv("CLAUDE_QUEUE_STORAGE_DIR", args.storage_dir)
+    storage_dir = os.getenv("CUTI_STORAGE_DIR", args.storage_dir)
     working_dir = os.getenv("CUTI_WORKING_DIR", args.working_directory)
     app = create_app(storage_dir=storage_dir, working_directory=working_dir)
 
@@ -113,7 +113,7 @@ def main() -> None:
         print(f"Working Directory: {working_dir}")
     print(f"Ops Console: http://{host}:{port}")
     print(f"API Docs: http://{host}:{port}/docs")
-    print("This UI is read-only. Use the CLI for provider changes, auth, and queue execution.")
+    print("This UI is read-only. Use the CLI for provider changes and auth.")
     print()
 
     try:

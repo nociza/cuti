@@ -3,12 +3,10 @@ CLI commands for managing global settings and data.
 """
 
 import click
-import json
-from pathlib import Path
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from ...services.global_data_manager import GlobalDataManager, GlobalSettings
 from ...services.usage_sync_service import UsageSyncManager
@@ -27,55 +25,49 @@ def show():
     """Show current global settings."""
     manager = GlobalDataManager()
     settings = manager.settings
-    
+
     table = Table(title="Global Settings", box=box.ROUNDED)
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="yellow")
     table.add_column("Description", style="dim")
-    
+
     table.add_row(
         "Usage Tracking",
         "✓ Enabled" if settings.usage_tracking_enabled else "✗ Disabled",
-        "Track Claude Code usage statistics"
+        "Track Claude Code usage statistics",
     )
     table.add_row(
         "Privacy Mode",
         "✓ Enabled" if settings.privacy_mode else "✗ Disabled",
-        "Don't store prompt content"
+        "Don't store prompt content",
     )
     table.add_row(
         "Favorite Prompts",
         "✓ Enabled" if settings.favorite_prompts_enabled else "✗ Disabled",
-        "Save favorite prompts for reuse"
+        "Save favorite prompts for reuse",
     )
     table.add_row(
         "Auto Cleanup",
         f"{settings.auto_cleanup_days} days",
-        "Delete data older than N days"
+        "Delete data older than N days",
     )
     table.add_row(
         "Max Storage",
         f"{settings.max_storage_mb} MB",
-        "Maximum storage for global data"
+        "Maximum storage for global data",
     )
     table.add_row(
-        "Claude Plan",
-        settings.claude_plan.upper(),
-        "Your Claude subscription plan"
+        "Claude Plan", settings.claude_plan.upper(), "Your Claude subscription plan"
     )
-    table.add_row(
-        "Theme",
-        settings.theme.capitalize(),
-        "UI theme preference"
-    )
+    table.add_row("Theme", settings.theme.capitalize(), "UI theme preference")
     table.add_row(
         "Notifications",
         "✓ Enabled" if settings.notifications_enabled else "✗ Disabled",
-        "Show notifications"
+        "Show notifications",
     )
-    
+
     console.print(table)
-    
+
     # Show storage info
     storage_info = manager.get_storage_info()
     storage_panel = Panel(
@@ -84,7 +76,7 @@ def show():
         f"Files: {storage_info['file_count']}\n"
         f"Database: {storage_info['database_size_mb']} MB",
         title="Storage Usage",
-        border_style="dim"
+        border_style="dim",
     )
     console.print(storage_panel)
 
@@ -103,40 +95,40 @@ def update(**kwargs):
     manager = GlobalDataManager()
     settings = manager.settings
     updated = False
-    
+
     # Update settings based on provided options
     if kwargs.get('tracking') is not None:
         settings.usage_tracking_enabled = kwargs['tracking']
         updated = True
-    
+
     if kwargs.get('privacy') is not None:
         settings.privacy_mode = kwargs['privacy']
         updated = True
-    
+
     if kwargs.get('favorites') is not None:
         settings.favorite_prompts_enabled = kwargs['favorites']
         updated = True
-    
+
     if kwargs.get('cleanup_days'):
         settings.auto_cleanup_days = kwargs['cleanup_days']
         updated = True
-    
+
     if kwargs.get('max_storage'):
         settings.max_storage_mb = kwargs['max_storage']
         updated = True
-    
+
     if kwargs.get('plan'):
         settings.claude_plan = kwargs['plan']
         updated = True
-    
+
     if kwargs.get('theme'):
         settings.theme = kwargs['theme']
         updated = True
-    
+
     if kwargs.get('notifications') is not None:
         settings.notifications_enabled = kwargs['notifications']
         updated = True
-    
+
     if updated:
         manager.save_settings(settings)
         console.print("[green]✓[/green] Settings updated successfully")
@@ -157,11 +149,13 @@ def reset():
 def cleanup():
     """Clean up old usage data."""
     manager = GlobalDataManager()
-    
-    if click.confirm(f"Delete data older than {manager.settings.auto_cleanup_days} days?"):
+
+    if click.confirm(
+        f"Delete data older than {manager.settings.auto_cleanup_days} days?"
+    ):
         manager.cleanup_old_data()
         console.print("[green]✓[/green] Old data cleaned up")
-        
+
         # Show updated storage info
         storage_info = manager.get_storage_info()
         console.print(f"Storage now: {storage_info['total_size_mb']} MB")
@@ -172,7 +166,7 @@ def backup():
     """Create a backup of global data."""
     manager = GlobalDataManager()
     backup_path = manager.backup_database()
-    
+
     if backup_path:
         console.print(f"[green]✓[/green] Backup created: {backup_path}")
     else:
@@ -185,7 +179,7 @@ def backup():
 def export(output_path, format):
     """Export all global data."""
     manager = GlobalDataManager()
-    
+
     if manager.export_data(output_path, format):
         console.print(f"[green]✓[/green] Data exported to: {output_path}")
     else:
@@ -196,9 +190,9 @@ def export(output_path, format):
 def sync():
     """Sync usage data from Claude logs."""
     console.print("Syncing usage data from Claude logs...")
-    
+
     imported = UsageSyncManager.sync_now()
-    
+
     if imported > 0:
         console.print(f"[green]✓[/green] Imported {imported} new usage records")
     elif imported == 0:
@@ -211,18 +205,18 @@ def sync():
 def sync_status():
     """Show sync service status."""
     status = UsageSyncManager.get_status()
-    
+
     table = Table(title="Sync Service Status", box=box.ROUNDED)
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="yellow")
-    
+
     table.add_row("Status", "🟢 Running" if status['running'] else "🔴 Stopped")
     table.add_row("Last Sync", status['last_sync'] or "Never")
     table.add_row("Sync Count", str(status['sync_count']))
     table.add_row("Error Count", str(status['error_count']))
     table.add_row("Sync Interval", f"{status['sync_interval']} seconds")
     table.add_row("Tracking Enabled", "Yes" if status['tracking_enabled'] else "No")
-    
+
     console.print(table)
 
 

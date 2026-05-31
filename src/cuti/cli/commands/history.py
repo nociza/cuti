@@ -6,7 +6,6 @@ import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -21,11 +20,13 @@ history_app = typer.Typer(help="Inspect Claude Code chat history and resume sess
 console = Console()
 
 
-def _workspace_path_override(workspace: Optional[str]) -> Path:
+def _workspace_path_override(workspace: str | None) -> Path:
     return Path(workspace).expanduser().resolve() if workspace else Path.cwd().resolve()
 
 
-def _resolve_session_identifier(identifier: str, sessions: List[SessionSummary]) -> SessionSummary:
+def _resolve_session_identifier(
+    identifier: str, sessions: list[SessionSummary]
+) -> SessionSummary:
     if not sessions:
         raise typer.BadParameter("No Claude sessions available")
 
@@ -37,9 +38,15 @@ def _resolve_session_identifier(identifier: str, sessions: List[SessionSummary])
         idx = int(identifier) - 1
         if 0 <= idx < len(sessions):
             return sessions[idx]
-        raise typer.BadParameter(f"Index {identifier} is out of range (total sessions: {len(sessions)})")
+        raise typer.BadParameter(
+            f"Index {identifier} is out of range (total sessions: {len(sessions)})"
+        )
 
-    matches = [session for session in sessions if session.session_id.lower().startswith(identifier)]
+    matches = [
+        session
+        for session in sessions
+        if session.session_id.lower().startswith(identifier)
+    ]
     if not matches:
         raise typer.BadParameter(f"No session with id/prefix '{identifier}' found")
     if len(matches) > 1:
@@ -57,8 +64,12 @@ def _format_timestamp(value: datetime) -> str:
 @history_app.command("list")
 def list_sessions(
     limit: int = typer.Option(10, help="Number of sessions to show"),
-    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
-    all_workspaces: bool = typer.Option(False, "--all", help="Show sessions for every recorded workspace"),
+    workspace: str | None = typer.Option(
+        None, "--workspace", "-w", help="Workspace path (defaults to cwd)"
+    ),
+    all_workspaces: bool = typer.Option(
+        False, "--all", help="Show sessions for every recorded workspace"
+    ),
 ):
     """Display Claude sessions for the current workspace."""
 
@@ -66,7 +77,9 @@ def list_sessions(
     sessions = service.list_sessions(limit=limit, include_all_workspaces=all_workspaces)
 
     if not sessions:
-        console.print("[yellow]No Claude sessions found for this workspace yet.[/yellow]")
+        console.print(
+            "[yellow]No Claude sessions found for this workspace yet.[/yellow]"
+        )
         return
 
     table = Table(title="Claude Sessions")
@@ -83,7 +96,11 @@ def list_sessions(
             summary.session_id,
             _format_timestamp(summary.updated_at),
             turns,
-            (summary.last_user_prompt[:80] + "…") if len(summary.last_user_prompt) > 80 else summary.last_user_prompt,
+            (
+                (summary.last_user_prompt[:80] + "…")
+                if len(summary.last_user_prompt) > 80
+                else summary.last_user_prompt
+            ),
         )
 
     console.print(table)
@@ -91,15 +108,23 @@ def list_sessions(
 
 @history_app.command("show")
 def show_session(
-    session: str = typer.Argument("latest", help="Session id, numeric index, or 'latest'"),
+    session: str = typer.Argument(
+        "latest", help="Session id, numeric index, or 'latest'"
+    ),
     limit: int = typer.Option(40, help="Number of messages to display"),
-    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
-    all_workspaces: bool = typer.Option(False, "--all", help="Search across every recorded workspace"),
+    workspace: str | None = typer.Option(
+        None, "--workspace", "-w", help="Workspace path (defaults to cwd)"
+    ),
+    all_workspaces: bool = typer.Option(
+        False, "--all", help="Search across every recorded workspace"
+    ),
 ):
     """Show the last few messages from a Claude session."""
 
     service = ClaudeHistoryService(_workspace_path_override(workspace))
-    sessions = service.list_sessions(limit=max(limit, 50), include_all_workspaces=all_workspaces)
+    sessions = service.list_sessions(
+        limit=max(limit, 50), include_all_workspaces=all_workspaces
+    )
     if not sessions:
         console.print("[yellow]No Claude sessions available to display.[/yellow]")
         raise typer.Exit(code=1)
@@ -121,14 +146,22 @@ def show_session(
 
 @history_app.command("resume")
 def resume_session(
-    session: str = typer.Argument("latest", help="Session id, numeric index, or 'latest'"),
-    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
-    all_workspaces: bool = typer.Option(False, "--all", help="Search across every recorded workspace"),
+    session: str = typer.Argument(
+        "latest", help="Session id, numeric index, or 'latest'"
+    ),
+    workspace: str | None = typer.Option(
+        None, "--workspace", "-w", help="Workspace path (defaults to cwd)"
+    ),
+    all_workspaces: bool = typer.Option(
+        False, "--all", help="Search across every recorded workspace"
+    ),
 ):
     """Resume a Claude session using the official CLI."""
 
     if not shutil.which("claude"):
-        console.print("[red]The 'claude' CLI is not available in this environment.[/red]")
+        console.print(
+            "[red]The 'claude' CLI is not available in this environment.[/red]"
+        )
         raise typer.Exit(code=1)
 
     service = ClaudeHistoryService(_workspace_path_override(workspace))
@@ -141,10 +174,14 @@ def resume_session(
     console.print(
         f"[dim]Launching:[/dim] claude --resume {summary.session_id} (last active {_format_timestamp(summary.updated_at)})"
     )
-    result = subprocess.run([
-        "claude",
-        "--resume",
-        summary.session_id,
-    ], check=False, cwd=str(service.workspace_path))
+    result = subprocess.run(
+        [
+            "claude",
+            "--resume",
+            summary.session_id,
+        ],
+        check=False,
+        cwd=str(service.workspace_path),
+    )
     if result.returncode != 0:
         raise typer.Exit(result.returncode)

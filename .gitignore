@@ -1,9 +1,14 @@
 __pycache__/
+*.egg-info/
+build/
+dist/
 .venv/
 .cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .DS_Store
 .env
-dist/
 
 # Website docs (copied from root docs/ during build)
 website/docs/

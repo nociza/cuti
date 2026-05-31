@@ -2,23 +2,22 @@
 Container management commands for cuti.
 """
 
-import subprocess
 import json
-from pathlib import Path
-from typing import Dict, List, Optional
+import subprocess
 from collections import defaultdict
+from pathlib import Path
 
 import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 app = typer.Typer(help="Container management commands")
 console = Console()
 
 
-def get_container_info() -> Dict[str, List[Dict]]:
+def get_container_info() -> dict[str, list[dict]]:
     """Get information about all cuti-dev containers grouped by workspace."""
     try:
         # Get all containers using cuti-dev-universal image
@@ -108,7 +107,7 @@ def get_container_info() -> Dict[str, List[Dict]]:
 
 @app.command()
 def start(
-    command: Optional[str] = typer.Argument(None, help="Command to run in container"),
+    command: str | None = typer.Argument(None, help="Command to run in container"),
     rebuild: bool = typer.Option(
         False, "--rebuild", help="Force rebuild the container image"
     ),
@@ -120,6 +119,12 @@ def start(
         "--openclaw",
         "--claw",
         help="Start in OpenClaw mode instead of the default Claude Code mode",
+    ),
+    docker_socket: bool = typer.Option(
+        False,
+        "--docker-socket",
+        help="Mount the host Docker socket (root-equivalent on the host). "
+        "Off by default; enable only when you need Docker-in-Docker.",
     ),
 ):
     """Start a new container for the current workspace."""
@@ -172,7 +177,14 @@ def start(
     # Run in container
     mode_label = "OpenClaw" if openclaw_mode else "Claude Code"
     console.print(f"[green]Starting dev container in {mode_label} mode...[/green]")
-    exit_code = service.run_in_container(command, rebuild=rebuild)
+    if docker_socket:
+        console.print(
+            "[yellow]⚠ Mounting the host Docker socket grants root-equivalent host "
+            "access.[/yellow]"
+        )
+    exit_code = service.run_in_container(
+        command, rebuild=rebuild, mount_docker_socket=docker_socket
+    )
 
     if exit_code != 0:
         console.print(f"[red]Container exited with code {exit_code}[/red]")
@@ -273,7 +285,7 @@ def status(
 
 @app.command()
 def stop(
-    container_id: Optional[str] = typer.Argument(
+    container_id: str | None = typer.Argument(
         None, help="Container ID to stop (or current if inside container)"
     ),
     all: bool = typer.Option(False, "--all", "-a", help="Stop all cuti containers"),
@@ -349,8 +361,8 @@ def stop(
 
 @app.command()
 def enter(
-    container_id: Optional[str] = typer.Argument(None, help="Container ID to enter"),
-    workspace: Optional[str] = typer.Option(
+    container_id: str | None = typer.Argument(None, help="Container ID to enter"),
+    workspace: str | None = typer.Option(
         None, "--workspace", "-w", help="Enter container for specific workspace"
     ),
 ):

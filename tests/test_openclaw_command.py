@@ -235,7 +235,9 @@ def test_openclaw_up_onboards_when_state_missing(monkeypatch) -> None:
             interactive=False,
             mount_docker_socket=True,
         ):
-            calls.append({"kind": "shell", "command": command, "interactive": interactive})
+            calls.append(
+                {"kind": "shell", "command": command, "interactive": interactive}
+            )
             return 0
 
         def run_provider_command(

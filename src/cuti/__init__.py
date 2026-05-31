@@ -1,19 +1,21 @@
-"""cuti - Production-ready Claude Code utilities with queuing and a read-only ops console."""
+"""cuti — an instant, containerized Claude Code dev environment.
 
-__version__ = "0.1.73"
+Launch a ready-to-use Claude Code workspace in Docker with ``cuti container``,
+manage agent-CLI providers and Claude accounts, and inspect usage and history.
+"""
+
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
+try:
+    __version__ = _pkg_version("cuti")
+except PackageNotFoundError:  # pragma: no cover - source checkout without install
+    __version__ = "0.0.0"
+
 __author__ = "claude-code, nociza"
-__description__ = "Production-ready Claude Code utilities with command queuing, prompt aliases, and a read-only ops console."
+__description__ = (
+    "An instant, containerized Claude Code dev environment with provider, "
+    "account, history, and usage tooling."
+)
 
-# Import main components for convenience
-from .services.queue_service import QueueManager
-from .core.models import QueuedPrompt, PromptStatus
-from .services.aliases import PromptAliasManager
-from .services.history import PromptHistoryManager
-
-__all__ = [
-    "QueueManager",
-    "QueuedPrompt", 
-    "PromptStatus",
-    "PromptAliasManager",
-    "PromptHistoryManager",
-]
+__all__ = ["__version__", "__author__", "__description__"]

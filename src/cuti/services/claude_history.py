@@ -6,13 +6,13 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional
 
 
-def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
+def _parse_timestamp(value: str | None) -> datetime | None:
     """Parse ISO timestamp strings from Claude logs."""
 
     if not value:
@@ -30,7 +30,7 @@ def _content_to_text(content) -> str:
 
     if isinstance(content, str):
         return content
-    parts: List[str] = []
+    parts: list[str] = []
     if isinstance(content, list):
         for chunk in content:
             if not isinstance(chunk, dict):
@@ -41,11 +41,15 @@ def _content_to_text(content) -> str:
             elif ctype == "tool_use":
                 tool_name = chunk.get("name", "tool")
                 tool_id = chunk.get("id", "")
-                parts.append(f"[tool:{tool_name} {tool_id}] {json.dumps(chunk.get('input', {}))}")
+                parts.append(
+                    f"[tool:{tool_name} {tool_id}] {json.dumps(chunk.get('input', {}))}"
+                )
             elif ctype == "tool_result":
                 tool_id = chunk.get("tool_use_id", "")
                 if "content" in chunk:
-                    parts.append(f"[tool-result {tool_id}] {_content_to_text(chunk['content'])}")
+                    parts.append(
+                        f"[tool-result {tool_id}] {_content_to_text(chunk['content'])}"
+                    )
                 else:
                     parts.append(f"[tool-result {tool_id}]")
     return "\n".join(part for part in parts if part).strip()
@@ -57,7 +61,7 @@ class SessionSummary:
 
     session_id: str
     file_path: Path
-    workspace_path: Optional[str]
+    workspace_path: str | None
     started_at: datetime
     updated_at: datetime
     user_turns: int
@@ -70,14 +74,14 @@ class SessionMessage:
     """Individual message inside a session transcript."""
 
     role: str
-    timestamp: Optional[datetime]
+    timestamp: datetime | None
     text: str
 
 
 class ClaudeHistoryService:
     """Loads and summarizes Claude Code JSONL conversation logs."""
 
-    def __init__(self, workspace_path: Optional[Path] = None) -> None:
+    def __init__(self, workspace_path: Path | None = None) -> None:
         self.workspace_path = Path(workspace_path or Path.cwd()).resolve()
         self._project_dirs = self._discover_project_dirs()
 
@@ -89,11 +93,11 @@ class ClaudeHistoryService:
         *,
         limit: int = 20,
         include_all_workspaces: bool = False,
-    ) -> List[SessionSummary]:
+    ) -> list[SessionSummary]:
         """Return the most recent session summaries."""
 
         session_files = self._collect_session_files(include_all_workspaces)
-        summaries: List[SessionSummary] = []
+        summaries: list[SessionSummary] = []
         for file_path in session_files:
             summary = self._summarize_session(file_path)
             if summary:
@@ -102,10 +106,12 @@ class ClaudeHistoryService:
         summaries.sort(key=lambda item: item.updated_at, reverse=True)
         return summaries[:limit]
 
-    def load_session(self, summary: SessionSummary, *, limit: Optional[int] = None) -> List[SessionMessage]:
+    def load_session(
+        self, summary: SessionSummary, *, limit: int | None = None
+    ) -> list[SessionMessage]:
         """Return ordered transcript for ``summary`` (optionally truncated)."""
 
-        messages: List[SessionMessage] = []
+        messages: list[SessionMessage] = []
         try:
             with summary.file_path.open() as handle:
                 for raw_line in handle:
@@ -123,7 +129,9 @@ class ClaudeHistoryService:
                     if not text and entry_type != "system":
                         continue
                     timestamp = _parse_timestamp(record.get("timestamp"))
-                    messages.append(SessionMessage(role=entry_type, timestamp=timestamp, text=text))
+                    messages.append(
+                        SessionMessage(role=entry_type, timestamp=timestamp, text=text)
+                    )
         except FileNotFoundError:
             return []
 
@@ -134,17 +142,17 @@ class ClaudeHistoryService:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _discover_project_dirs(self) -> List[Path]:
+    def _discover_project_dirs(self) -> list[Path]:
         """Return existing Claude projects directories to inspect."""
 
-        candidates: List[Path] = []
+        candidates: list[Path] = []
         env_dir = os.getenv("CLAUDE_CONFIG_DIR")
         if env_dir:
             candidates.append(Path(env_dir).expanduser())
         candidates.append(Path.home() / ".cuti" / "claude-linux")
         candidates.append(Path.home() / ".claude")
 
-        project_dirs: List[Path] = []
+        project_dirs: list[Path] = []
         seen: set[Path] = set()
         for root in candidates:
             projects = root / "projects"
@@ -158,10 +166,10 @@ class ClaudeHistoryService:
             project_dirs.append(projects)
         return project_dirs
 
-    def _collect_session_files(self, include_all: bool) -> List[Path]:
+    def _collect_session_files(self, include_all: bool) -> list[Path]:
         """Return candidate JSONL files for the current workspace."""
 
-        files: List[Path] = []
+        files: list[Path] = []
         target_slug = self._workspace_slug(self.workspace_path)
         for projects_dir in self._project_dirs:
             if not projects_dir.exists():
@@ -174,11 +182,18 @@ class ClaudeHistoryService:
                     child
                     for child in projects_dir.iterdir()
                     if child.is_dir()
-                    and (child.name == target_slug or child.name.startswith(f"{target_slug}-"))
+                    and (
+                        child.name == target_slug
+                        or child.name.startswith(f"{target_slug}-")
+                    )
                 ]
                 if not dirs:
                     # Fallback to direct slug match on sanitized /workspace, useful when running on host
-                    dirs = [child for child in projects_dir.iterdir() if child.is_dir() and child.name.endswith(target_slug)]
+                    dirs = [
+                        child
+                        for child in projects_dir.iterdir()
+                        if child.is_dir() and child.name.endswith(target_slug)
+                    ]
             for directory in dirs:
                 for path in directory.glob("*.jsonl"):
                     files.append(path)
@@ -194,11 +209,11 @@ class ClaudeHistoryService:
                     files.extend(directory.glob("*.jsonl"))
         return files
 
-    def _summarize_session(self, file_path: Path) -> Optional[SessionSummary]:
+    def _summarize_session(self, file_path: Path) -> SessionSummary | None:
         session_id = file_path.stem
-        workspace_path: Optional[str] = None
-        started_at: Optional[datetime] = None
-        updated_at: Optional[datetime] = None
+        workspace_path: str | None = None
+        started_at: datetime | None = None
+        updated_at: datetime | None = None
         user_turns = 0
         assistant_turns = 0
         last_prompt = ""
@@ -223,7 +238,9 @@ class ClaudeHistoryService:
                     entry_type = record.get("type")
                     if entry_type == "user":
                         user_turns += 1
-                        text = _content_to_text(record.get("message", {}).get("content"))
+                        text = _content_to_text(
+                            record.get("message", {}).get("content")
+                        )
                         if text:
                             last_prompt = text.strip()
                     elif entry_type == "assistant":
@@ -265,5 +282,9 @@ class ClaudeHistoryService:
 def claude_available() -> bool:
     """Return True when the ``claude`` CLI is discoverable."""
 
-    return subprocess.call(["which", "claude"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
-
+    return (
+        subprocess.call(
+            ["which", "claude"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        == 0
+    )

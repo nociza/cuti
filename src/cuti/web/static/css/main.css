@@ -496,32 +496,22 @@ select:focus {
     font-weight: 500;
 }
 
-.status-ready,
-.todo-completed,
-.queue-completed {
+.status-ready {
     color: var(--success);
     background: rgba(31, 122, 92, 0.14);
 }
 
-.status-partial,
-.todo-in_progress,
-.queue-executing {
+.status-partial {
     color: var(--warning);
     background: rgba(170, 106, 8, 0.14);
 }
 
-.status-missing,
-.todo-blocked,
-.queue-failed,
-.queue-rate_limited {
+.status-missing {
     color: var(--danger);
     background: rgba(164, 63, 44, 0.14);
 }
 
-.status-selected,
-.todo-pending,
-.queue-queued,
-.queue-cancelled {
+.status-selected {
     color: var(--slate);
     background: rgba(50, 80, 106, 0.12);
 }

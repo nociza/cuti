@@ -1,5 +1,6 @@
 """
-Simple test to verify the project structure is working correctly.
+Smoke tests that verify the project structure and that the obsolete
+queue / multi-agent subsystems have been fully removed.
 """
 
 import sys
@@ -7,44 +8,51 @@ from pathlib import Path
 
 
 def test_project_structure():
-    """Test that the project structure is properly organized."""
-    # Get the project root
+    """Key directories and packaging metadata exist."""
     project_root = Path(__file__).parent.parent
-    
-    # Check that key directories exist
+
     assert (project_root / "src" / "cuti").exists(), "Source package should exist"
     assert (project_root / "tests").exists(), "Tests directory should exist"
     assert (project_root / "pyproject.toml").exists(), "pyproject.toml should exist"
-    
-    # Check that test files are in the right place
-    assert (project_root / "tests" / "test_agents.py").exists(), "test_agents.py should be in tests/"
-    assert (project_root / "tests" / "test_agent_integration.py").exists(), "test_agent_integration.py should be in tests/"
-    assert (project_root / "tests" / "test_web_ops.py").exists(), "test_web_ops.py should be in tests/"
-    
-    # Check that old test files are removed from root
-    assert not (project_root / "test_agents.py").exists(), "Old test_agents.py should be removed from root"
-    assert not (project_root / "test_agent_integration.py").exists(), "Old test_agent_integration.py should be removed from root"
 
 
-def test_imports_configured():
-    """Test that import paths are configured correctly."""
-    # Add src to path
+def test_obsolete_subsystems_removed():
+    """The queue, multi-agent, todo, and alias subsystems are gone."""
+    pkg = Path(__file__).parent.parent / "src" / "cuti"
+
+    removed = [
+        "agents",
+        "core/queue.py",
+        "core/storage.py",
+        "core/models.py",
+        "services/queue_service.py",
+        "services/task_expansion.py",
+        "services/aliases.py",
+        "services/todo_service.py",
+        "cli/commands/queue.py",
+        "cli/commands/agent.py",
+        "cli/commands/todo.py",
+        "cli/commands/alias.py",
+        "models.py",
+        "queue_manager.py",
+    ]
+    present = [rel for rel in removed if (pkg / rel).exists()]
+    assert not present, f"obsolete modules should be removed: {present}"
+
+
+def test_package_imports():
+    """The package and CLI import cleanly."""
     project_root = Path(__file__).parent.parent
-    src_path = project_root / "src"
-    sys.path.insert(0, str(src_path))
-    
-    # This should work without errors when dependencies are installed
-    try:
-        import cuti
-        import_success = True
-    except ImportError as e:
-        # Expected if dependencies aren't installed, but structure is correct
-        import_success = "yaml" in str(e) or "claude" in str(e) or "fastapi" in str(e)
-    
-    assert import_success, "Import should work or fail only due to missing dependencies"
+    sys.path.insert(0, str(project_root / "src"))
+
+    import cuti  # noqa: F401
+    import cuti.cli.app  # noqa: F401
+
+    assert isinstance(cuti.__version__, str)
 
 
 if __name__ == "__main__":
     test_project_structure()
-    test_imports_configured()
-    print("✓ All structure tests passed!")
+    test_obsolete_subsystems_removed()
+    test_package_imports()
+    print("All structure tests passed!")

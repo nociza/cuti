@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Request
 
-from ...core.models import PromptStatus
 from ...services.instructions import TOOLS_SECTION_HEADER
 from ...services.provider_host import ProviderHostService
 from ...services.providers import ProviderManager
@@ -40,101 +39,7 @@ PROVIDER_INSTRUCTION_FILES = (
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "note": 2}
 
 
-def _isoformat(value: Any) -> Optional[str]:
-    if value is None:
-        return None
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return str(value)
-
-
-def _serialize_queue_prompt(prompt: Any) -> Dict[str, Any]:
-    return {
-        "id": prompt.id,
-        "content": prompt.content,
-        "status": prompt.status.value,
-        "priority": prompt.priority,
-        "created_at": _isoformat(prompt.created_at),
-        "working_directory": prompt.working_directory,
-        "context_files": list(prompt.context_files or []),
-    }
-
-
-def _serialize_history_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "content": entry.get("content", ""),
-        "working_directory": entry.get("working_directory"),
-        "timestamp": _isoformat(entry.get("timestamp")),
-        "success": entry.get("success"),
-        "context_files": list(entry.get("context_files") or []),
-        "output_preview": entry.get("output_preview"),
-    }
-
-
-def _queue_summary(request: Request) -> Dict[str, Any]:
-    queue_manager = request.app.state.queue_manager
-    detail = "The ops console is passive. Use the CLI or container session to process queued prompts."
-    status_counts = {status.value: 0 for status in PromptStatus}
-
-    if not queue_manager:
-        warning = getattr(request.app.state, "queue_warning", None)
-        if warning:
-            detail = f"{detail} Queue inspection is unavailable: {warning}"
-        return {
-            "available": False,
-            "processor_mode": "passive",
-            "total_prompts": 0,
-            "status_counts": status_counts,
-            "total_processed": 0,
-            "failed_count": 0,
-            "rate_limited_count": 0,
-            "last_processed": None,
-            "current_rate_limit": {"is_rate_limited": False, "reset_time": None},
-            "recent_prompts": [],
-            "detail": detail,
-        }
-
-    state = queue_manager.get_status()
-    stats = state.get_stats()
-    prompts = sorted(state.prompts, key=lambda item: item.created_at, reverse=True)
-    return {
-        "available": True,
-        "processor_mode": "passive",
-        "total_prompts": stats.get("total_prompts", 0),
-        "status_counts": stats.get("status_counts", status_counts),
-        "total_processed": stats.get("total_processed", 0),
-        "failed_count": stats.get("failed_count", 0),
-        "rate_limited_count": stats.get("rate_limited_count", 0),
-        "last_processed": stats.get("last_processed"),
-        "current_rate_limit": stats.get(
-            "current_rate_limit",
-            {"is_rate_limited": False, "reset_time": None},
-        ),
-        "recent_prompts": [_serialize_queue_prompt(prompt) for prompt in prompts[:6]],
-        "detail": detail,
-    }
-
-
-def _history_summary(request: Request) -> Dict[str, Any]:
-    history_manager = request.app.state.history_manager
-    history = [
-        _serialize_history_entry(entry)
-        for entry in history_manager.get_history(limit=8)
-    ]
-    stats = history_manager.get_history_stats() or {}
-    return {
-        "recent": history,
-        "stats": {
-            "total_prompts": stats.get("total_prompts", 0),
-            "successful_prompts": stats.get("successful_prompts", 0),
-            "failed_prompts": stats.get("failed_prompts", 0),
-            "success_rate": stats.get("success_rate", 0),
-            "latest_prompt": stats.get("latest_prompt"),
-        },
-    }
-
-
-def _session_summary(request: Request) -> Dict[str, Any]:
+def _session_summary(request: Request) -> dict[str, Any]:
     logs_reader = request.app.state.claude_logs_reader
     current_session_id = logs_reader.get_current_session_id()
     sessions = logs_reader.get_all_sessions()[:6]
@@ -149,7 +54,7 @@ def _session_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-def _provider_summary(request: Request) -> Dict[str, Any]:
+def _provider_summary(request: Request) -> dict[str, Any]:
     service = ProviderHostService(
         working_directory=str(request.app.state.working_directory)
     )
@@ -166,11 +71,11 @@ def _provider_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-def _tools_summary() -> Dict[str, Any]:
+def _tools_summary() -> dict[str, Any]:
     config = load_tools_config()
     enabled = set(config.get("enabled_tools", []))
     auto_install = set(config.get("auto_install", []))
-    items: List[Dict[str, Any]] = []
+    items: list[dict[str, Any]] = []
     installed_count = 0
 
     for tool in AVAILABLE_TOOLS:
@@ -202,13 +107,13 @@ def _tools_summary() -> Dict[str, Any]:
 
 
 def _workspace_summary(
-    request: Request, selected_instruction_files: List[str], tools_enabled: bool
-) -> Dict[str, Any]:
+    request: Request, selected_instruction_files: list[str], tools_enabled: bool
+) -> dict[str, Any]:
     working_directory = Path(request.app.state.working_directory)
-    files: List[Dict[str, Any]] = []
-    missing_selected_files: List[str] = []
-    stale_files: List[str] = []
-    missing_tools_sections: List[str] = []
+    files: list[dict[str, Any]] = []
+    missing_selected_files: list[str] = []
+    stale_files: list[str] = []
+    missing_tools_sections: list[str] = []
 
     for name in INSTRUCTION_FILES:
         path = working_directory / name
@@ -258,9 +163,9 @@ def _action_item(
     title: str,
     detail: str,
     *,
-    command: Optional[str] = None,
-    source: Optional[str] = None,
-) -> Dict[str, Any]:
+    command: str | None = None,
+    source: str | None = None,
+) -> dict[str, Any]:
     return {
         "severity": severity,
         "title": title,
@@ -271,14 +176,12 @@ def _action_item(
 
 
 def _attention_items(
-    providers: Dict[str, Any],
-    queue: Dict[str, Any],
-    history: Dict[str, Any],
-    tools: Dict[str, Any],
-    workspace: Dict[str, Any],
-    sessions: Dict[str, Any],
-) -> List[Dict[str, Any]]:
-    items: List[Dict[str, Any]] = []
+    providers: dict[str, Any],
+    tools: dict[str, Any],
+    workspace: dict[str, Any],
+    sessions: dict[str, Any],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
 
     if not providers["selected_providers"]:
         items.append(
@@ -302,17 +205,6 @@ def _attention_items(
                     source="providers",
                 )
             )
-
-    if queue["current_rate_limit"].get("is_rate_limited"):
-        reset_time = queue["current_rate_limit"].get("reset_time") or "unknown time"
-        items.append(
-            _action_item(
-                "warning",
-                "Queue is rate limited",
-                f"Claude reported a rate limit. Next reset: {reset_time}.",
-                source="queue",
-            )
-        )
 
     for tool in tools["missing_enabled"][:3]:
         items.append(
@@ -368,17 +260,6 @@ def _attention_items(
             )
         )
 
-    if queue["available"] and queue["total_prompts"] and not history["recent"]:
-        items.append(
-            _action_item(
-                "note",
-                "Queued work has not produced history yet",
-                "The queue has prompts, but there is no recent prompt history recorded for this workspace.",
-                command="cuti start",
-                source="history",
-            )
-        )
-
     if not items:
         items.append(
             _action_item(
@@ -393,11 +274,10 @@ def _attention_items(
     return items[:8]
 
 
-def _recommended_commands(attention_items: List[Dict[str, Any]]) -> List[str]:
-    commands: List[str] = []
+def _recommended_commands(attention_items: list[dict[str, Any]]) -> list[str]:
+    commands: list[str] = []
     for candidate in [item.get("command") for item in attention_items] + [
         "cuti providers doctor",
-        "cuti start",
         "cuti container",
     ]:
         if candidate and candidate not in commands:
@@ -406,12 +286,10 @@ def _recommended_commands(attention_items: List[Dict[str, Any]]) -> List[str]:
 
 
 @router.get("/summary")
-async def ops_summary(request: Request) -> Dict[str, Any]:
+async def ops_summary(request: Request) -> dict[str, Any]:
     """Return the passive operations summary used by the web console."""
 
     providers = _provider_summary(request)
-    queue = _queue_summary(request)
-    history = _history_summary(request)
     tools = _tools_summary()
     workspace = _workspace_summary(
         request,
@@ -423,15 +301,11 @@ async def ops_summary(request: Request) -> Dict[str, Any]:
         tools_enabled=tools["enabled_count"] > 0,
     )
     sessions = _session_summary(request)
-    attention_items = _attention_items(
-        providers, queue, history, tools, workspace, sessions
-    )
+    attention_items = _attention_items(providers, tools, workspace, sessions)
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "providers": providers,
-        "queue": queue,
-        "history": history,
         "tools": tools,
         "workspace": workspace,
         "sessions": sessions,

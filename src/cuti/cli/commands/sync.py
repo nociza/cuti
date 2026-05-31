@@ -5,12 +5,15 @@ CLI commands for syncing usage data.
 import typer
 from rich.console import Console
 from rich.table import Table
-from typing import Optional
-from pathlib import Path
 
-from ...services.usage_sync_service import UsageSyncManager
-from ...services.container_usage_sync import get_container_sync, sync_now as container_sync_now
+from ...services.container_usage_sync import (
+    get_container_sync,
+)
+from ...services.container_usage_sync import (
+    sync_now as container_sync_now,
+)
 from ...services.global_data_manager import GlobalDataManager
+from ...services.usage_sync_service import UsageSyncManager
 
 app = typer.Typer(help="Sync usage data between container and host")
 console = Console()
@@ -21,15 +24,16 @@ def now(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output")
 ):
     """Manually trigger usage data sync."""
-    
+
     # Check if we're in a container
     import os
+
     is_container = os.environ.get("CUTI_IN_CONTAINER") == "true"
-    
+
     if is_container:
         console.print("[cyan]Running container usage sync...[/cyan]")
         records = container_sync_now()
-        
+
         if records > 0:
             console.print(f"✅ Synced {records} usage records from container to host")
         else:
@@ -37,12 +41,12 @@ def now(
     else:
         console.print("[cyan]Running host usage sync...[/cyan]")
         records = UsageSyncManager.sync_now()
-        
+
         if records > 0:
             console.print(f"✅ Imported {records} new usage records")
         else:
             console.print("ℹ️  No new usage records found")
-    
+
     if verbose:
         # Show sync status
         status = UsageSyncManager.get_status()
@@ -55,26 +59,29 @@ def now(
 @app.command()
 def status():
     """Show usage sync service status."""
-    
+
     # Get sync status
     status = UsageSyncManager.get_status()
-    
+
     # Create status table
     table = Table(title="Usage Sync Status")
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="green")
-    
+
     table.add_row("Service Running", "✅ Yes" if status['running'] else "❌ No")
-    table.add_row("Tracking Enabled", "✅ Yes" if status['tracking_enabled'] else "❌ No")
+    table.add_row(
+        "Tracking Enabled", "✅ Yes" if status['tracking_enabled'] else "❌ No"
+    )
     table.add_row("Last Sync", status.get('last_sync', 'Never'))
     table.add_row("Total Syncs", str(status.get('sync_count', 0)))
     table.add_row("Error Count", str(status.get('error_count', 0)))
     table.add_row("Sync Interval", f"{status.get('sync_interval', 300)} seconds")
-    
+
     console.print(table)
-    
+
     # Check container sync if in container
     import os
+
     if os.environ.get("CUTI_IN_CONTAINER") == "true":
         console.print("\n[bold]Container Sync:[/bold]")
         sync = get_container_sync()
@@ -90,10 +97,11 @@ def status():
 @app.command()
 def start():
     """Start the background usage sync service."""
-    
+
     import os
+
     is_container = os.environ.get("CUTI_IN_CONTAINER") == "true"
-    
+
     if is_container:
         console.print("[cyan]Starting container usage sync service...[/cyan]")
         sync = get_container_sync()
@@ -108,10 +116,11 @@ def start():
 @app.command()
 def stop():
     """Stop the background usage sync service."""
-    
+
     import os
+
     is_container = os.environ.get("CUTI_IN_CONTAINER") == "true"
-    
+
     if is_container:
         console.print("[cyan]Stopping container usage sync service...[/cyan]")
         sync = get_container_sync()
@@ -126,21 +135,21 @@ def stop():
 @app.command()
 def stats():
     """Show usage statistics from the global database."""
-    
+
     manager = GlobalDataManager()
-    
+
     # Get usage statistics
     stats = manager.get_usage_stats(days=30)
-    
+
     if not stats:
         console.print("ℹ️  No usage data available")
         return
-    
+
     # Create statistics table
     table = Table(title="Usage Statistics (Last 30 Days)")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
-    
+
     table.add_row("Total Tokens", f"{stats.get('total_tokens', 0):,}")
     table.add_row("Input Tokens", f"{stats.get('input_tokens', 0):,}")
     table.add_row("Output Tokens", f"{stats.get('output_tokens', 0):,}")
@@ -148,9 +157,9 @@ def stats():
     table.add_row("Cache Creation Tokens", f"{stats.get('cache_creation_tokens', 0):,}")
     table.add_row("Total Cost", f"${stats.get('total_cost', 0):.4f}")
     table.add_row("Total Requests", str(stats.get('request_count', 0)))
-    
+
     console.print(table)
-    
+
     # Show breakdown by model if available
     if 'by_model' in stats and stats['by_model']:
         console.print("\n[bold]Usage by Model:[/bold]")
@@ -159,59 +168,61 @@ def stats():
         model_table.add_column("Requests", style="yellow")
         model_table.add_column("Tokens", style="green")
         model_table.add_column("Cost", style="magenta")
-        
+
         for model, data in stats['by_model'].items():
             model_table.add_row(
                 model,
                 str(data.get('requests', 0)),
                 f"{data.get('tokens', 0):,}",
-                f"${data.get('cost', 0):.4f}"
+                f"${data.get('cost', 0):.4f}",
             )
-        
+
         console.print(model_table)
 
 
 @app.command()
 def chat(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
-    project_path: Optional[str] = typer.Option(None, "--project", "-p", help="Project path to sync")
+    project_path: str | None = typer.Option(
+        None, "--project", "-p", help="Project path to sync"
+    ),
 ):
     """Sync chat history from Claude logs to database."""
-    
+
     console.print("[cyan]Syncing chat history from Claude logs...[/cyan]")
-    
+
     manager = GlobalDataManager()
-    
+
     # Sync chat history
     synced = manager.sync_chat_history(project_path)
-    
+
     if synced > 0:
         console.print(f"✅ Synced {synced} chat messages to database")
     else:
         console.print("ℹ️  No new chat messages to sync")
-    
+
     if verbose:
         # Show session summary
         sessions = manager.get_chat_sessions(project_path, days=30)
-        
+
         if sessions:
-            console.print(f"\n[bold]Chat Sessions (Last 30 Days):[/bold]")
+            console.print("\n[bold]Chat Sessions (Last 30 Days):[/bold]")
             session_table = Table()
             session_table.add_column("Session ID", style="cyan", max_width=20)
             session_table.add_column("Start Time", style="yellow")
             session_table.add_column("Messages", style="green")
             session_table.add_column("Tokens", style="magenta")
-            
+
             for session in sessions[:10]:  # Show first 10
                 session_table.add_row(
                     session['session_id'][:12] + "...",
                     session['start_time'][:19],
                     f"{session['prompt_count'] + session['response_count']}",
-                    f"{session['total_tokens']:,}"
+                    f"{session['total_tokens']:,}",
                 )
-            
+
             console.print(session_table)
-            
+
             if len(sessions) > 10:
                 console.print(f"[dim]... and {len(sessions) - 10} more sessions[/dim]")
 
@@ -219,36 +230,36 @@ def chat(
 @app.command()
 def history(
     limit: int = typer.Option(20, "--limit", "-l", help="Number of messages to show"),
-    session_id: Optional[str] = typer.Option(None, "--session", "-s", help="Specific session ID"),
-    days: int = typer.Option(7, "--days", "-d", help="Number of days to look back")
+    session_id: str | None = typer.Option(
+        None, "--session", "-s", help="Specific session ID"
+    ),
+    days: int = typer.Option(7, "--days", "-d", help="Number of days to look back"),
 ):
     """Display chat history from the database."""
-    
+
     manager = GlobalDataManager()
-    
+
     # Get chat history
-    messages = manager.get_chat_history(
-        session_id=session_id,
-        days=days,
-        limit=limit
-    )
-    
+    messages = manager.get_chat_history(session_id=session_id, days=days, limit=limit)
+
     if not messages:
         console.print("ℹ️  No chat history found")
         return
-    
+
     console.print(f"[bold]Chat History (Last {days} days):[/bold]\n")
-    
+
     current_session = None
     for msg in reversed(messages):  # Show in chronological order
         # Show session separator
         if msg['session_id'] != current_session:
             current_session = msg['session_id']
-            console.print(f"\n[dim]──── Session: {current_session[:12]}... ────[/dim]\n")
-        
+            console.print(
+                f"\n[dim]──── Session: {current_session[:12]}... ────[/dim]\n"
+            )
+
         # Format message
         timestamp = msg['timestamp'][:19]
-        
+
         if msg['type'] == 'user':
             console.print(f"[cyan]👤 User ({timestamp}):[/cyan]")
             # Truncate long messages
@@ -263,7 +274,7 @@ def history(
             if len(content) > 100:
                 content = content[:100] + "..."
             console.print(f"   {content}")
-            
+
             # Show token usage if available
             if msg['input_tokens'] or msg['output_tokens']:
                 tokens = []
@@ -279,19 +290,21 @@ def history(
 @app.command()
 def sessions(
     days: int = typer.Option(30, "--days", "-d", help="Number of days to look back"),
-    project_path: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project")
+    project_path: str | None = typer.Option(
+        None, "--project", "-p", help="Filter by project"
+    ),
 ):
     """List chat sessions from the database."""
-    
+
     manager = GlobalDataManager()
-    
+
     # Get sessions
     sessions = manager.get_chat_sessions(project_path, days)
-    
+
     if not sessions:
         console.print("ℹ️  No chat sessions found")
         return
-    
+
     # Create sessions table
     table = Table(title=f"Chat Sessions (Last {days} Days)")
     table.add_column("Session ID", style="cyan")
@@ -300,14 +313,15 @@ def sessions(
     table.add_column("Duration", style="magenta")
     table.add_column("Messages", style="blue")
     table.add_column("Tokens", style="red")
-    
+
     for session in sessions:
         # Calculate duration
         from datetime import datetime
+
         start = datetime.fromisoformat(session['start_time'])
         end = datetime.fromisoformat(session['last_activity'])
         duration = end - start
-        
+
         # Format duration
         hours = int(duration.total_seconds() // 3600)
         minutes = int((duration.total_seconds() % 3600) // 60)
@@ -315,21 +329,21 @@ def sessions(
             duration_str = f"{hours}h {minutes}m"
         else:
             duration_str = f"{minutes}m"
-        
+
         # Format project path
         project = session['project_path']
         if len(project) > 30:
             project = "..." + project[-27:]
-        
+
         table.add_row(
             session['session_id'][:12] + "...",
             project,
             session['start_time'][:16],
             duration_str,
             f"{session['prompt_count'] + session['response_count']}",
-            f"{session['total_tokens']:,}"
+            f"{session['total_tokens']:,}",
         )
-    
+
     console.print(table)
     console.print(f"\n[dim]Total sessions: {len(sessions)}[/dim]")
 

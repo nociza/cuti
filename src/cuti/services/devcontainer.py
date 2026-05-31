@@ -10,13 +10,13 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional, Set, Tuple
 
 try:
     from rich.console import Console
-    from rich.prompt import Confirm, IntPrompt
+    from rich.prompt import Confirm
 
     _RICH_AVAILABLE = True
 except ImportError:
@@ -24,7 +24,11 @@ except ImportError:
 
 from .providers import (
     CONTAINER_MODE_CLAUDE as PROVIDER_CONTAINER_MODE_CLAUDE,
+)
+from .providers import (
     CONTAINER_MODE_OPENCLAW as PROVIDER_CONTAINER_MODE_OPENCLAW,
+)
+from .providers import (
     KNOWN_CONTAINER_MODES,
     ProviderManager,
 )
@@ -409,9 +413,9 @@ CMD ["/bin/zsh", "-l"]
 
     def __init__(
         self,
-        working_directory: Optional[str] = None,
+        working_directory: str | None = None,
         *,
-        provider_storage_dir: Optional[Path] = None,
+        provider_storage_dir: Path | None = None,
         container_mode: str = PROVIDER_CONTAINER_MODE_CLAUDE,
     ):
         """Initialize the dev container service."""
@@ -426,14 +430,38 @@ CMD ["/bin/zsh", "-l"]
         self.is_macos = platform.system() == "Darwin"
         self.provider_manager = ProviderManager(storage_dir=provider_storage_dir)
         self.container_mode = container_mode
-        self._selected_providers_cache: Optional[List[str]] = None
+        self._selected_providers_cache: list[str] | None = None
 
-        # Check tool availability (cached for CLI compatibility)
-        self.docker_available = self._check_tool_available("docker")
-        self.colima_available = self._check_tool_available("colima")
+        # Host-tool availability is probed lazily on first access so that
+        # constructing the service never shells out (keeps it testable and
+        # side-effect-free). See the docker_available/colima_available properties.
+        self._docker_available: bool | None = None
+        self._colima_available: bool | None = None
+
+    @property
+    def docker_available(self) -> bool:
+        """Whether the ``docker`` CLI is available (probed lazily, cached)."""
+        if self._docker_available is None:
+            self._docker_available = self._check_tool_available("docker")
+        return self._docker_available
+
+    @docker_available.setter
+    def docker_available(self, value: bool) -> None:
+        self._docker_available = value
+
+    @property
+    def colima_available(self) -> bool:
+        """Whether the ``colima`` CLI is available (probed lazily, cached)."""
+        if self._colima_available is None:
+            self._colima_available = self._check_tool_available("colima")
+        return self._colima_available
+
+    @colima_available.setter
+    def colima_available(self, value: bool) -> None:
+        self._colima_available = value
 
     def _run_command(
-        self, cmd: List[str], timeout: int = 30, show_output: bool = False
+        self, cmd: list[str], timeout: int = 30, show_output: bool = False
     ) -> subprocess.CompletedProcess:
         """Run a command with consistent error handling."""
         try:
@@ -468,7 +496,7 @@ CMD ["/bin/zsh", "-l"]
         except FileNotFoundError:
             raise RuntimeError(f"Command not found: {cmd[0]}")
 
-    def _selected_providers(self) -> List[str]:
+    def _selected_providers(self) -> list[str]:
         """Return the enabled provider IDs for the cloud container profile."""
 
         if self._selected_providers_cache is None:
@@ -482,7 +510,7 @@ CMD ["/bin/zsh", "-l"]
 
         return provider in self._selected_providers()
 
-    def _primary_provider(self) -> Optional[str]:
+    def _primary_provider(self) -> str | None:
         """Return the primary provider for prompts/help text."""
 
         providers = self._selected_providers()
@@ -519,7 +547,7 @@ CMD ["/bin/zsh", "-l"]
         codex_dir.mkdir(parents=True, exist_ok=True)
         return codex_dir
 
-    def _prepare_opencode_storage(self) -> Tuple[Path, Path, Path]:
+    def _prepare_opencode_storage(self) -> tuple[Path, Path, Path]:
         """Ensure OpenCode storage directories exist on the host."""
 
         home_dir = Path.home() / ".opencode"
@@ -641,12 +669,12 @@ CMD ["/bin/zsh", "-l"]
         return runtime_dir
 
     def _provider_runtime_path_entries(
-        self, providers: Optional[Iterable[str]] = None
-    ) -> List[str]:
+        self, providers: Iterable[str] | None = None
+    ) -> list[str]:
         """Return persistent provider binary directories in PATH order."""
 
         selected = set(providers or self._selected_providers())
-        entries: List[str] = []
+        entries: list[str] = []
         if "claude" in selected:
             entries.append(f"{self.PROVIDER_RUNTIME_CONTAINER_DIR}/claude/.local/bin")
         if "codex" in selected:
@@ -656,7 +684,7 @@ CMD ["/bin/zsh", "-l"]
         return entries
 
     def _container_path_value(
-        self, extra_providers: Optional[Iterable[str]] = None
+        self, extra_providers: Iterable[str] | None = None
     ) -> str:
         """Return the PATH used for cloud provider containers and updates."""
 
@@ -688,15 +716,15 @@ CMD ["/bin/zsh", "-l"]
         return ",".join(self._selected_providers())
 
     def _prepare_cloud_provider_mounts(
-        self, extra_providers: Optional[Iterable[str]] = None
-    ) -> Tuple[Optional[Path], List[str]]:
+        self, extra_providers: Iterable[str] | None = None
+    ) -> tuple[Path | None, list[str]]:
         """Prepare host storage and mount specs for selected cloud providers."""
 
         providers = set(self._selected_providers())
         if extra_providers:
             providers.update(extra_providers)
-        mount_args: List[str] = []
-        linux_claude_dir: Optional[Path] = None
+        mount_args: list[str] = []
+        linux_claude_dir: Path | None = None
 
         if providers:
             provider_runtime_dir = self._prepare_provider_runtime_storage()
@@ -763,7 +791,9 @@ CMD ["/bin/zsh", "-l"]
         try:
             result = self._run_command([tool, "--version"])
             return result.returncode == 0
-        except RuntimeError:
+        except (RuntimeError, OSError):
+            # OSError covers FileNotFoundError (tool absent) and PermissionError
+            # (exec denied, e.g. in restricted sandboxes).
             return False
 
     def _check_colima(self) -> bool:
@@ -905,7 +935,7 @@ RUN /root/.local/bin/uv pip install --system cuti \\
         tools_setup = ""
         container_tools_path = Path("/workspace/.cuti/container_tools.sh")
         if container_tools_path.exists():
-            tools_setup = f'''
+            tools_setup = '''
 # Install additional CLI tools
 COPY .cuti/container_tools.sh /tmp/container_tools.sh
 RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
@@ -999,7 +1029,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
         config = {}
         if linux_claude_json.exists():
             try:
-                with open(linux_claude_json, 'r') as f:
+                with open(linux_claude_json) as f:
                     config = json.load(f)
             except Exception:
                 config = {}
@@ -1134,7 +1164,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
 
         return False
 
-    def generate_devcontainer(self, project_type: Optional[str] = None) -> bool:
+    def generate_devcontainer(self, project_type: str | None = None) -> bool:
         """Generate dev container configuration."""
         print(f"🔧 Generating dev container in {self.working_dir}")
 
@@ -1323,7 +1353,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
 
         return "\n".join(lines)
 
-    def _running_cloud_cuti_container_ids(self) -> List[str]:
+    def _running_cloud_cuti_container_ids(self) -> list[str]:
         """Return IDs for running cuti cloud containers, including older images."""
 
         queries = [
@@ -1344,8 +1374,8 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 "{{.ID}}",
             ],
         ]
-        container_ids: List[str] = []
-        seen: Set[str] = set()
+        container_ids: list[str] = []
+        seen: set[str] = set()
 
         for query in queries:
             result = self._run_command(query, timeout=10)
@@ -1508,11 +1538,11 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
 
     def run_in_container(
         self,
-        command: Optional[str] = None,
+        command: str | None = None,
         rebuild: bool = False,
         interactive: bool = False,
         *,
-        mount_docker_socket: bool = True,
+        mount_docker_socket: bool = False,
         runtime_profile: str = RUNTIME_PROFILE_CLOUD,
     ) -> int:
         """Run command in dev container.
@@ -1521,7 +1551,11 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             command: Command to run in the container
             rebuild: Force rebuild of the container image
             interactive: Run in interactive mode with TTY
-            mount_docker_socket: Whether to mount host docker socket
+            mount_docker_socket: Mount the host Docker socket into the container.
+                Off by default: the socket is root-equivalent on the host, and the
+                container runs the agent with skip-permissions, so mounting it turns
+                a prompt injection into host root. Opt in with ``--docker-socket``
+                only when you explicitly need Docker-in-Docker.
             runtime_profile: Runtime profile (`cloud`)
         """
         if runtime_profile != self.RUNTIME_PROFILE_CLOUD:
@@ -1587,6 +1621,12 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             f"{current_dir}:/workspace:{mount_options}",  # Dynamic mount options
             "-v",
             f"{Path.home() / '.cuti'}:/home/cuti/.cuti-shared:rw",  # Mount to cuti-accessible location
+            # Shadow saved-account credentials with an empty tmpfs so the
+            # (skip-permissions) agent cannot read OAuth tokens / API keys for
+            # accounts other than the active one. The active account is provided
+            # separately via the .claude-linux mount below.
+            "--tmpfs",
+            "/home/cuti/.cuti-shared/claude-accounts:rw,noexec,nosuid",
             "--label",
             f"cuti.runtime_profile={runtime_profile}",
             "--label",
@@ -1605,7 +1645,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             f"CUTI_CLAUDE_AUTO_UPDATE={'true' if auto_update_claude else 'false'}",
             "--env",
             "CUTI_ENFORCE_SELECTED_PROVIDERS=true",
-            # Don't set CLAUDE_QUEUE_STORAGE_DIR here - let the init script decide based on writability
             "--env",
             "IS_SANDBOX=1",
             "--env",
@@ -1680,8 +1719,6 @@ if touch /workspace/.test_write 2>/dev/null; then
     rm /workspace/.test_write
     WORKSPACE_WRITABLE=true
     echo "✅ Workspace is writable"
-    # Use workspace directories when writable
-    export CLAUDE_QUEUE_STORAGE_DIR=/workspace/.cuti
     export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux
 else
     WORKSPACE_WRITABLE=false
@@ -1698,7 +1735,6 @@ else
     echo "       - colima start --mount-type 9p"
     echo ""
     # Fall back to home directories when read-only
-    export CLAUDE_QUEUE_STORAGE_DIR=/home/cuti/.cuti
     export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux
 fi
 
@@ -2189,7 +2225,7 @@ if [ -S /var/run/docker.sock ]; then
     echo "🐳 Docker socket mounted - setting up access..."
     
     # Ensure Docker socket permissions are accessible
-    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+    sudo chmod 660 /var/run/docker.sock 2>/dev/null || true  # group-rw (user is in docker group); not world-writable
     
     # Test if we can access Docker directly
     if docker version > /dev/null 2>&1; then
@@ -2200,7 +2236,7 @@ if [ -S /var/run/docker.sock ]; then
 #!/bin/bash
 # Docker wrapper to handle permission issues
 if [ -S /var/run/docker.sock ]; then
-    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+    sudo chmod 660 /var/run/docker.sock 2>/dev/null || true  # group-rw (user is in docker group); not world-writable
 fi
 exec sudo /usr/bin/docker "$@"
 DOCKER_EOF
@@ -2211,7 +2247,7 @@ DOCKER_EOF
 #!/bin/bash
 # Docker-compose wrapper for compatibility
 if [ -S /var/run/docker.sock ]; then
-    sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
+    sudo chmod 660 /var/run/docker.sock 2>/dev/null || true  # group-rw (user is in docker group); not world-writable
 fi
 # Try docker compose v2 first, fallback to docker-compose
 if command -v docker >/dev/null 2>&1; then
@@ -2309,7 +2345,7 @@ def is_running_in_container() -> bool:
     return False
 
 
-def get_claude_command(prompt: str) -> List[str]:
+def get_claude_command(prompt: str) -> list[str]:
     """Get Claude command with appropriate flags."""
     cmd = ["claude"]
     if is_running_in_container():

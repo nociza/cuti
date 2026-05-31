@@ -1,17 +1,7 @@
-"""
-Business logic services for cuti.
-"""
+"""Business-logic services for cuti.
 
-from .queue_service import QueueManager
-from .aliases import PromptAliasManager
-from .history import PromptHistoryManager
-from .task_expansion import TaskExpansionEngine
-from .monitoring import SystemMonitor
+Import the specific service module you need directly, e.g.::
 
-__all__ = [
-    "QueueManager",
-    "PromptAliasManager",
-    "PromptHistoryManager",
-    "TaskExpansionEngine",
-    "SystemMonitor",
-]
+    from cuti.services.devcontainer import DevContainerService
+    from cuti.services.providers import ProviderManager
+"""

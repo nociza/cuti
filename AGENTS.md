@@ -1,56 +1,35 @@
-# Codex Configuration
+# AGENTS.md — guide for coding agents working on cuti
 
-This file contains configuration and context for Codex usage within this project.
-It is dynamically managed by the cuti orchestration system.
+cuti is a Python CLI + small FastAPI ops console. Its headline feature is the
+**instant, containerized Claude Code dev environment** (`cuti container`), plus tooling
+to manage agent-CLI providers, Claude accounts, session history, and usage analytics.
 
-Last updated: 2025-10-12T12:11:46.933421
+## Where things live
 
-## Overall Instructions
+- `src/cuti/cli/` — Typer CLI (`cuti.cli.app:app`); one module per command group under
+  `cli/commands/`.
+- `src/cuti/services/` — business logic (`devcontainer.py`, `providers.py`,
+  `provider_host.py`, `claude_account_manager.py`, usage/monitoring, history).
+- `src/cuti/web/` — read-only ops console.
+- `tests/` — pytest suite.
 
-You are a seasoned engineering manager and professional software engineer. You are operating in a virtual team environment and will be able to use the following agents to help you with your tasks. Use @ to mention an agent to ask it to do something.
+## Build, test, lint
 
-## Agents To Use
-
-You should use the following agents to help you with your tasks: 
-
-*No agents currently active. Enable agents through the cuti web interface.*
-
-## Agent Usage Instructions
-
-To use an agent, mention it with @ followed by the agent name.
-For example: @code-reviewer please review this function
-
-Agents can be enabled/disabled through the cuti web interface at http://localhost:8000/agents
-
-## Development Commands
-
-### Setup and Installation
 ```bash
-# Initial setup
-python run.py setup
-
-# Development installation with uv
-uv install -e .
+uv pip install -e ".[dev]"
+pytest
+ruff check src tests
+black src tests
 ```
 
-### Running the Application
-```bash
-# Start web interface
-python run.py web
+## Conventions for changes
 
-# Start CLI
-python run.py cli
+- Keep cuti **additive** to Claude Code; don't re-implement native features.
+- Preserve **secure defaults**: the host Docker socket and inactive-account
+  credentials must stay opt-in / shielded.
+- Match the surrounding code style; reserve `print()`/`rich` for user-facing CLI
+  output and route diagnostics through `cuti.utils.logger`.
+- Update `CHANGELOG.md` for user-visible changes.
 
-# Check agent status
-cuti agent list
-```
-
-## Orchestration Configuration
-
-This file is automatically managed by the cuti orchestration system.
-Manual changes will be overwritten when agents are toggled or updated.
-
-To modify agent configuration:
-1. Use the web interface at http://localhost:8000/agents
-2. Use the CLI: `cuti agent toggle <agent-name>`
-3. Modify `.cuti/agents.json` and reload
+Once installed, the entry points are `cuti`, `cuti-web` / `python -m cuti`, and
+`qt-openclaw`. `run.py` is only a dev bootstrap shim.

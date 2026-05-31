@@ -1,70 +1,35 @@
-# Project Goals - CUTI Enhancement
+# Project goals
 
-## Primary Objective
-Focus CUTI on orchestration, observability, and multi-session coordination on top of Claude Code, not re-implementing core Claude Code capabilities.
+## What cuti is
 
-## Claude Code Native Capabilities (Deprioritized in CUTI)
-Based on current Anthropic Claude Code docs and release notes, these are already first-class features in Claude Code and should be treated as low priority or out-of-scope in CUTI:
+cuti is the fastest way to get a **clean, isolated Claude Code dev environment**:
+`cuti container` launches a reproducible Docker workspace with Claude Code (or another
+agent-CLI provider) ready to go, plus the operational tooling around it — provider
+management, Claude account switching, session history, and usage analytics.
 
-- Native todo tracking in the SDK/agent loop (deprioritize building a parallel base todo engine)
-- Built-in subagents (`/agents`) with separate context windows (deprioritize baseline multi-agent primitives)
-- Built-in session continuation/resume (`--continue`, `--resume`) and local conversation history (deprioritize raw session persistence features)
-- Built-in hooks lifecycle and permissions controls (deprioritize generic tool-level policy framework duplication)
-- Built-in slash commands for config/review/status/memory/mcp/cost (deprioritize command-surface parity work)
+cuti is **additive to Claude Code**. It does not re-implement Claude Code's own
+capabilities (todos, subagents, session resume, hooks, slash commands). Where those
+exist natively, cuti integrates with them rather than duplicating them.
 
-CUTI should only extend these areas where we add differentiated value (cross-session orchestration, queue semantics, analytics, team workflows, container/runtime management).
+## Principles
 
-## Priorities
+- **Container-first.** The headline experience is one command to a working,
+  disposable Claude Code environment. Everything else supports that.
+- **Secure by default.** No host-root escape hatches or broad credential exposure
+  unless the user explicitly opts in.
+- **Thin and legible.** Prefer integrating with provider CLIs over re-building their
+  features. Keep the surface small enough that a new contributor can read it.
 
-### P0 - Differentiate CUTI
-- [ ] Build robust queue system for task distribution across sessions/workspaces
-- [ ] Create real-time sync between Claude Code runs and cuti web interface
-- [ ] Establish durable persistence for cuti-specific orchestration state
-- [ ] Build comprehensive analytics dashboard (usage, throughput, blockers, completion quality)
-- [ ] Implement conflict-aware orchestration for concurrent agent/session execution
+## Roadmap
 
-### P1 - High-Value Integrations
-- [ ] Capture and normalize Claude todo/progress signals for cuti dashboards
-- [ ] Create agent/session-specific task assignment and routing on top of Claude subagents
-- [ ] Implement interactive goal management with project-level views
-- [ ] Add automated blocker detection and escalation workflows
+- **Containers**: faster cold start, more host runtimes, clearer rebuild story.
+- **Providers**: smoother auth/setup for Claude, Codex, OpenCode, OpenClaw, Hermes.
+- **Insight**: richer (but still read-only) usage/cost analytics and session history.
+- **Polish**: complete type coverage, broaden test coverage of the container path,
+  and route library diagnostics through structured logging.
 
-### P2 - Deprioritized (Claude Code already covers baseline)
-- [ ] Rebuilding generic todo tracking primitives already provided by Claude Code
-- [ ] Rebuilding generic subagent infrastructure already provided by Claude Code
-- [ ] Rebuilding baseline session history/resume mechanisms
-- [ ] Rebuilding generic slash-command and hook frameworks
+## Non-goals
 
-## Success Criteria
-
-1. Functionality
-   - CUTI orchestrates multiple Claude sessions/workspaces reliably
-   - Claude-native signals (todos/progress/events) are visible in CUTI dashboards
-   - Queue and routing decisions are transparent and auditable
-
-2. Performance
-   - Sub-second status/telemetry refresh for active sessions
-   - Handle 10+ active Claude sessions with stable orchestration behavior
-   - Zero loss of CUTI-managed orchestration metadata on restart
-
-3. Usability
-   - Clear project/goal/task visibility without duplicating Claude core UX
-   - Fast path from goal definition to queued executable work
-   - Minimal manual coordination needed for multi-session workflows
-
-## Phase Plan
-
-- Phase 1: Queue + orchestration persistence + Claude signal ingestion
-- Phase 2: Real-time web sync + dashboarding + reliability hardening
-- Phase 3: Multi-session orchestration policies + conflict resolution
-- Phase 4: Advanced analytics and predictive assistance
-
-## Notes
-
-- Keep CUTI scope additive to Claude Code.
-- Prefer integration points over feature duplication.
-- Re-evaluate deprioritized items only if Claude Code drops support or exposes gaps critical to CUTI use cases.
-
----
-*Last Updated: 2026-03-12*
-*Version: 1.1.0*
+- Re-implementing Claude Code's native todo, subagent, or session-resume features.
+- A stateful, write-capable web UI. The ops console stays read-only; the CLI is the
+  source of truth for changes.

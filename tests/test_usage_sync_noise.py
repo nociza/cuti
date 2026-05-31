@@ -7,7 +7,9 @@ from types import SimpleNamespace
 from cuti.services.global_data_manager import GlobalDataManager
 
 
-def test_import_claude_logs_is_idempotent_for_entries_without_ids(tmp_path, monkeypatch) -> None:
+def test_import_claude_logs_is_idempotent_for_entries_without_ids(
+    tmp_path, monkeypatch
+) -> None:
     manager = GlobalDataManager(str(tmp_path / ".cuti"))
     entry = SimpleNamespace(
         timestamp=datetime(2026, 3, 18, 12, 0, 0).isoformat(sep=" "),

@@ -1,56 +1,39 @@
-# Claude Code Configuration
+# cuti — Claude Code project guide
 
-This file contains configuration and context for Claude Code usage within this project.
-It is dynamically managed by the cuti orchestration system.
+cuti is a Python CLI + small FastAPI ops console whose headline feature is the
+**instant, containerized Claude Code dev environment** (`cuti container`), plus tooling
+to manage agent-CLI providers, Claude accounts, session history, and usage analytics.
 
-Last updated: 2025-10-12T12:11:46.933421
+## Architecture
 
-## Overall Instructions
+- `src/cuti/cli/` — the Typer CLI (`cuti.cli.app:app`). One module per command group
+  under `cli/commands/` (container, devcontainer, providers, claude_account, openclaw,
+  history, sync, tools, settings, favorites).
+- `src/cuti/services/` — business logic. Notable: `devcontainer.py` (the heart of
+  `cuti container`), `providers.py` / `provider_host.py` (provider management),
+  `claude_account_manager.py` (account/API-key switching), `claude_monitor_integration.py`
+  + `usage_sync_service.py` (usage analytics), `claude_history.py` / `claude_logs_reader.py`.
+- `src/cuti/web/` — the read-only ops console (`cuti web`): one page + the
+  `/api/ops/summary` endpoint.
+- `src/cuti/utils/` — shared helpers and constants.
 
-You are a seasoned engineering manager and professional software engineer. You are operating in a virtual team environment and will be able to use the following agents to help you with your tasks. Use @ to mention an agent to ask it to do something.
+## Development
 
-## Agents To Use
-
-You should use the following agents to help you with your tasks: 
-
-*No agents currently active. Enable agents through the cuti web interface.*
-
-## Agent Usage Instructions
-
-To use an agent, mention it with @ followed by the agent name.
-For example: @code-reviewer please review this function
-
-Agents can be enabled/disabled through the cuti web interface at http://localhost:8000/agents
-
-## Development Commands
-
-### Setup and Installation
 ```bash
-# Initial setup
-python run.py setup
-
-# Development installation with uv
-uv install -e .
+uv pip install -e ".[dev]"   # editable install with dev tools
+pytest                       # run the test suite
+ruff check src tests         # lint
+black src tests              # format
 ```
 
-### Running the Application
-```bash
-# Start web interface
-python run.py web
+`run.py` is only a developer bootstrap shim. Once installed, use the console scripts:
+`cuti` (full CLI), `cuti-web` / `python -m cuti` (ops console), `qt-openclaw`.
 
-# Start CLI
-python run.py cli
+## Conventions
 
-# Check agent status
-cuti agent list
-```
-
-## Orchestration Configuration
-
-This file is automatically managed by the cuti orchestration system.
-Manual changes will be overwritten when agents are toggled or updated.
-
-To modify agent configuration:
-1. Use the web interface at http://localhost:8000/agents
-2. Use the CLI: `cuti agent toggle <agent-name>`
-3. Modify `.cuti/agents.json` and reload
+- Keep cuti **additive** to Claude Code — integrate with native features (todos,
+  subagents, resume) rather than re-implementing them.
+- **Secure defaults**: never mount the host Docker socket or expose inactive-account
+  credentials unless the user explicitly opts in.
+- Reserve `print()` / `rich` for intentional user-facing CLI output; route diagnostics
+  through `cuti.utils.logger`.

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 main_router = APIRouter()
 
 
-
-def _render(request: Request, template_name: str, page_id: str, **context: object) -> HTMLResponse:
+def _render(
+    request: Request, template_name: str, page_id: str, **context: object
+) -> HTMLResponse:
     templates = request.app.state.templates
     payload = {
         "request": request,
@@ -29,18 +30,6 @@ async def ops_console(request: Request) -> HTMLResponse:
         "ops.html",
         "ops",
         page_title="Workspace Ops Console",
-        page_description="Inspect provider readiness, queue state, recent activity, and workspace drift. Use the CLI for changes.",
+        page_description="Inspect provider readiness, Claude sessions, tools, and "
+        "workspace instruction-file drift. Use the CLI for changes.",
     )
-
-
-@main_router.get("/providers")
-@main_router.get("/tasks")
-@main_router.get("/tools")
-@main_router.get("/agents")
-@main_router.get("/todos")
-@main_router.get("/statistics")
-@main_router.get("/global-settings")
-@main_router.get("/orchestration")
-@main_router.get("/enhanced-chat")
-async def legacy_redirect() -> RedirectResponse:
-    return RedirectResponse(url="/", status_code=307)

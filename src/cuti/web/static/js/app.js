@@ -85,17 +85,12 @@ function summarizeProviderDetail(status) {
 
 function updateHeader(summary) {
     const primary = document.getElementById('headerPrimaryProvider');
-    const queue = document.getElementById('headerQueueState');
     const selected = document.getElementById('headerSelectedProviders');
     const refreshed = document.getElementById('headerLastRefresh');
     const selectedProviders = summary?.providers?.selected_providers || [];
 
     if (primary) {
         primary.textContent = summary?.providers?.primary_provider ? `primary ${summary.providers.primary_provider}` : 'no provider selected';
-    }
-    if (queue) {
-        const queued = summary?.queue?.status_counts?.queued || 0;
-        queue.textContent = summary?.queue?.available ? `${queued} queued` : 'queue unavailable';
     }
     if (selected) {
         selected.textContent = selectedProviders.length ? selectedProviders.join(', ') : 'No providers selected';
@@ -112,8 +107,8 @@ function renderMetrics(summary) {
     document.getElementById('metricAttention').textContent = `${summary.attention_items.length}`;
     document.getElementById('metricAttentionDetail').textContent = summary.attention_items[0]?.title || 'No immediate drift detected';
 
-    document.getElementById('metricQueue').textContent = `${summary.queue.total_prompts}`;
-    document.getElementById('metricQueueDetail').textContent = summary.queue.detail;
+    document.getElementById('metricTools').textContent = `${summary.tools.installed_count}/${summary.tools.total_count}`;
+    document.getElementById('metricToolsDetail').textContent = summary.tools.missing_enabled.length ? `${summary.tools.missing_enabled.length} enabled but missing` : 'enabled tools installed';
 
     document.getElementById('metricSessions').textContent = `${summary.sessions.recent_sessions.length}`;
     document.getElementById('metricSessionsDetail').textContent = summary.sessions.current_session_id ? `current ${summary.sessions.current_session_id.slice(0, 12)}...` : 'No current Claude session';
@@ -156,30 +151,6 @@ function renderProviders(summary) {
             </div>
         </article>
     `).join('') : renderEmptyState('No provider data available.');
-}
-
-function renderHistory(summary) {
-    const node = document.getElementById('historyList');
-    const items = summary.history.recent || [];
-    node.innerHTML = items.length ? items.map((item) => {
-        const status = item.success === true ? 'ready' : item.success === false ? 'missing' : 'selected';
-        return `
-            <article class="list-item">
-                <div class="list-item-head">
-                    <div>
-                        <h3 class="item-title">${escapeHtml(item.content)}</h3>
-                        <p class="item-copy mono">${escapeHtml(item.working_directory || '.')}
-                        </p>
-                        <div class="badge-row">
-                            <span class="badge mono">${escapeHtml(formatDate(item.timestamp))}</span>
-                            ${(item.context_files || []).slice(0, 3).map((file) => `<span class="badge mono">${escapeHtml(file)}</span>`).join('')}
-                        </div>
-                    </div>
-                    <span class="status-badge status-${status}">${item.success === true ? 'success' : item.success === false ? 'failed' : 'recorded'}</span>
-                </div>
-            </article>
-        `;
-    }).join('') : renderEmptyState('No prompt history recorded yet.');
 }
 
 function renderSessions(summary) {
@@ -297,7 +268,6 @@ function renderOps(summary) {
     renderMetrics(summary);
     renderAttention(summary);
     renderProviders(summary);
-    renderHistory(summary);
     renderSessions(summary);
     renderWorkspace(summary);
     renderTools(summary);
