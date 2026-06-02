@@ -76,12 +76,12 @@ inside the container.
 ### OpenClaw
 
 OpenClaw is a separate container mode. Drive it with `cuti container --openclaw` or the
-`qt-openclaw` entry point:
+`cuti openclaw` subcommand:
 
 ```bash
-qt-openclaw onboard
-qt-openclaw up
-qt-openclaw run <command> ...   # forward any OpenClaw command into the container
+cuti openclaw onboard
+cuti openclaw up
+cuti openclaw run <command> ...   # forward any OpenClaw command into the container
 ```
 
 ## Security

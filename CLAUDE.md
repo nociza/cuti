@@ -27,7 +27,7 @@ black src tests              # format
 ```
 
 `run.py` is only a developer bootstrap shim. Once installed, use the console scripts:
-`cuti` (full CLI), `cuti-web` / `python -m cuti` (ops console), `qt-openclaw`.
+`cuti` (full CLI, including `cuti openclaw`) and `cuti-web` / `python -m cuti` (ops console).
 
 ## Conventions
 

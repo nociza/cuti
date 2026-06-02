@@ -189,8 +189,8 @@ cuti providers enable hermes
 cuti container --openclaw
 
 cuti providers auth claude --login
-qt-openclaw onboard
-qt-openclaw up
+cuti openclaw onboard
+cuti openclaw up
 cuti providers update codex
 cuti providers update openclaw
 cuti providers update hermes
@@ -230,12 +230,12 @@ Install behavior is provider-specific:
 
 OpenClaw-specific notes:
 
-- `qt-openclaw ...` runs the dedicated OpenClaw command group from the host.
-- `qt-openclaw onboard` runs `openclaw onboard --install-daemon` in the container, then runs `openclaw doctor --non-interactive`.
-- `qt-openclaw up` runs onboarding if no OpenClaw state is detected, runs doctor, then starts the gateway in the foreground.
-- Channel, browser, plugin, voice-call, and dashboard surfaces are exposed as direct wrappers: `qt-openclaw channels-login`, `qt-openclaw channels ...`, `qt-openclaw browser ...`, `qt-openclaw plugins ...`, `qt-openclaw voice-setup`, `qt-openclaw voicecall ...`, and `qt-openclaw dashboard ...`.
+- `cuti openclaw ...` runs the dedicated OpenClaw command group from the host.
+- `cuti openclaw onboard` runs `openclaw onboard --install-daemon` in the container, then runs `openclaw doctor --non-interactive`.
+- `cuti openclaw up` runs onboarding if no OpenClaw state is detected, runs doctor, then starts the gateway in the foreground.
+- Channel, browser, plugin, voice-call, and dashboard surfaces are exposed as direct wrappers: `cuti openclaw channels-login`, `cuti openclaw channels ...`, `cuti openclaw browser ...`, `cuti openclaw plugins ...`, `cuti openclaw voice-setup`, `cuti openclaw voicecall ...`, and `cuti openclaw dashboard ...`.
 - Source-backed OpenClaw command families are also exposed directly: setup/config/configure, backup/reset/uninstall, message/agent/agents, status/health/sessions, tasks/flows/cron, models/infer/capability, ACP/MCP, approvals/exec-policy, nodes/devices/node, sandbox, TUI/chat/terminal, DNS/docs/proxy, hooks/webhooks, QR/pairing/directory, security/secrets/skills, update/completion, memory, and wiki.
-- Future plugin command roots remain supported through `qt-openclaw run <command> ...`, which forwards raw arguments to the installed OpenClaw CLI after cuti has enabled the provider and mounted state.
+- Future plugin command roots remain supported through `cuti openclaw run <command> ...`, which forwards raw arguments to the installed OpenClaw CLI after cuti has enabled the provider and mounted state.
 - Managed OpenClaw state persists under `~/.openclaw`; the CLI/runtime install persists separately under `~/.cuti/provider-runtimes/openclaw`.
 - cuti sets OpenClaw's container environment to the mounted state tree: `OPENCLAW_HOME=/home/cuti`, `OPENCLAW_STATE_DIR=/home/cuti/.openclaw`, `OPENCLAW_CONFIG_PATH=/home/cuti/.openclaw/openclaw.json`, `OPENCLAW_OAUTH_DIR=/home/cuti/.openclaw/credentials`, `OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw`, `NPM_CONFIG_PREFIX=/home/cuti/.cuti-providers/openclaw`, `npm_config_prefix=/home/cuti/.cuti-providers/openclaw`, and `PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers`.
 - Containerized browser automation works best with OpenClaw-managed or remote-CDP browser profiles. Attaching to an already signed-in host browser still depends on host-local browser access.

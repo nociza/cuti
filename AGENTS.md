@@ -31,5 +31,5 @@ black src tests
   output and route diagnostics through `cuti.utils.logger`.
 - Update `CHANGELOG.md` for user-visible changes.
 
-Once installed, the entry points are `cuti`, `cuti-web` / `python -m cuti`, and
-`qt-openclaw`. `run.py` is only a dev bootstrap shim.
+Once installed, the entry points are `cuti` (the full CLI, including `cuti openclaw`)
+and `cuti-web` / `python -m cuti` (the ops console). `run.py` is only a dev bootstrap shim.

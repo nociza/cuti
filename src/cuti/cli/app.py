@@ -100,7 +100,7 @@ app.add_typer(
 app.add_typer(
     openclaw_app,
     name="openclaw",
-    help="Run OpenClaw inside the Qt container.",
+    help="Run OpenClaw inside the cuti container.",
     rich_help_panel="Providers & accounts",
 )
 
