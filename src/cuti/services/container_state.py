@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class ContainerStateManager:
@@ -13,11 +13,11 @@ class ContainerStateManager:
 
     SCHEMA_VERSION = 1
 
-    def __init__(self, storage_dir: Optional[Path] = None) -> None:
+    def __init__(self, storage_dir: Path | None = None) -> None:
         base_dir = Path(storage_dir or Path.home() / ".cuti" / "container-state")
         base_dir.mkdir(parents=True, exist_ok=True)
         self.state_path = base_dir / "state.json"
-        self._state: Dict[str, Any] = {"version": self.SCHEMA_VERSION, "global": {}, "workspaces": {}}
+        self._state: dict[str, Any] = {"version": self.SCHEMA_VERSION, "global": {}, "workspaces": {}}
         self._load()
 
     # ------------------------------------------------------------------
@@ -48,7 +48,7 @@ class ContainerStateManager:
         self._state["workspaces"][workspace_key] = entry
         self._save()
 
-    def get_workspace(self, workspace: Path) -> Dict[str, Any]:
+    def get_workspace(self, workspace: Path) -> dict[str, Any]:
         workspace_key = str(Path(workspace).resolve())
         return dict(self._state.get("workspaces", {}).get(workspace_key, {}))
 
@@ -59,6 +59,6 @@ class ContainerStateManager:
         global_state["updated_at"] = datetime.utcnow().isoformat()
         self._save()
 
-    def get_global(self) -> Dict[str, Any]:
+    def get_global(self) -> dict[str, Any]:
         return dict(self._state.get("global", {}))
 

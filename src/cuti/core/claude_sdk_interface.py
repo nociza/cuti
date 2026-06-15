@@ -3,39 +3,55 @@ Enhanced Claude interface using the Claude Code SDK Python wrapper.
 Provides streaming, progress tracking, and proper error handling.
 """
 
-import os
-import json
 import asyncio
-import subprocess
+import os
 import shutil
-from pathlib import Path
-from typing import AsyncIterator, Dict, Any, Optional, List
-from datetime import datetime
+import subprocess
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
-# Try to import the Claude Code SDK
-try:
-    from claude_code_sdk import query, ClaudeCodeOptions
-    from claude_code_sdk.exceptions import (
+SDK_AVAILABLE = False
+
+if TYPE_CHECKING:
+    from claude_code_sdk import (
+        ClaudeCodeOptions,
         ClaudeSDKError,
+        CLIJSONDecodeError,
         CLINotFoundError,
         ProcessError,
-        CLIJSONDecodeError
+        query,
     )
-    SDK_AVAILABLE = True
-except ImportError:
-    SDK_AVAILABLE = False
-    # Fallback definitions for when SDK is not installed
-    class ClaudeSDKError(Exception):
-        pass
-    class CLINotFoundError(ClaudeSDKError):
-        pass
-    class ProcessError(ClaudeSDKError):
-        def __init__(self, exit_code: int):
-            self.exit_code = exit_code
-    class CLIJSONDecodeError(ClaudeSDKError):
-        pass
+else:
+    # Try to import the Claude Code SDK
+    try:
+        from claude_code_sdk import (
+            ClaudeCodeOptions,
+            ClaudeSDKError,
+            CLIJSONDecodeError,
+            CLINotFoundError,
+            ProcessError,
+            query,
+        )
+
+        SDK_AVAILABLE = True
+    except ImportError:
+        # Fallback definitions for when SDK is not installed
+        class ClaudeSDKError(Exception):
+            pass
+
+        class CLINotFoundError(ClaudeSDKError):
+            pass
+
+        class ProcessError(ClaudeSDKError):
+            def __init__(self, exit_code: int) -> None:
+                self.exit_code = exit_code
+
+        class CLIJSONDecodeError(ClaudeSDKError):
+            pass
 
 
 class MessageType(Enum):
@@ -56,16 +72,16 @@ class StreamMessage:
     """Structured message for streaming responses."""
     type: MessageType
     content: str = ""
-    metadata: Dict[str, Any] = None
-    timestamp: str = None
-    
-    def __post_init__(self):
+    metadata: dict[str, Any] | None = None
+    timestamp: str | None = None
+
+    def __post_init__(self) -> None:
         if self.timestamp is None:
             self.timestamp = datetime.now().isoformat()
         if self.metadata is None:
             self.metadata = {}
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "type": self.type.value,
@@ -77,14 +93,19 @@ class StreamMessage:
 
 class ClaudeSDKInterface:
     """Enhanced interface for Claude Code using the official SDK."""
-    
-    def __init__(self, 
-                 system_prompt: Optional[str] = None,
+
+    def __init__(self,
+                 system_prompt: str | None = None,
                  max_turns: int = 1,
-                 allowed_tools: Optional[List[str]] = None,
-                 permission_mode: str = 'acceptEdits'):
+                 allowed_tools: list[str] | None = None,
+                 permission_mode: Literal[
+                     "default",
+                     "acceptEdits",
+                     "plan",
+                     "bypassPermissions",
+                 ] = 'acceptEdits') -> None:
         """Initialize the Claude SDK interface.
-        
+
         Args:
             system_prompt: Optional system prompt to use
             max_turns: Maximum number of conversation turns
@@ -107,8 +128,8 @@ class ClaudeSDKInterface:
             return str(shared_cli)
 
         return shutil.which("claude") or "claude"
-    
-    def _verify_installation(self):
+
+    def _verify_installation(self) -> None:
         """Verify that Claude Code CLI and SDK are properly installed."""
         global SDK_AVAILABLE
         if not SDK_AVAILABLE:
@@ -121,13 +142,12 @@ class ClaudeSDKInterface:
                     timeout=30
                 )
                 # Re-import after installation
-                from claude_code_sdk import query, ClaudeCodeOptions
                 SDK_AVAILABLE = True
-            except Exception as e:
+            except Exception:
                 raise RuntimeError(
                     "Claude Code SDK not installed. Please run: pip install claude-code-sdk"
-                )
-        
+                ) from None
+
         # Verify Claude Code CLI is available
         claude_cmd = self._resolve_claude_command()
         try:
@@ -144,19 +164,19 @@ class ClaudeSDKInterface:
         except FileNotFoundError:
             raise RuntimeError(
                 "Claude Code CLI not found. Please install: npm install -g @anthropic-ai/claude-code"
-            )
-    
-    async def stream_response(self, 
-                             prompt: str, 
+            ) from None
+
+    async def stream_response(self,
+                             prompt: str,
                              working_dir: str = ".",
-                             context_files: Optional[List[str]] = None) -> AsyncIterator[StreamMessage]:
+                             context_files: list[str] | None = None) -> AsyncIterator[StreamMessage]:
         """Stream a response from Claude with detailed progress tracking.
-        
+
         Args:
             prompt: The prompt to send to Claude
             working_dir: Working directory for execution
             context_files: Optional list of files to include as context
-            
+
         Yields:
             StreamMessage objects containing progress and content
         """
@@ -166,14 +186,14 @@ class ClaudeSDKInterface:
                 content="Claude Code SDK not available. Please install it first."
             )
             return
-        
+
         # Prepare the full prompt with context files
         full_prompt = prompt
         if context_files:
             context_refs = [f"@{file}" for file in context_files if Path(file).exists()]
             if context_refs:
                 full_prompt = f"{' '.join(context_refs)} {prompt}"
-        
+
         # Configure options
         options = ClaudeCodeOptions(
             system_prompt=self.system_prompt,
@@ -181,7 +201,7 @@ class ClaudeSDKInterface:
             allowed_tools=self.allowed_tools,
             permission_mode=self.permission_mode
         )
-        
+
         try:
             # Change to working directory
             original_cwd = os.getcwd()
@@ -189,27 +209,27 @@ class ClaudeSDKInterface:
             if not working_path.exists():
                 working_path.mkdir(parents=True, exist_ok=True)
             os.chdir(working_path)
-            
+
             # Send initial status
             yield StreamMessage(
                 type=MessageType.STATUS,
                 content="Initializing Claude...",
                 metadata={"step": "init"}
             )
-            
+
             # Track progress
             chunk_count = 0
             total_content = []
             last_progress_time = datetime.now()
-            
+
             # Stream the response
             async for message in query(prompt=full_prompt, options=options):
                 chunk_count += 1
-                
+
                 # Handle different message types
                 if hasattr(message, '__class__'):
                     message_type = message.__class__.__name__
-                    
+
                     if message_type == "AssistantMessage":
                         # Extract content from assistant message
                         if hasattr(message, 'content'):
@@ -217,7 +237,7 @@ class ClaudeSDKInterface:
                                 if hasattr(block, 'text'):
                                     content = block.text
                                     total_content.append(content)
-                                    
+
                                     # Send stream message
                                     yield StreamMessage(
                                         type=MessageType.STREAM,
@@ -231,7 +251,7 @@ class ClaudeSDKInterface:
                                         content=f"Using tool: {block.tool_use.name}",
                                         metadata={"tool": block.tool_use.name}
                                     )
-                    
+
                     elif message_type == "ThinkingMessage":
                         # Claude is thinking
                         yield StreamMessage(
@@ -239,7 +259,7 @@ class ClaudeSDKInterface:
                             content="Claude is thinking...",
                             metadata={"thinking": True}
                         )
-                    
+
                     elif message_type == "ErrorMessage":
                         # Error occurred
                         yield StreamMessage(
@@ -256,7 +276,7 @@ class ClaudeSDKInterface:
                         content=content,
                         metadata={"chunk": chunk_count}
                     )
-                
+
                 # Send periodic progress updates
                 now = datetime.now()
                 if (now - last_progress_time).total_seconds() > 2:
@@ -269,10 +289,10 @@ class ClaudeSDKInterface:
                         }
                     )
                     last_progress_time = now
-            
+
             # Change back to original directory
             os.chdir(original_cwd)
-            
+
             # Send completion message
             yield StreamMessage(
                 type=MessageType.COMPLETE,
@@ -282,7 +302,7 @@ class ClaudeSDKInterface:
                     "total_length": sum(len(c) for c in total_content)
                 }
             )
-            
+
         except CLINotFoundError:
             yield StreamMessage(
                 type=MessageType.ERROR,
@@ -311,20 +331,20 @@ class ClaudeSDKInterface:
             # Ensure we return to original directory
             try:
                 os.chdir(original_cwd)
-            except:
+            except Exception:
                 pass
-    
-    async def execute_with_agents(self, 
+
+    async def execute_with_agents(self,
                                  prompt: str,
-                                 agents: List[str],
+                                 agents: list[str],
                                  working_dir: str = ".") -> AsyncIterator[StreamMessage]:
         """Execute a prompt with specific agents activated.
-        
+
         Args:
             prompt: The prompt to execute
             agents: List of agent names to activate
             working_dir: Working directory
-            
+
         Yields:
             StreamMessage objects with agent status updates
         """
@@ -336,13 +356,13 @@ class ClaudeSDKInterface:
                 metadata={"agent": agent, "status": "activating"}
             )
             await asyncio.sleep(0.1)  # Brief pause for UI
-        
+
         # Process with agents
         agent_prompt = " ".join([f"@{agent}" for agent in agents]) + " " + prompt
-        
+
         async for message in self.stream_response(agent_prompt, working_dir):
             yield message
-        
+
         # Deactivate agents
         for agent in agents:
             yield StreamMessage(
@@ -350,21 +370,21 @@ class ClaudeSDKInterface:
                 content=f"{agent} agent completed",
                 metadata={"agent": agent, "status": "completed"}
             )
-    
+
     def is_available(self) -> bool:
         """Check if the Claude SDK is available and working."""
         try:
             self._verify_installation()
             return SDK_AVAILABLE
-        except:
+        except Exception:
             return False
-    
+
     async def simple_query(self, prompt: str) -> str:
         """Execute a simple query and return the full response.
-        
+
         Args:
             prompt: The prompt to execute
-            
+
         Returns:
             The complete response as a string
         """

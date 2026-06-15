@@ -2,14 +2,16 @@
 CLI utility functions.
 """
 
+from typing import Any
+
+from rich import print as rprint
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich import print as rprint
 
 console = Console()
 
 
-def test_connection(manager):
+def test_connection(manager: Any) -> bool:
     """Test Claude Code connection with progress indicator."""
     with Progress(
         SpinnerColumn(),
@@ -18,7 +20,7 @@ def test_connection(manager):
     ) as progress:
         progress.add_task(description="Testing Claude Code connection...", total=None)
         is_working, message = manager.claude_interface.test_connection()
-    
+
     if is_working:
         rprint(f"[green]✓[/green] {message}")
         return True

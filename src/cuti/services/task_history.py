@@ -2,13 +2,13 @@
 Task history persistence and management.
 """
 
-import sqlite3
 import json
-from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field, asdict
+import sqlite3
 import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -18,19 +18,19 @@ class TaskHistoryEntry:
     session_id: str = ""
     content: str = ""
     response: str = ""
-    agents_used: List[str] = field(default_factory=list)
-    sub_tasks: List[Dict[str, Any]] = field(default_factory=list)
+    agents_used: list[str] = field(default_factory=list)
+    sub_tasks: list[dict[str, Any]] = field(default_factory=list)
     status: str = "pending"  # pending, executing, completed, failed, cancelled
     created_at: datetime = field(default_factory=datetime.now)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     duration_seconds: float = 0.0
     tokens_used: int = 0
     cost: float = 0.0
-    error_message: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
-    def to_dict(self) -> Dict[str, Any]:
+    error_message: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         data = asdict(self)
         data['created_at'] = self.created_at.isoformat() if self.created_at else None
@@ -40,9 +40,9 @@ class TaskHistoryEntry:
         data['sub_tasks'] = json.dumps(self.sub_tasks)
         data['metadata'] = json.dumps(self.metadata)
         return data
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'TaskHistoryEntry':
+    def from_dict(cls, data: dict[str, Any]) -> 'TaskHistoryEntry':
         """Create from dictionary."""
         if isinstance(data.get('agents_used'), str):
             data['agents_used'] = json.loads(data['agents_used'])
@@ -61,18 +61,18 @@ class TaskHistoryEntry:
 
 class TaskHistoryManager:
     """Manages task execution history in database."""
-    
+
     def __init__(self, storage_dir: str = ".cuti"):
         self.storage_dir = Path(storage_dir)
         self.db_path = self.storage_dir / "databases" / "task_history.db"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
-    
-    def _init_database(self):
+
+    def _init_database(self) -> None:
         """Initialize the task history database."""
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
-        
+
         # Create main task history table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS task_history (
@@ -93,7 +93,7 @@ class TaskHistoryManager:
                 metadata TEXT
             )
         ''')
-        
+
         # Create sub-tasks table for detailed tracking
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS sub_tasks (
@@ -109,21 +109,21 @@ class TaskHistoryManager:
                 FOREIGN KEY (parent_task_id) REFERENCES task_history(id)
             )
         ''')
-        
+
         # Create indexes for better query performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_task_session ON task_history(session_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_task_status ON task_history(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_task_created ON task_history(created_at)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_subtask_parent ON sub_tasks(parent_task_id)')
-        
+
         conn.commit()
         conn.close()
-    
+
     def add_task(self, task: TaskHistoryEntry) -> str:
         """Add a new task to history."""
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
-        
+
         try:
             task_dict = task.to_dict()
             cursor.execute('''
@@ -140,7 +140,7 @@ class TaskHistoryManager:
                 task_dict['tokens_used'], task_dict['cost'], task_dict['error_message'],
                 task_dict['metadata']
             ))
-            
+
             # Add sub-tasks if any
             for sub_task in task.sub_tasks:
                 cursor.execute('''
@@ -159,136 +159,136 @@ class TaskHistoryManager:
                     sub_task.get('duration_seconds', 0),
                     json.dumps(sub_task.get('metadata', {}))
                 ))
-            
+
             conn.commit()
             return task.id
         finally:
             conn.close()
-    
-    def update_task(self, task_id: str, updates: Dict[str, Any]) -> bool:
+
+    def update_task(self, task_id: str, updates: dict[str, Any]) -> bool:
         """Update an existing task."""
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
-        
+
         try:
             # Build update query dynamically
             update_fields = []
             values = []
-            
+
             for key, value in updates.items():
                 if key in ['agents_used', 'sub_tasks', 'metadata']:
                     value = json.dumps(value) if not isinstance(value, str) else value
                 elif key in ['created_at', 'started_at', 'completed_at'] and value:
                     value = value.isoformat() if isinstance(value, datetime) else value
-                
+
                 update_fields.append(f"{key} = ?")
                 values.append(value)
-            
+
             values.append(task_id)
-            
+
             cursor.execute(
                 f"UPDATE task_history SET {', '.join(update_fields)} WHERE id = ?",
                 values
             )
-            
+
             conn.commit()
             return cursor.rowcount > 0
         finally:
             conn.close()
-    
-    def get_task(self, task_id: str) -> Optional[TaskHistoryEntry]:
+
+    def get_task(self, task_id: str) -> TaskHistoryEntry | None:
         """Get a single task by ID."""
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         try:
             cursor.execute('SELECT * FROM task_history WHERE id = ?', (task_id,))
             row = cursor.fetchone()
-            
+
             if row:
                 return TaskHistoryEntry.from_dict(dict(row))
             return None
         finally:
             conn.close()
-    
+
     def get_tasks(
         self,
-        session_id: Optional[str] = None,
-        status: Optional[str] = None,
+        session_id: str | None = None,
+        status: str | None = None,
         limit: int = 50,
         offset: int = 0,
         order_by: str = "created_at DESC"
-    ) -> List[TaskHistoryEntry]:
+    ) -> list[TaskHistoryEntry]:
         """Get tasks with optional filtering."""
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         try:
             query = "SELECT * FROM task_history WHERE 1=1"
-            params = []
-            
+            params: list[Any] = []
+
             if session_id:
                 query += " AND session_id = ?"
                 params.append(session_id)
-            
+
             if status:
                 query += " AND status = ?"
                 params.append(status)
-            
+
             query += f" ORDER BY {order_by} LIMIT ? OFFSET ?"
             params.extend([limit, offset])
-            
+
             cursor.execute(query, params)
             rows = cursor.fetchall()
-            
+
             return [TaskHistoryEntry.from_dict(dict(row)) for row in rows]
         finally:
             conn.close()
-    
-    def get_task_stats(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+
+    def get_task_stats(self, session_id: str | None = None) -> dict[str, Any]:
         """Get statistics about tasks."""
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
-        
+
         try:
             base_query = "FROM task_history"
             params = []
-            
+
             if session_id:
                 base_query += " WHERE session_id = ?"
                 params.append(session_id)
-            
+
             # Total tasks
             cursor.execute(f"SELECT COUNT(*) {base_query}", params)
             total = cursor.fetchone()[0]
-            
+
             # Tasks by status
             cursor.execute(f"""
-                SELECT status, COUNT(*) 
+                SELECT status, COUNT(*)
                 {base_query}
                 {'AND' if session_id else 'WHERE'} status IS NOT NULL
                 GROUP BY status
             """, params)
             by_status = dict(cursor.fetchall())
-            
+
             # Average duration
             cursor.execute(f"""
-                SELECT AVG(duration_seconds) 
+                SELECT AVG(duration_seconds)
                 {base_query}
                 {'AND' if session_id else 'WHERE'} duration_seconds > 0
             """, params)
             avg_duration = cursor.fetchone()[0] or 0
-            
+
             # Total cost
             cursor.execute(f"SELECT SUM(cost) {base_query}", params)
             total_cost = cursor.fetchone()[0] or 0
-            
+
             # Total tokens
             cursor.execute(f"SELECT SUM(tokens_used) {base_query}", params)
             total_tokens = cursor.fetchone()[0] or 0
-            
+
             # Most used agents
             cursor.execute(f"""
                 SELECT agents_used, COUNT(*) as count
@@ -298,13 +298,13 @@ class TaskHistoryManager:
                 ORDER BY count DESC
                 LIMIT 5
             """, params)
-            
-            agent_usage = {}
+
+            agent_usage: dict[str, int] = {}
             for row in cursor.fetchall():
                 agents = json.loads(row[0])
                 for agent in agents:
                     agent_usage[agent] = agent_usage.get(agent, 0) + 1
-            
+
             return {
                 "total_tasks": total,
                 "by_status": by_status,
@@ -312,42 +312,38 @@ class TaskHistoryManager:
                 "total_cost": total_cost,
                 "total_tokens": total_tokens,
                 "most_used_agents": dict(sorted(
-                    agent_usage.items(), 
-                    key=lambda x: x[1], 
+                    agent_usage.items(),
+                    key=lambda x: x[1],
                     reverse=True
                 )[:5])
             }
         finally:
             conn.close()
-    
+
     def cleanup_old_tasks(self, days: int = 30) -> int:
         """Remove tasks older than specified days."""
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
-        
+
         try:
             cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
-            
+
             # Delete sub-tasks first
             cursor.execute('''
-                DELETE FROM sub_tasks 
+                DELETE FROM sub_tasks
                 WHERE parent_task_id IN (
                     SELECT id FROM task_history WHERE created_at < ?
                 )
             ''', (cutoff_date,))
-            
+
             # Delete main tasks
             cursor.execute(
                 'DELETE FROM task_history WHERE created_at < ?',
                 (cutoff_date,)
             )
-            
+
             deleted = cursor.rowcount
             conn.commit()
             return deleted
         finally:
             conn.close()
-
-
-# Import for timedelta
-from datetime import timedelta

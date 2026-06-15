@@ -2,11 +2,11 @@
 Todo list models for hierarchical task management.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
-import uuid
+from typing import Any
 
 
 class TodoStatus(Enum):
@@ -35,24 +35,24 @@ class TodoItem:
     priority: TodoPriority = TodoPriority.MEDIUM
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     created_by: str = "user"  # "user" or "claude"
-    assigned_to: Optional[str] = None  # agent name if assigned
-    parent_id: Optional[str] = None  # for sub-todos
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
-    def mark_completed(self):
+    assigned_to: str | None = None  # agent name if assigned
+    parent_id: str | None = None  # for sub-todos
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def mark_completed(self) -> None:
         """Mark this todo as completed."""
         self.status = TodoStatus.COMPLETED
         self.completed_at = datetime.now()
         self.updated_at = datetime.now()
-    
-    def mark_in_progress(self):
+
+    def mark_in_progress(self) -> None:
         """Mark this todo as in progress."""
         self.status = TodoStatus.IN_PROGRESS
         self.updated_at = datetime.now()
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -67,13 +67,13 @@ class TodoItem:
             "parent_id": self.parent_id,
             "metadata": self.metadata
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'TodoItem':
+    def from_dict(cls, data: dict[str, Any]) -> 'TodoItem':
         """Create from dictionary."""
         if isinstance(data.get('status'), str):
             data['status'] = TodoStatus(data['status'])
-        if isinstance(data.get('priority'), (str, int)):
+        if isinstance(data.get('priority'), str | int):
             if isinstance(data['priority'], str):
                 data['priority'] = TodoPriority[data['priority'].upper()]
             else:
@@ -93,21 +93,21 @@ class TodoList:
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     name: str = ""
     description: str = ""
-    todos: List[TodoItem] = field(default_factory=list)
-    parent_list_id: Optional[str] = None  # for sub-lists
-    session_id: Optional[str] = None  # links to a work session
+    todos: list[TodoItem] = field(default_factory=list)
+    parent_list_id: str | None = None  # for sub-lists
+    session_id: str | None = None  # links to a work session
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     created_by: str = "user"  # "user" or "claude"
     is_master: bool = False  # True for the master GOAL.md list
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
+    metadata: dict[str, Any] = field(default_factory=dict)
+
     def add_todo(self, todo: TodoItem) -> None:
         """Add a todo item to this list."""
         todo.parent_id = self.id
         self.todos.append(todo)
         self.updated_at = datetime.now()
-    
+
     def remove_todo(self, todo_id: str) -> bool:
         """Remove a todo item by ID."""
         original_count = len(self.todos)
@@ -116,17 +116,17 @@ class TodoList:
             self.updated_at = datetime.now()
             return True
         return False
-    
-    def get_todo(self, todo_id: str) -> Optional[TodoItem]:
+
+    def get_todo(self, todo_id: str) -> TodoItem | None:
         """Get a todo item by ID."""
         for todo in self.todos:
             if todo.id == todo_id:
                 return todo
         return None
-    
-    def get_progress(self) -> Dict[str, int]:
+
+    def get_progress(self) -> dict[str, int]:
         """Get progress statistics."""
-        stats = {
+        stats: dict[str, int] = {
             "total": len(self.todos),
             "pending": 0,
             "in_progress": 0,
@@ -134,32 +134,32 @@ class TodoList:
             "blocked": 0,
             "cancelled": 0
         }
-        
+
         for todo in self.todos:
             stats[todo.status.value] += 1
-        
+
         if stats["total"] > 0:
             stats["completion_percentage"] = int(
                 (stats["completed"] / stats["total"]) * 100
             )
         else:
             stats["completion_percentage"] = 0
-        
+
         return stats
-    
-    def get_pending_todos(self) -> List[TodoItem]:
+
+    def get_pending_todos(self) -> list[TodoItem]:
         """Get all pending todos."""
         return [t for t in self.todos if t.status == TodoStatus.PENDING]
-    
-    def get_in_progress_todos(self) -> List[TodoItem]:
+
+    def get_in_progress_todos(self) -> list[TodoItem]:
         """Get all in-progress todos."""
         return [t for t in self.todos if t.status == TodoStatus.IN_PROGRESS]
-    
-    def get_completed_todos(self) -> List[TodoItem]:
+
+    def get_completed_todos(self) -> list[TodoItem]:
         """Get all completed todos."""
         return [t for t in self.todos if t.status == TodoStatus.COMPLETED]
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -175,13 +175,13 @@ class TodoList:
             "metadata": self.metadata,
             "progress": self.get_progress()
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'TodoList':
+    def from_dict(cls, data: dict[str, Any]) -> 'TodoList':
         """Create from dictionary."""
         if 'todos' in data and isinstance(data['todos'], list):
             data['todos'] = [
-                TodoItem.from_dict(t) if isinstance(t, dict) else t 
+                TodoItem.from_dict(t) if isinstance(t, dict) else t
                 for t in data['todos']
             ]
         if data.get('created_at'):
@@ -198,13 +198,13 @@ class TodoSession:
     """Represents a work session with associated todo lists."""
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     name: str = ""
-    master_list: Optional[TodoList] = None
-    sub_lists: List[TodoList] = field(default_factory=list)
+    master_list: TodoList | None = None
+    sub_lists: list[TodoList] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     active: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
+    metadata: dict[str, Any] = field(default_factory=dict)
+
     def add_sub_list(self, sub_list: TodoList) -> None:
         """Add a sub-list to this session."""
         sub_list.session_id = self.id
@@ -212,8 +212,8 @@ class TodoSession:
             sub_list.parent_list_id = self.master_list.id
         self.sub_lists.append(sub_list)
         self.updated_at = datetime.now()
-    
-    def get_all_todos(self) -> List[TodoItem]:
+
+    def get_all_todos(self) -> list[TodoItem]:
         """Get all todos from master and sub-lists."""
         todos = []
         if self.master_list:
@@ -221,11 +221,11 @@ class TodoSession:
         for sub_list in self.sub_lists:
             todos.extend(sub_list.todos)
         return todos
-    
-    def get_overall_progress(self) -> Dict[str, Any]:
+
+    def get_overall_progress(self) -> dict[str, Any]:
         """Get overall progress across all lists."""
         all_todos = self.get_all_todos()
-        stats = {
+        stats: dict[str, Any] = {
             "total": len(all_todos),
             "pending": sum(1 for t in all_todos if t.status == TodoStatus.PENDING),
             "in_progress": sum(1 for t in all_todos if t.status == TodoStatus.IN_PROGRESS),
@@ -233,22 +233,22 @@ class TodoSession:
             "blocked": sum(1 for t in all_todos if t.status == TodoStatus.BLOCKED),
             "cancelled": sum(1 for t in all_todos if t.status == TodoStatus.CANCELLED)
         }
-        
+
         if stats["total"] > 0:
             stats["completion_percentage"] = int(
                 (stats["completed"] / stats["total"]) * 100
             )
         else:
             stats["completion_percentage"] = 0
-        
+
         stats["lists"] = {
             "master": self.master_list.get_progress() if self.master_list else None,
             "sub_lists": [sl.get_progress() for sl in self.sub_lists]
         }
-        
+
         return stats
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -261,15 +261,15 @@ class TodoSession:
             "metadata": self.metadata,
             "overall_progress": self.get_overall_progress()
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'TodoSession':
+    def from_dict(cls, data: dict[str, Any]) -> 'TodoSession':
         """Create from dictionary."""
         if 'master_list' in data and data['master_list']:
             data['master_list'] = TodoList.from_dict(data['master_list'])
         if 'sub_lists' in data and isinstance(data['sub_lists'], list):
             data['sub_lists'] = [
-                TodoList.from_dict(sl) if isinstance(sl, dict) else sl 
+                TodoList.from_dict(sl) if isinstance(sl, dict) else sl
                 for sl in data['sub_lists']
             ]
         if data.get('created_at'):

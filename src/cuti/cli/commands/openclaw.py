@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import shlex
+from collections.abc import Callable
 from contextvars import ContextVar
-from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -27,13 +27,13 @@ _FORWARD_CONTEXT = {
 }
 
 
-def _collect_forwarded(ctx: typer.Context, args: Optional[List[str]]) -> List[str]:
+def _collect_forwarded(ctx: typer.Context, args: list[str] | None) -> list[str]:
     """Merge positional args and unknown option args captured by Typer."""
 
     return [*(args or []), *ctx.args]
 
 
-def _current_global_args() -> List[str]:
+def _current_global_args() -> list[str]:
     """Return root OpenClaw flags captured by the Typer callback."""
 
     return list(_OPENCLAW_GLOBAL_ARGS.get())
@@ -54,12 +54,12 @@ def main(
         "--dev",
         help="Forward OpenClaw's dev profile flag and shifted default ports.",
     ),
-    profile: Optional[str] = typer.Option(
+    profile: str | None = typer.Option(
         None,
         "--profile",
         help="Forward OpenClaw's named profile flag.",
     ),
-    container: Optional[str] = typer.Option(
+    container: str | None = typer.Option(
         None,
         "--container",
         help="Forward OpenClaw's named container target flag.",
@@ -84,7 +84,7 @@ def main(
 ) -> None:
     """Capture OpenClaw root flags before dispatching to a command wrapper."""
 
-    global_args: List[str] = []
+    global_args: list[str] = []
     if dev:
         global_args.append("--dev")
     if profile:
@@ -109,7 +109,7 @@ def main(
 
 
 def _run_openclaw(
-    args: List[str],
+    args: list[str],
     *,
     rebuild: bool = False,
     interactive: bool = False,
@@ -151,7 +151,7 @@ def _run_openclaw_shell(
         raise typer.Exit(exit_code)
 
 
-def _openclaw_command(args: List[str]) -> str:
+def _openclaw_command(args: list[str]) -> str:
     return shlex.join(["openclaw", *_current_global_args(), *args])
 
 
@@ -161,13 +161,13 @@ def _openclaw_setup_state() -> str:
 
 def _gateway_args(
     *,
-    port: Optional[int],
-    bind: Optional[str],
+    port: int | None,
+    bind: str | None,
     allow_unconfigured: bool,
     dev: bool,
     verbose: bool,
-    extra_args: Optional[List[str]] = None,
-) -> List[str]:
+    extra_args: list[str] | None = None,
+) -> list[str]:
     args = ["gateway"]
     if port is not None:
         args.extend(["--port", str(port)])
@@ -197,7 +197,7 @@ def onboard(
         help="Run `openclaw doctor --non-interactive` after onboarding.",
     ),
     rebuild: bool = typer.Option(False, "--rebuild", help="Rebuild the container image first."),
-    extra_args: Optional[List[str]] = typer.Argument(
+    extra_args: list[str] | None = typer.Argument(
         None,
         help="Additional arguments forwarded to `openclaw onboard`.",
         metavar="[EXTRA...]",
@@ -246,8 +246,8 @@ def doctor(
 @app.command(context_settings=_FORWARD_CONTEXT)
 def gateway(
     ctx: typer.Context,
-    port: Optional[int] = typer.Option(None, "--port", help="Gateway port."),
-    bind: Optional[str] = typer.Option(None, "--bind", help="Gateway bind mode."),
+    port: int | None = typer.Option(None, "--port", help="Gateway port."),
+    bind: str | None = typer.Option(None, "--bind", help="Gateway bind mode."),
     allow_unconfigured: bool = typer.Option(
         False,
         "--allow-unconfigured",
@@ -256,7 +256,7 @@ def gateway(
     dev: bool = typer.Option(False, "--dev", help="Ask OpenClaw to create dev config/workspace if missing."),
     verbose: bool = typer.Option(True, "--verbose/--quiet", help="Enable verbose gateway logs."),
     rebuild: bool = typer.Option(False, "--rebuild", help="Rebuild the container image first."),
-    extra_args: Optional[List[str]] = typer.Argument(
+    extra_args: list[str] | None = typer.Argument(
         None,
         help="Additional arguments forwarded to `openclaw gateway`.",
         metavar="[EXTRA...]",
@@ -277,8 +277,8 @@ def gateway(
 
 @app.command()
 def up(
-    port: Optional[int] = typer.Option(None, "--port", help="Gateway port."),
-    bind: Optional[str] = typer.Option(None, "--bind", help="Gateway bind mode."),
+    port: int | None = typer.Option(None, "--port", help="Gateway port."),
+    bind: str | None = typer.Option(None, "--bind", help="Gateway bind mode."),
     configure: bool = typer.Option(
         True,
         "--configure/--no-configure",
@@ -320,8 +320,8 @@ def up(
 
 @app.command("channels-login")
 def channels_login(
-    channel: Optional[str] = typer.Option(None, "--channel", "-c", help="Channel identifier, for example whatsapp."),
-    account: Optional[str] = typer.Option(None, "--account", help="Account id for multi-account setups."),
+    channel: str | None = typer.Option(None, "--channel", "-c", help="Channel identifier, for example whatsapp."),
+    account: str | None = typer.Option(None, "--account", help="Account id for multi-account setups."),
     rebuild: bool = typer.Option(False, "--rebuild", help="Rebuild the container image first."),
 ) -> None:
     """Run `openclaw channels login` for QR or browser-based channel auth."""
@@ -337,7 +337,7 @@ def channels_login(
 @app.command(context_settings=_FORWARD_CONTEXT)
 def channels(
     ctx: typer.Context,
-    args: Optional[List[str]] = typer.Argument(
+    args: list[str] | None = typer.Argument(
         None,
         help="Arguments forwarded to `openclaw channels`.",
         metavar="[ARGS...]",
@@ -352,7 +352,7 @@ def channels(
 @app.command(context_settings=_FORWARD_CONTEXT)
 def browser(
     ctx: typer.Context,
-    args: Optional[List[str]] = typer.Argument(
+    args: list[str] | None = typer.Argument(
         None,
         help="Arguments forwarded to `openclaw browser`.",
         metavar="[ARGS...]",
@@ -367,7 +367,7 @@ def browser(
 @app.command(context_settings=_FORWARD_CONTEXT)
 def plugins(
     ctx: typer.Context,
-    args: Optional[List[str]] = typer.Argument(
+    args: list[str] | None = typer.Argument(
         None,
         help="Arguments forwarded to `openclaw plugins`.",
         metavar="[ARGS...]",
@@ -398,7 +398,7 @@ def voice_setup(
 @app.command(context_settings=_FORWARD_CONTEXT)
 def voicecall(
     ctx: typer.Context,
-    args: Optional[List[str]] = typer.Argument(
+    args: list[str] | None = typer.Argument(
         None,
         help="Arguments forwarded to `openclaw voicecall`.",
         metavar="[ARGS...]",
@@ -413,7 +413,7 @@ def voicecall(
 @app.command(context_settings=_FORWARD_CONTEXT)
 def voice(
     ctx: typer.Context,
-    args: Optional[List[str]] = typer.Argument(
+    args: list[str] | None = typer.Argument(
         None,
         help="Arguments forwarded to `openclaw voicecall`.",
         metavar="[ARGS...]",
@@ -430,10 +430,10 @@ def _make_forward_command(
     *,
     help_text: str,
     interactive_default: bool = False,
-):
+) -> Callable[..., None]:
     def forwarded(
         ctx: typer.Context,
-        args: Optional[List[str]] = typer.Argument(
+        args: list[str] | None = typer.Argument(
             None,
             help=f"Arguments forwarded to `openclaw {command_name}`.",
             metavar="[ARGS...]",
@@ -538,7 +538,7 @@ for _command_name, _help_text, _interactive_default in _SOURCE_BACKED_FORWARD_CO
 @app.command(context_settings=_FORWARD_CONTEXT)
 def dashboard(
     ctx: typer.Context,
-    args: Optional[List[str]] = typer.Argument(
+    args: list[str] | None = typer.Argument(
         None,
         help="Arguments forwarded to `openclaw dashboard`.",
         metavar="[ARGS...]",
@@ -553,7 +553,7 @@ def dashboard(
 @app.command(context_settings=_FORWARD_CONTEXT)
 def run(
     ctx: typer.Context,
-    args: Optional[List[str]] = typer.Argument(
+    args: list[str] | None = typer.Argument(
         None,
         help="Arguments forwarded directly to the OpenClaw CLI.",
         metavar="[ARGS...]",

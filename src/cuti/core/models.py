@@ -2,11 +2,11 @@
 Data structures for cuti system.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
-import uuid
+from typing import Any
 
 
 class PromptStatus(Enum):
@@ -29,15 +29,15 @@ class QueuedPrompt:
     working_directory: str = "."
     created_at: datetime = field(default_factory=datetime.now)
     priority: int = 0  # Lower number = higher priority
-    context_files: List[str] = field(default_factory=list)
+    context_files: list[str] = field(default_factory=list)
     max_retries: int = 3
     retry_count: int = 0
     status: PromptStatus = PromptStatus.QUEUED
     execution_log: str = ""
-    estimated_tokens: Optional[int] = None
-    last_executed: Optional[datetime] = None
-    rate_limited_at: Optional[datetime] = None
-    reset_time: Optional[datetime] = None
+    estimated_tokens: int | None = None
+    last_executed: datetime | None = None
+    rate_limited_at: datetime | None = None
+    reset_time: datetime | None = None
 
     def add_log(self, message: str) -> None:
         """Add a log entry with timestamp."""
@@ -67,9 +67,9 @@ class RateLimitInfo:
     """Information about rate limiting from Claude Code response."""
 
     is_rate_limited: bool = False
-    reset_time: Optional[datetime] = None
+    reset_time: datetime | None = None
     limit_message: str = ""
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
 
     @classmethod
     def from_claude_response(cls, response_text: str) -> "RateLimitInfo":
@@ -101,14 +101,14 @@ class RateLimitInfo:
 class QueueState:
     """Overall state of the queue system."""
 
-    prompts: List[QueuedPrompt] = field(default_factory=list)
-    last_processed: Optional[datetime] = None
+    prompts: list[QueuedPrompt] = field(default_factory=list)
+    last_processed: datetime | None = None
     total_processed: int = 0
     failed_count: int = 0
     rate_limited_count: int = 0
-    current_rate_limit: Optional[RateLimitInfo] = None
+    current_rate_limit: RateLimitInfo | None = None
 
-    def get_next_prompt(self) -> Optional[QueuedPrompt]:
+    def get_next_prompt(self) -> QueuedPrompt | None:
         """Get the next prompt to execute (highest priority, can execute now)."""
         executable_prompts = [
             p
@@ -146,14 +146,14 @@ class QueueState:
         self.prompts = [p for p in self.prompts if p.id != prompt_id]
         return len(self.prompts) < original_count
 
-    def get_prompt(self, prompt_id: str) -> Optional[QueuedPrompt]:
+    def get_prompt(self, prompt_id: str) -> QueuedPrompt | None:
         """Get a prompt by ID."""
         for prompt in self.prompts:
             if prompt.id == prompt_id:
                 return prompt
         return None
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get queue statistics."""
         status_counts = {}
         for status in PromptStatus:
@@ -200,7 +200,7 @@ class ExecutionResult:
     success: bool
     output: str
     error: str = ""
-    rate_limit_info: Optional[RateLimitInfo] = None
+    rate_limit_info: RateLimitInfo | None = None
     execution_time: float = 0.0
     tokens_used: int = 0
 

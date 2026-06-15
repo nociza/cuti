@@ -5,11 +5,11 @@ Interface for executing prompts via Claude Code CLI.
 import os
 import subprocess
 import time
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, List, Tuple
 
-from .models import ExecutionResult, RateLimitInfo, QueuedPrompt
+from .models import ExecutionResult, QueuedPrompt, RateLimitInfo
 
 
 class ClaudeCodeInterface:
@@ -25,7 +25,7 @@ class ClaudeCodeInterface:
                 shared_cli = Path.home() / ".cuti" / "claude-cli" / "bin" / "claude"
                 if shared_cli.exists():
                     claude_command = str(shared_cli)
-        
+
         self.claude_command = claude_command
         self.timeout = timeout
         self._verify_claude_available()
@@ -44,9 +44,9 @@ class ClaudeCodeInterface:
         except FileNotFoundError:
             raise RuntimeError(
                 f"Claude Code CLI not found. Make sure '{self.claude_command}' is in PATH."
-            )
+            ) from None
         except subprocess.TimeoutExpired:
-            raise RuntimeError("Claude Code CLI verification timed out.")
+            raise RuntimeError("Claude Code CLI verification timed out.") from None
 
     def execute_prompt(self, prompt: QueuedPrompt) -> ExecutionResult:
         """Execute a prompt via Claude Code CLI."""
@@ -104,7 +104,7 @@ class ClaudeCodeInterface:
         except subprocess.TimeoutExpired:
             try:
                 os.chdir(original_cwd)
-            except:
+            except Exception:
                 pass
             execution_time = time.time() - start_time
             return ExecutionResult(
@@ -116,7 +116,7 @@ class ClaudeCodeInterface:
         except Exception as e:
             try:
                 os.chdir(original_cwd)
-            except:
+            except Exception:
                 pass
             execution_time = time.time() - start_time
             return ExecutionResult(
@@ -151,7 +151,7 @@ class ClaudeCodeInterface:
 
         return RateLimitInfo(is_rate_limited=False)
 
-    def _extract_reset_time_from_limit_message(self, output: str) -> Optional[datetime]:
+    def _extract_reset_time_from_limit_message(self, output: str) -> datetime | None:
         """Extract reset time from Claude's limit message."""
         try:
             import re
@@ -164,37 +164,36 @@ class ClaudeCodeInterface:
                 time_str = match_reset.group(1)
                 am_pm = match_reset.group(2).lower()
                 timezone_str = match_reset.group(3)
-                
+
                 # Parse the time
                 if ':' in time_str:
                     hour, minute = map(int, time_str.split(':'))
                 else:
                     hour = int(time_str)
                     minute = 0
-                
+
                 # Convert to 24-hour format
                 if am_pm == 'pm' and hour != 12:
                     hour += 12
                 elif am_pm == 'am' and hour == 12:
                     hour = 0
-                
+
                 # Get current time in the specified timezone
                 try:
                     tz = ZoneInfo(timezone_str)
                     now_tz = datetime.now(tz)
-                    
+
                     # Create reset time for today
                     reset_time = now_tz.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                    
+
                     # If reset time is in the past, it must be tomorrow
                     if reset_time <= now_tz:
                         reset_time += timedelta(days=1)
-                    
+
                     # Convert to local timezone
                     return reset_time.astimezone()
                 except Exception:
                     # Fallback: assume EST/EDT
-                    from datetime import timezone
                     now = datetime.now()
                     reset_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
                     if reset_time <= now:
@@ -258,7 +257,7 @@ class ClaudeCodeInterface:
 
         return next_reset
 
-    def test_connection(self) -> Tuple[bool, str]:
+    def test_connection(self) -> tuple[bool, str]:
         """Test if Claude Code is working."""
         try:
             result = subprocess.run(
@@ -280,7 +279,7 @@ class ClaudeCodeInterface:
         except Exception as e:
             return False, f"Claude Code CLI test failed: {str(e)}"
 
-    def get_available_commands(self) -> List[str]:
+    def get_available_commands(self) -> list[str]:
         """Get available Claude Code commands."""
         try:
             result = subprocess.run(
@@ -319,17 +318,21 @@ class ClaudeCodeInterface:
         """Execute a simple prompt without full QueuedPrompt object."""
         simple_prompt = QueuedPrompt(content=prompt_text, working_directory=working_dir)
         return self.execute_prompt(simple_prompt)
-    
-    async def stream_prompt(self, prompt_text: str, working_dir: str = "."):
+
+    async def stream_prompt(
+        self, prompt_text: str, working_dir: str = "."
+    ) -> AsyncGenerator[str, None]:
         """Stream output from Claude Code CLI asynchronously."""
         import asyncio
-        
+
+        original_cwd = os.getcwd()
+
         # Prepare command
         cmd = [
             self.claude_command,
             prompt_text
         ]
-        
+
         try:
             # Change to working directory
             original_cwd = os.getcwd()
@@ -337,7 +340,7 @@ class ClaudeCodeInterface:
             if not working_path.exists():
                 working_path.mkdir(parents=True, exist_ok=True)
             os.chdir(working_path)
-            
+
             # Start the process
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -345,30 +348,32 @@ class ClaudeCodeInterface:
                 stderr=asyncio.subprocess.PIPE,
                 env={**os.environ}
             )
-            
+            if process.stdout is None or process.stderr is None:
+                raise RuntimeError("Claude stream process did not expose stdout/stderr")
+
             # Stream stdout line by line
             while True:
                 line = await process.stdout.readline()
                 if not line:
                     break
                 yield line.decode('utf-8', errors='replace')
-            
+
             # Wait for process to complete
             await process.wait()
-            
+
             # Change back to original directory
             os.chdir(original_cwd)
-            
+
             # If there's stderr, yield it
             if process.returncode != 0:
                 stderr = await process.stderr.read()
                 if stderr:
                     yield f"\n[Error] {stderr.decode('utf-8', errors='replace')}"
-                    
+
         except Exception as e:
             # Ensure we change back to original directory
             try:
                 os.chdir(original_cwd)
-            except:
+            except Exception:
                 pass
             yield f"\n[Error] {str(e)}"

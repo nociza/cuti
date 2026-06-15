@@ -11,7 +11,7 @@ main_router = APIRouter()
 
 def _render(request: Request, template_name: str, page_id: str, **context: object) -> HTMLResponse:
     templates = request.app.state.templates
-    payload = {
+    payload: dict[str, object] = {
         "request": request,
         "page_id": page_id,
         "working_directory": str(request.app.state.working_directory),

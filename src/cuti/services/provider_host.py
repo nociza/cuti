@@ -7,7 +7,7 @@ import shlex
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .claude_account_manager import ClaudeAccountManager
 from .devcontainer import DevContainerService
@@ -30,18 +30,18 @@ class ProviderHostStatus:
     enabled: bool
     default_enabled: bool
     explicit: bool
-    commands: List[str]
-    host_command_path: Optional[str]
+    commands: list[str]
+    host_command_path: str | None
     setup_state: str
     detail: str
-    state_paths: List[Path]
-    existing_state_paths: List[Path]
-    setup_command: Optional[str]
+    state_paths: list[Path]
+    existing_state_paths: list[Path]
+    setup_command: str | None
     setup_hint: str
-    update_command: Optional[str]
+    update_command: str | None
     update_hint: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation."""
 
         data = asdict(self)
@@ -55,9 +55,9 @@ class ProviderHostService:
 
     def __init__(
         self,
-        working_directory: Optional[str] = None,
+        working_directory: str | None = None,
         *,
-        provider_storage_dir: Optional[Path] = None,
+        provider_storage_dir: Path | None = None,
     ):
         self.working_directory = working_directory
         self.provider_manager = ProviderManager(storage_dir=provider_storage_dir)
@@ -68,7 +68,7 @@ class ProviderHostService:
         return self.provider_manager.get_metadata(provider)
 
     @staticmethod
-    def _status_kwargs(meta: ProviderMetadata) -> Dict[str, Any]:
+    def _status_kwargs(meta: ProviderMetadata) -> dict[str, Any]:
         return {
             "provider": meta.name,
             "title": meta.title,
@@ -84,7 +84,7 @@ class ProviderHostService:
             "update_hint": meta.update_hint,
         }
 
-    def _state_paths(self, provider: str) -> List[Path]:
+    def _state_paths(self, provider: str) -> list[Path]:
         if provider == "claude":
             return [
                 self.storage_dir / "claude-linux",
@@ -127,8 +127,8 @@ class ProviderHostService:
         return any(child.is_file() for child in path.rglob("*"))
 
     @staticmethod
-    def _find_auth_like_files(paths: List[Path]) -> List[Path]:
-        matches: List[Path] = []
+    def _find_auth_like_files(paths: list[Path]) -> list[Path]:
+        matches: list[Path] = []
         for path in paths:
             if not path.exists() or not path.is_dir():
                 continue
@@ -382,7 +382,7 @@ class ProviderHostService:
             return self._status_for_hermes(meta)
         raise ValueError(f"Unsupported provider '{provider}'")
 
-    def list_statuses(self, *, enabled_only: bool = False) -> List[ProviderHostStatus]:
+    def list_statuses(self, *, enabled_only: bool = False) -> list[ProviderHostStatus]:
         """Return provider statuses for all known providers."""
 
         providers = list(self.provider_manager.known_providers())
@@ -456,7 +456,7 @@ class ProviderHostService:
     def run_provider_command(
         self,
         provider: str,
-        args: List[str],
+        args: list[str],
         *,
         rebuild: bool = False,
         interactive: bool = False,

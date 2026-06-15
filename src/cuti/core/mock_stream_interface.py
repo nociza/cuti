@@ -3,17 +3,17 @@ Mock streaming interface that simulates Claude's intermediate steps for testing.
 """
 
 import asyncio
-from typing import AsyncIterator
-from datetime import datetime
+from collections.abc import AsyncIterator
+
 from .claude_stream_interface import StreamEvent, StreamEventType
 
 
 class MockStreamInterface:
     """Mock interface that simulates streaming with intermediate steps."""
-    
+
     async def stream_mock_response(self, prompt: str) -> AsyncIterator[StreamEvent]:
         """Generate a mock stream of events simulating Claude's work."""
-        
+
         # Initialization
         yield StreamEvent(
             type=StreamEventType.INIT,
@@ -21,20 +21,20 @@ class MockStreamInterface:
             metadata={"mode": "mock"}
         )
         await asyncio.sleep(0.5)
-        
+
         # Thinking phase
         yield StreamEvent(
             type=StreamEventType.THINKING,
             content="Analyzing your request..."
         )
         await asyncio.sleep(0.3)
-        
+
         yield StreamEvent(
             type=StreamEventType.THINKING,
             content=f"Processing: {prompt[:50]}..."
         )
         await asyncio.sleep(0.5)
-        
+
         # Simulate file operations based on keywords
         if "readme" in prompt.lower() or "understand" in prompt.lower():
             yield StreamEvent(
@@ -43,34 +43,34 @@ class MockStreamInterface:
                 metadata={"tool": "search"}
             )
             await asyncio.sleep(0.3)
-            
+
             yield StreamEvent(
                 type=StreamEventType.READING_FILE,
                 content="Reading README.md",
                 metadata={"file": "README.md"}
             )
             await asyncio.sleep(0.5)
-            
+
             yield StreamEvent(
                 type=StreamEventType.PROGRESS,
                 content="Analyzing file structure..."
             )
             await asyncio.sleep(0.3)
-            
+
             yield StreamEvent(
                 type=StreamEventType.READING_FILE,
                 content="Reading package.json",
                 metadata={"file": "package.json"}
             )
             await asyncio.sleep(0.4)
-            
+
             yield StreamEvent(
                 type=StreamEventType.TOOL_END,
                 content="File analysis complete",
                 metadata={"tool": "search"}
             )
             await asyncio.sleep(0.2)
-        
+
         # Simulate command execution
         if "test" in prompt.lower() or "run" in prompt.lower():
             yield StreamEvent(
@@ -79,13 +79,13 @@ class MockStreamInterface:
                 metadata={"command": "npm test"}
             )
             await asyncio.sleep(0.5)
-            
+
             yield StreamEvent(
                 type=StreamEventType.COMMAND_OUTPUT,
                 content="✓ All tests passed (42 tests)"
             )
             await asyncio.sleep(0.3)
-        
+
         # Start generating response text
         response_parts = [
             "Based on my analysis, ",
@@ -104,14 +104,14 @@ class MockStreamInterface:
             "The codebase is well-organized with clear separation ",
             "between backend services and frontend components."
         ]
-        
+
         for part in response_parts:
             yield StreamEvent(
                 type=StreamEventType.TEXT,
                 content=part
             )
             await asyncio.sleep(0.1 + len(part) * 0.002)  # Simulate typing speed
-        
+
         # Complete
         yield StreamEvent(
             type=StreamEventType.COMPLETE,

@@ -2,71 +2,102 @@
 Main CLI application using Typer.
 """
 
-from typing import Optional
+from importlib.metadata import version
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
-# Version information - dynamically imported from package
-try:
-    from importlib.metadata import version
-
-    __version__ = version("cuti")
-except ImportError:
-    # Fallback for Python < 3.8
-    from importlib_metadata import version
-
-    __version__ = version("cuti")
-
-from ..services.queue_service import QueueManager
 from ..services.aliases import PromptAliasManager
 from ..services.history import PromptHistoryManager
-from .commands.queue import queue_app
-from .commands.alias import alias_app
+from ..services.queue_service import QueueManager
 from .commands.agent import agent_app
+from .commands.alias import alias_app
+from .commands.queue import add_prompt, queue_app, show_status, start_queue
 from .commands.todo import app as todo_app
 
+# Version information - dynamically imported from package
+__version__ = version("cuti")
+
+devcontainer_app: typer.Typer | None = None
 try:
-    from .commands.devcontainer import app as devcontainer_app
+    from .commands.devcontainer import app as _devcontainer_app
 except ImportError:
-    devcontainer_app = None
+    pass
+else:
+    devcontainer_app = _devcontainer_app
+
+container_app: typer.Typer | None = None
 try:
-    from .commands.container import app as container_app
+    from .commands.container import app as _container_app
 except ImportError:
-    container_app = None
+    pass
+else:
+    container_app = _container_app
+
+tools_app: typer.Typer | None = None
 try:
-    from .commands.tools import app as tools_app
+    from .commands.tools import app as _tools_app
 except ImportError:
-    tools_app = None
+    pass
+else:
+    tools_app = _tools_app
+
+settings_app: typer.Typer | None = None
 try:
-    from .commands.settings import settings as settings_app
+    from .commands.settings import app as _settings_app
 except ImportError:
-    settings_app = None
+    pass
+else:
+    settings_app = _settings_app
+
+favorites_app: typer.Typer | None = None
 try:
-    from .commands.favorites import favorites as favorites_app
+    from .commands.favorites import app as _favorites_app
 except ImportError:
-    favorites_app = None
+    pass
+else:
+    favorites_app = _favorites_app
+
+sync_app: typer.Typer | None = None
 try:
-    from .commands.sync import app as sync_app
+    from .commands.sync import app as _sync_app
 except ImportError:
-    sync_app = None
+    pass
+else:
+    sync_app = _sync_app
+
+claude_app: typer.Typer | None = None
 try:
-    from .commands.claude_account import app as claude_app
+    from .commands.claude_account import app as _claude_app
 except ImportError:
-    claude_app = None
+    pass
+else:
+    claude_app = _claude_app
+
+providers_app: typer.Typer | None = None
 try:
-    from .commands.providers import app as providers_app
+    from .commands.providers import app as _providers_app
 except ImportError:
-    providers_app = None
+    pass
+else:
+    providers_app = _providers_app
+
+openclaw_app: typer.Typer | None = None
 try:
-    from .commands.openclaw import app as openclaw_app
+    from .commands.openclaw import app as _openclaw_app
 except ImportError:
-    openclaw_app = None
+    pass
+else:
+    openclaw_app = _openclaw_app
+
+history_app: typer.Typer | None = None
 try:
-    from .commands.history import history_app
+    from .commands.history import history_app as _history_app
 except ImportError:
-    history_app = None
+    pass
+else:
+    history_app = _history_app
 
 app = typer.Typer(
     name="cuti",
@@ -77,7 +108,7 @@ app = typer.Typer(
 console = Console()
 
 
-def version_callback(value: bool):
+def version_callback(value: bool) -> None:
     """Print version and exit."""
     if value:
         console.print(f"cuti version {__version__}")
@@ -86,7 +117,7 @@ def version_callback(value: bool):
 
 @app.callback()
 def main(
-    version: bool = typer.Option(
+    version: bool | None = typer.Option(
         None,
         "--version",
         "-v",
@@ -94,7 +125,7 @@ def main(
         callback=version_callback,
         is_eager=True,
     ),
-):
+) -> None:
     """
     cuti - Production-ready AI command queue and orchestration system
 
@@ -104,9 +135,9 @@ def main(
 
 
 # Global state
-_manager: Optional[QueueManager] = None
-_alias_manager: Optional[PromptAliasManager] = None
-_history_manager: Optional[PromptHistoryManager] = None
+_manager: QueueManager | None = None
+_alias_manager: PromptAliasManager | None = None
+_history_manager: PromptHistoryManager | None = None
 
 
 def get_manager(
@@ -145,7 +176,7 @@ def get_history_manager(storage_dir: str = "~/.cuti") -> PromptHistoryManager:
 
 # Version command
 @app.command(name="version")
-def show_version():
+def show_version() -> None:
     """Show version information."""
     console.print(f"cuti version {__version__}")
 
@@ -164,17 +195,9 @@ if container_app:
 if tools_app:
     app.add_typer(tools_app, name="tools", help="CLI tools management")
 if settings_app:
-    # Convert Click group to Typer app
-    settings_typer = typer.Typer()
-    for cmd in settings_app.commands.values():
-        settings_typer.command()(cmd.callback)
-    app.add_typer(settings_typer, name="settings", help="Global settings management")
+    app.add_typer(settings_app, name="settings", help="Global settings management")
 if favorites_app:
-    # Convert Click group to Typer app
-    favorites_typer = typer.Typer()
-    for cmd in favorites_app.commands.values():
-        favorites_typer.command()(cmd.callback)
-    app.add_typer(favorites_typer, name="favorites", help="Favorite prompts management")
+    app.add_typer(favorites_app, name="favorites", help="Favorite prompts management")
 
 # Add sync commands if available
 if sync_app:
@@ -200,9 +223,6 @@ if history_app:
         help="Browse Claude chat history and resume sessions",
     )
 
-# Add top-level commands for convenience
-from .commands.queue import start_queue, add_prompt, show_status
-
 app.command("start")(start_queue)
 app.command("add")(add_prompt)
 app.command("status")(show_status)
@@ -214,7 +234,7 @@ def container(
     rebuild: bool = typer.Option(
         False, "--rebuild", help="Force rebuild the container image"
     ),
-    command: Optional[str] = typer.Argument(
+    command: str | None = typer.Argument(
         None, help="Command to run in container (or 'start' for interactive shell)"
     ),
     skip_colima: bool = typer.Option(
@@ -229,7 +249,7 @@ def container(
         "--claw",
         help="Start in OpenClaw mode instead of the default Claude Code mode",
     ),
-):
+) -> None:
     """Run cuti in a dev container with automatic setup."""
     from ..services.devcontainer import DevContainerService, is_running_in_container
 
@@ -314,14 +334,13 @@ def web(
     storage_dir: str = typer.Option(
         "~/.cuti", "--storage-dir", help="Storage directory"
     ),
-    working_directory: Optional[str] = typer.Option(
+    working_directory: str | None = typer.Option(
         None, "--working-dir", "-w", help="Working directory"
     ),
-):
+) -> None:
     """Start the read-only ops console."""
-    import sys
     import os
-    from pathlib import Path
+    import sys
 
     # Set environment variables for the web app
     if working_directory:

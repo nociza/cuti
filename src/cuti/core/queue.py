@@ -4,12 +4,14 @@ Core queue processing logic.
 
 import signal
 import time
+from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, timedelta
-from typing import Optional, Callable
+from typing import Any
 
-from .models import QueuedPrompt, QueueState, PromptStatus, ExecutionResult
-from .storage import PromptStorage
 from .claude_interface import ClaudeCodeInterface
+from .models import ExecutionResult, PromptStatus, QueuedPrompt, QueueState
+from .storage import PromptStorage
 
 
 class QueueProcessor:
@@ -23,19 +25,19 @@ class QueueProcessor:
     ):
         self.storage = storage
         self.claude_interface = claude_interface
-        self.check_interval = check_interval
+        self.check_interval: float = check_interval
         self.running = False
-        self.state: Optional[QueueState] = None
+        self.state: QueueState | None = None
 
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-    def _signal_handler(self, signum, frame):
+    def _signal_handler(self, signum: int, frame: Any) -> None:
         """Handle shutdown signals."""
         print(f"\nReceived signal {signum}, shutting down gracefully...")
         self.stop()
 
-    def start(self, callback: Optional[Callable[[QueueState], None]] = None) -> None:
+    def start(self, callback: Callable[[QueueState], None] | None = None) -> None:
         """Start the queue processing loop."""
         print("Starting Queue Processor...")
 
@@ -85,7 +87,7 @@ class QueueProcessor:
         print("Queue processor stopped")
 
     def _process_queue_iteration(
-        self, callback: Optional[Callable[[QueueState], None]] = None
+        self, callback: Callable[[QueueState], None] | None = None
     ) -> None:
         """Process one iteration of the queue."""
         # Preserve counters across state reloads
@@ -93,9 +95,9 @@ class QueueProcessor:
         previous_failed_count = self.state.failed_count if self.state else 0
         previous_rate_limited_count = self.state.rate_limited_count if self.state else 0
         previous_last_processed = self.state.last_processed if self.state else None
-        
+
         self.state = self.storage.load_queue_state()
-        
+
         # Restore counters
         self.state.total_processed = max(self.state.total_processed, previous_total_processed)
         self.state.failed_count = max(self.state.failed_count, previous_failed_count)
@@ -118,18 +120,18 @@ class QueueProcessor:
                     if prompt.reset_time:
                         if earliest_reset is None or prompt.reset_time < earliest_reset:
                             earliest_reset = prompt.reset_time
-                
+
                 if earliest_reset:
                     wait_seconds = max(0, (earliest_reset - datetime.now()).total_seconds())
                     if wait_seconds > 0:
                         reset_time_str = earliest_reset.strftime("%I:%M %p")
                         print(f"⏳ Rate limited. Next retry at {reset_time_str} ({wait_seconds/60:.1f} minutes)")
-                        
+
                         # Use a shorter check interval when waiting for rate limit reset
                         # Check every minute or at reset time, whichever is sooner
                         self.check_interval = min(60, max(1, wait_seconds))
                     else:
-                        print(f"Rate limit should have reset, checking prompts...")
+                        print("Rate limit should have reset, checking prompts...")
                 else:
                     print(f"Waiting for rate limit reset ({len(rate_limited_prompts)} prompts rate limited)")
             else:
@@ -149,6 +151,9 @@ class QueueProcessor:
 
     def _check_rate_limited_prompts(self) -> None:
         """Check if any rate-limited prompts should be retried."""
+        if self.state is None:
+            return
+
         current_time = datetime.now()
 
         for prompt in self.state.prompts:
@@ -171,7 +176,7 @@ class QueueProcessor:
                 ):
                     if prompt.can_retry():
                         prompt.status = PromptStatus.QUEUED
-                        prompt.add_log(f"Retrying after rate limit cooldown")
+                        prompt.add_log("Retrying after rate limit cooldown")
                         print(f"✓ Prompt {prompt.id} ready for retry after cooldown")
                     else:
                         prompt.status = PromptStatus.FAILED
@@ -182,16 +187,16 @@ class QueueProcessor:
         """Execute a single prompt."""
         prompt.status = PromptStatus.EXECUTING
         prompt.last_executed = datetime.now()
-        
+
         # Check if this is a retry after rate limit
-        is_rate_limit_retry = (prompt.retry_count > 0 and 
-                               prompt.rate_limited_at is not None and 
+        is_rate_limit_retry = (prompt.retry_count > 0 and
+                               prompt.rate_limited_at is not None and
                                prompt.reset_time is not None)
-        
+
+        execution_prompt = prompt
+
         if is_rate_limit_retry:
-            # Append "continue" to the prompt for rate limit retries
-            original_content = prompt.content
-            prompt.content = "continue"
+            execution_prompt = replace(prompt, content="continue")
             prompt.add_log(
                 f"Retrying with 'continue' after rate limit (attempt {prompt.retry_count + 1}/{prompt.max_retries})"
             )
@@ -200,13 +205,12 @@ class QueueProcessor:
                 f"Started execution (attempt {prompt.retry_count + 1}/{prompt.max_retries})"
             )
 
+        if self.state is None:
+            raise RuntimeError("Queue state is not loaded")
+
         self.storage.save_queue_state(self.state)
 
-        result = self.claude_interface.execute_prompt(prompt)
-        
-        # Restore original content if it was modified
-        if is_rate_limit_retry:
-            prompt.content = original_content
+        result = self.claude_interface.execute_prompt(execution_prompt)
 
         self._process_execution_result(prompt, result)
 
@@ -214,6 +218,10 @@ class QueueProcessor:
         self, prompt: QueuedPrompt, result: ExecutionResult
     ) -> None:
         """Process the result of prompt execution."""
+        if self.state is None:
+            raise RuntimeError("Queue state is not loaded")
+
+        state = self.state
         execution_summary = f"Execution completed in {result.execution_time:.1f}s"
 
         if result.success:
@@ -222,7 +230,7 @@ class QueueProcessor:
             if result.output:
                 prompt.add_log(f"Output:\n{result.output}")
 
-            self.state.total_processed += 1
+            state.total_processed += 1
             print(f"✓ Prompt {prompt.id} completed successfully")
 
         elif result.is_rate_limited:
@@ -236,23 +244,23 @@ class QueueProcessor:
                 prompt.reset_time = result.rate_limit_info.reset_time
                 reset_time_str = result.rate_limit_info.reset_time.strftime("%I:%M %p")
                 wait_time = (result.rate_limit_info.reset_time - datetime.now()).total_seconds()
-                
+
                 prompt.add_log(f"{execution_summary} - RATE LIMITED (resets at {reset_time_str})")
                 print(f"⚠ Prompt {prompt.id} rate limited. Will retry at {reset_time_str} ({wait_time/60:.1f} minutes)")
-                
+
                 # Automatically send "continue" after rate limit reset
                 if wait_time > 0:
-                    print(f"📅 Scheduling automatic retry after rate limit reset...")
+                    print("📅 Scheduling automatic retry after rate limit reset...")
                     prompt.add_log(f"Scheduled for automatic retry at {reset_time_str}")
             else:
                 prompt.add_log(f"{execution_summary} - RATE LIMITED")
                 print(f"⚠ Prompt {prompt.id} rate limited, will retry later")
-                
+
             if result.rate_limit_info and result.rate_limit_info.limit_message:
                 prompt.add_log(f"Message: {result.rate_limit_info.limit_message}")
 
-            if not was_already_rate_limited and self.state is not None:
-                self.state.rate_limited_count += 1
+            if not was_already_rate_limited:
+                state.rate_limited_count += 1
 
         else:
             prompt.retry_count += 1
@@ -271,9 +279,9 @@ class QueueProcessor:
                 if result.error:
                     prompt.add_log(f"Error: {result.error}")
 
-                self.state.failed_count += 1
+                state.failed_count += 1
                 print(
                     f"✗ Prompt {prompt.id} failed permanently after {prompt.max_retries} attempts"
                 )
 
-        self.state.last_processed = datetime.now()
+        state.last_processed = datetime.now()

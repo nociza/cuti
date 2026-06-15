@@ -7,20 +7,42 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any
+
 import yaml  # type: ignore
 
-from .models import QueuedPrompt, QueueState, PromptStatus
+from .models import PromptStatus, QueuedPrompt, QueueState
 
 
 class MarkdownPromptParser:
     """Parser for markdown-based prompt files."""
 
     @staticmethod
-    def parse_prompt_file(file_path: Path) -> Optional[QueuedPrompt]:
+    def _parse_datetime(value: str | None) -> datetime | None:
+        """Parse an ISO datetime from prompt metadata."""
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _split_execution_log(content: str) -> tuple[str, str]:
+        """Split prompt content from the generated execution-log section."""
+        marker = "\n\n## Execution Log\n\n```\n"
+        if marker not in content:
+            return content.strip(), ""
+
+        prompt_content, log_section = content.split(marker, 1)
+        execution_log = log_section.rsplit("\n```", 1)[0]
+        return prompt_content.strip(), execution_log
+
+    @staticmethod
+    def parse_prompt_file(file_path: Path) -> QueuedPrompt | None:
         """Parse a markdown prompt file into a QueuedPrompt object."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             if content.startswith("---\n"):
@@ -35,18 +57,24 @@ class MarkdownPromptParser:
                 frontmatter = ""
                 markdown_content = content
 
-            metadata: dict = {}
+            metadata: dict[str, Any] = {}
             if frontmatter.strip():
                 try:
                     metadata = yaml.safe_load(frontmatter) or {}
                 except yaml.YAMLError:
                     metadata = {}
 
+            markdown_content, execution_log = MarkdownPromptParser._split_execution_log(
+                markdown_content
+            )
             prompt_id = (
                 file_path.stem.split("-", 1)[0]
                 if "-" in file_path.stem
                 else file_path.stem
             )
+            created_at = MarkdownPromptParser._parse_datetime(
+                metadata.get("created_at")
+            ) or datetime.fromtimestamp(file_path.stat().st_ctime)
 
             prompt = QueuedPrompt(
                 id=prompt_id,
@@ -55,8 +83,19 @@ class MarkdownPromptParser:
                 priority=metadata.get("priority", 0),
                 context_files=metadata.get("context_files", []),
                 max_retries=metadata.get("max_retries", 3),
+                retry_count=metadata.get("retry_count", 0),
                 estimated_tokens=metadata.get("estimated_tokens"),
-                created_at=datetime.fromtimestamp(file_path.stat().st_ctime),
+                created_at=created_at,
+                execution_log=execution_log,
+                last_executed=MarkdownPromptParser._parse_datetime(
+                    metadata.get("last_executed")
+                ),
+                rate_limited_at=MarkdownPromptParser._parse_datetime(
+                    metadata.get("rate_limited_at")
+                ),
+                reset_time=MarkdownPromptParser._parse_datetime(
+                    metadata.get("reset_time")
+                ),
             )
 
             return prompt
@@ -135,7 +174,7 @@ class PromptStorage:
 
         if self.state_file.exists():
             try:
-                with open(self.state_file, "r") as f:
+                with open(self.state_file) as f:
                     data = json.load(f)
 
                 state.total_processed = data.get("total_processed", 0)
@@ -178,7 +217,7 @@ class PromptStorage:
             print(f"Error saving queue state: {e}")
             return False
 
-    def _load_prompts_from_files(self) -> List[QueuedPrompt]:
+    def _load_prompts_from_files(self) -> list[QueuedPrompt]:
         """Load all prompts from markdown files."""
         prompts = []
         processed_ids = set()
@@ -212,7 +251,7 @@ class PromptStorage:
 
         return prompts
 
-    def _save_prompts_to_files(self, prompts: List[QueuedPrompt]) -> None:
+    def _save_prompts_to_files(self, prompts: list[QueuedPrompt]) -> None:
         """Save prompts to appropriate directories based on status."""
         for prompt in prompts:
             self._save_single_prompt(prompt)
@@ -241,6 +280,7 @@ class PromptStorage:
                 self._remove_prompt_files(prompt.id, self.queue_dir)
             else:  # QUEUED
                 target_dir = self.queue_dir
+                self._remove_prompt_files(prompt.id, self.queue_dir)
             file_path = target_dir / base_filename
             return self.parser.write_prompt_file(prompt, file_path)
         except Exception as e:
@@ -276,7 +316,7 @@ class PromptStorage:
         text = text.strip("-")
         return text[:50]
 
-    def add_prompt_from_markdown(self, file_path: Path) -> Optional[QueuedPrompt]:
+    def add_prompt_from_markdown(self, file_path: Path) -> QueuedPrompt | None:
         """Add a prompt from an existing markdown file."""
         prompt = self.parser.parse_prompt_file(file_path)
         if prompt:

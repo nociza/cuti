@@ -7,7 +7,7 @@ They represent best practices and expert implementations for common development 
 
 BUILTIN_AGENTS = [
     "ui-design-expert",
-    "code-reviewer", 
+    "code-reviewer",
     "test-writer",
     "docs-generator",
     "refactor-assistant"

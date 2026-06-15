@@ -6,13 +6,14 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Any
 
 
-def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
+def _parse_timestamp(value: str | None) -> datetime | None:
     """Parse ISO timestamp strings from Claude logs."""
 
     if not value:
@@ -25,12 +26,12 @@ def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def _content_to_text(content) -> str:
+def _content_to_text(content: Any) -> str:
     """Flatten Claude message content into human readable text."""
 
     if isinstance(content, str):
         return content
-    parts: List[str] = []
+    parts: list[str] = []
     if isinstance(content, list):
         for chunk in content:
             if not isinstance(chunk, dict):
@@ -57,7 +58,7 @@ class SessionSummary:
 
     session_id: str
     file_path: Path
-    workspace_path: Optional[str]
+    workspace_path: str | None
     started_at: datetime
     updated_at: datetime
     user_turns: int
@@ -70,14 +71,14 @@ class SessionMessage:
     """Individual message inside a session transcript."""
 
     role: str
-    timestamp: Optional[datetime]
+    timestamp: datetime | None
     text: str
 
 
 class ClaudeHistoryService:
     """Loads and summarizes Claude Code JSONL conversation logs."""
 
-    def __init__(self, workspace_path: Optional[Path] = None) -> None:
+    def __init__(self, workspace_path: Path | None = None) -> None:
         self.workspace_path = Path(workspace_path or Path.cwd()).resolve()
         self._project_dirs = self._discover_project_dirs()
 
@@ -89,11 +90,11 @@ class ClaudeHistoryService:
         *,
         limit: int = 20,
         include_all_workspaces: bool = False,
-    ) -> List[SessionSummary]:
+    ) -> list[SessionSummary]:
         """Return the most recent session summaries."""
 
         session_files = self._collect_session_files(include_all_workspaces)
-        summaries: List[SessionSummary] = []
+        summaries: list[SessionSummary] = []
         for file_path in session_files:
             summary = self._summarize_session(file_path)
             if summary:
@@ -102,10 +103,10 @@ class ClaudeHistoryService:
         summaries.sort(key=lambda item: item.updated_at, reverse=True)
         return summaries[:limit]
 
-    def load_session(self, summary: SessionSummary, *, limit: Optional[int] = None) -> List[SessionMessage]:
+    def load_session(self, summary: SessionSummary, *, limit: int | None = None) -> list[SessionMessage]:
         """Return ordered transcript for ``summary`` (optionally truncated)."""
 
-        messages: List[SessionMessage] = []
+        messages: list[SessionMessage] = []
         try:
             with summary.file_path.open() as handle:
                 for raw_line in handle:
@@ -134,17 +135,17 @@ class ClaudeHistoryService:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _discover_project_dirs(self) -> List[Path]:
+    def _discover_project_dirs(self) -> list[Path]:
         """Return existing Claude projects directories to inspect."""
 
-        candidates: List[Path] = []
+        candidates: list[Path] = []
         env_dir = os.getenv("CLAUDE_CONFIG_DIR")
         if env_dir:
             candidates.append(Path(env_dir).expanduser())
         candidates.append(Path.home() / ".cuti" / "claude-linux")
         candidates.append(Path.home() / ".claude")
 
-        project_dirs: List[Path] = []
+        project_dirs: list[Path] = []
         seen: set[Path] = set()
         for root in candidates:
             projects = root / "projects"
@@ -158,10 +159,10 @@ class ClaudeHistoryService:
             project_dirs.append(projects)
         return project_dirs
 
-    def _collect_session_files(self, include_all: bool) -> List[Path]:
+    def _collect_session_files(self, include_all: bool) -> list[Path]:
         """Return candidate JSONL files for the current workspace."""
 
-        files: List[Path] = []
+        files: list[Path] = []
         target_slug = self._workspace_slug(self.workspace_path)
         for projects_dir in self._project_dirs:
             if not projects_dir.exists():
@@ -194,11 +195,11 @@ class ClaudeHistoryService:
                     files.extend(directory.glob("*.jsonl"))
         return files
 
-    def _summarize_session(self, file_path: Path) -> Optional[SessionSummary]:
+    def _summarize_session(self, file_path: Path) -> SessionSummary | None:
         session_id = file_path.stem
-        workspace_path: Optional[str] = None
-        started_at: Optional[datetime] = None
-        updated_at: Optional[datetime] = None
+        workspace_path: str | None = None
+        started_at: datetime | None = None
+        updated_at: datetime | None = None
         user_turns = 0
         assistant_turns = 0
         last_prompt = ""
@@ -266,4 +267,3 @@ def claude_available() -> bool:
     """Return True when the ``claude`` CLI is discoverable."""
 
     return subprocess.call(["which", "claude"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
-

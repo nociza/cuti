@@ -6,17 +6,17 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 
 class PromptAliasManager:
     """Manages prompt aliases for common tasks."""
 
-    def __init__(self, base_dir: str = "~/.cuti"):
+    def __init__(self, base_dir: str = "~/.cuti") -> None:
         self.base_dir = Path(base_dir).expanduser()
         self.aliases_file = self.base_dir / "aliases.json"
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize with default aliases
         self._ensure_default_aliases()
 
@@ -28,15 +28,15 @@ class PromptAliasManager:
             # Load existing and add any missing defaults
             existing = self._load_aliases()
             defaults = self._get_default_aliases()
-            
+
             # Add missing defaults
             for alias_name, alias_data in defaults.items():
                 if alias_name not in existing:
                     existing[alias_name] = alias_data
-            
+
             self._save_aliases(existing)
 
-    def _get_default_aliases(self) -> Dict[str, Any]:
+    def _get_default_aliases(self) -> dict[str, Any]:
         """Get default aliases for common scenarios."""
         return {
             "explore-codebase": {
@@ -45,7 +45,7 @@ class PromptAliasManager:
                 "content": """Thoroughly explore this codebase and provide a comprehensive analysis:
 
 1. **Architecture Overview**: Analyze the overall structure, design patterns, and architectural decisions
-2. **Key Components**: Identify main modules, classes, and their responsibilities  
+2. **Key Components**: Identify main modules, classes, and their responsibilities
 3. **Data Flow**: Trace how data moves through the system
 4. **Dependencies**: List external dependencies and their purposes
 5. **Entry Points**: Identify main entry points and CLI commands
@@ -65,7 +65,7 @@ Focus on understanding the codebase deeply enough to make informed development d
                 "context_files": ["README.md", "pyproject.toml", "package.json"],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "document-api": {
                 "name": "document-api",
                 "description": "Generate comprehensive API documentation",
@@ -90,9 +90,9 @@ Focus on creating documentation that developers can immediately use to integrate
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "security-audit": {
-                "name": "security-audit", 
+                "name": "security-audit",
                 "description": "Perform comprehensive security audit",
                 "content": """Perform a comprehensive security audit of this codebase:
 
@@ -118,7 +118,7 @@ Focus on identifying actionable security improvements.""",
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "optimize-performance": {
                 "name": "optimize-performance",
                 "description": "Analyze and optimize application performance",
@@ -146,9 +146,9 @@ Focus on measurable improvements that enhance user experience.""",
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "write-tests": {
-                "name": "write-tests", 
+                "name": "write-tests",
                 "description": "Create comprehensive test suite",
                 "content": """Create a comprehensive test suite for this project:
 
@@ -175,7 +175,7 @@ Focus on creating maintainable tests that catch regressions and enable confident
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "refactor-code": {
                 "name": "refactor-code",
                 "description": "Refactor code for better maintainability",
@@ -204,7 +204,7 @@ Focus on improving code readability, maintainability, and extensibility without 
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "setup-cicd": {
                 "name": "setup-cicd",
                 "description": "Set up CI/CD pipeline",
@@ -242,7 +242,7 @@ Focus on creating a reliable, automated pipeline that enables fast and safe depl
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "add-logging": {
                 "name": "add-logging",
                 "description": "Implement comprehensive logging system",
@@ -271,7 +271,7 @@ Focus on creating actionable logs that aid in debugging, monitoring, and complia
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "fix-bugs": {
                 "name": "fix-bugs",
                 "description": "Systematically identify and fix bugs",
@@ -308,7 +308,7 @@ Focus on fixing bugs thoroughly while preventing future occurrences.""",
                 "context_files": [],
                 "created_at": datetime.now().isoformat()
             },
-            
+
             "modernize-stack": {
                 "name": "modernize-stack",
                 "description": "Modernize technology stack and dependencies",
@@ -354,19 +354,19 @@ Focus on improving security, performance, and maintainability through strategic 
         defaults = self._get_default_aliases()
         self._save_aliases(defaults)
 
-    def _load_aliases(self) -> Dict[str, Any]:
+    def _load_aliases(self) -> dict[str, Any]:
         """Load aliases from storage."""
         if not self.aliases_file.exists():
             return {}
-        
+
         try:
-            with open(self.aliases_file, 'r', encoding='utf-8') as f:
+            with open(self.aliases_file, encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
             print(f"Error loading aliases: {e}")
             return {}
 
-    def _save_aliases(self, aliases: Dict[str, Any]) -> bool:
+    def _save_aliases(self, aliases: dict[str, Any]) -> bool:
         """Save aliases to storage."""
         try:
             with open(self.aliases_file, 'w', encoding='utf-8') as f:
@@ -377,22 +377,22 @@ Focus on improving security, performance, and maintainability through strategic 
             return False
 
     def create_alias(
-        self, 
-        name: str, 
-        content: str, 
-        description: str = "", 
+        self,
+        name: str,
+        content: str,
+        description: str = "",
         working_directory: str = ".",
-        context_files: List[str] = None
+        context_files: list[str] | None = None
     ) -> bool:
         """Create a new alias."""
         if context_files is None:
             context_files = []
-            
+
         aliases = self._load_aliases()
-        
+
         if name in aliases:
             return False  # Alias already exists
-        
+
         aliases[name] = {
             "name": name,
             "content": content,
@@ -401,15 +401,15 @@ Focus on improving security, performance, and maintainability through strategic 
             "context_files": context_files,
             "created_at": datetime.now().isoformat()
         }
-        
+
         return self._save_aliases(aliases)
 
-    def get_alias(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_alias(self, name: str) -> dict[str, Any] | None:
         """Get an alias by name."""
         aliases = self._load_aliases()
         return aliases.get(name)
 
-    def list_aliases(self) -> List[Dict[str, Any]]:
+    def list_aliases(self) -> list[dict[str, Any]]:
         """List all aliases."""
         aliases = self._load_aliases()
         return list(aliases.values())
@@ -417,10 +417,10 @@ Focus on improving security, performance, and maintainability through strategic 
     def delete_alias(self, name: str) -> bool:
         """Delete an alias."""
         aliases = self._load_aliases()
-        
+
         if name not in aliases:
             return False
-        
+
         del aliases[name]
         return self._save_aliases(aliases)
 
@@ -430,28 +430,28 @@ Focus on improving security, performance, and maintainability through strategic 
         alias = self.get_alias(input_text)
         if alias:
             content = alias['content']
-            
+
             # Perform variable substitution
             content = self._substitute_variables(content, current_working_dir, alias)
-            
+
             return content
-        
+
         # Check if input contains alias references (e.g., @alias-name)
         content = input_text
         alias_pattern = r'@([a-zA-Z0-9_-]+)'
-        
-        def replace_alias_ref(match):
+
+        def replace_alias_ref(match: re.Match[str]) -> str:
             alias_name = match.group(1)
             referenced_alias = self.get_alias(alias_name)
             if referenced_alias:
                 alias_content = referenced_alias['content']
                 return self._substitute_variables(alias_content, current_working_dir, referenced_alias)
             return match.group(0)  # Return original if alias not found
-        
+
         resolved_content = re.sub(alias_pattern, replace_alias_ref, content)
         return resolved_content
 
-    def _substitute_variables(self, content: str, working_dir: str, alias: Dict[str, Any]) -> str:
+    def _substitute_variables(self, content: str, working_dir: str, alias: dict[str, Any]) -> str:
         """Substitute variables in alias content."""
         # Built-in variables
         variables = {
@@ -460,46 +460,46 @@ Focus on improving security, performance, and maintainability through strategic 
             'DATE': datetime.now().strftime('%Y-%m-%d'),
             'DATETIME': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         }
-        
+
         # Substitute variables in format ${VARIABLE_NAME}
-        def replace_var(match):
+        def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1)
             return variables.get(var_name, match.group(0))
-        
+
         content = re.sub(r'\$\{([^}]+)\}', replace_var, content)
-        
+
         return content
 
-    def search_aliases(self, query: str) -> List[Dict[str, Any]]:
+    def search_aliases(self, query: str) -> list[dict[str, Any]]:
         """Search aliases by name, description, or content."""
         aliases = self.list_aliases()
         query_lower = query.lower()
-        
+
         results = []
         for alias in aliases:
             if (query_lower in alias['name'].lower() or
                 query_lower in alias.get('description', '').lower() or
                 query_lower in alias['content'].lower()):
                 results.append(alias)
-        
+
         return results
 
     def update_alias(
-        self, 
-        name: str, 
-        content: Optional[str] = None,
-        description: Optional[str] = None,
-        working_directory: Optional[str] = None,
-        context_files: Optional[List[str]] = None
+        self,
+        name: str,
+        content: str | None = None,
+        description: str | None = None,
+        working_directory: str | None = None,
+        context_files: list[str] | None = None
     ) -> bool:
         """Update an existing alias."""
         aliases = self._load_aliases()
-        
+
         if name not in aliases:
             return False
-        
+
         alias = aliases[name]
-        
+
         if content is not None:
             alias['content'] = content
         if description is not None:
@@ -508,9 +508,9 @@ Focus on improving security, performance, and maintainability through strategic 
             alias['working_directory'] = working_directory
         if context_files is not None:
             alias['context_files'] = context_files
-        
+
         alias['updated_at'] = datetime.now().isoformat()
-        
+
         return self._save_aliases(aliases)
 
     def export_aliases(self, file_path: str) -> bool:
@@ -532,18 +532,18 @@ Focus on improving security, performance, and maintainability through strategic 
             if not import_path.exists():
                 print(f"Import file not found: {file_path}")
                 return False
-            
-            with open(import_path, 'r', encoding='utf-8') as f:
+
+            with open(import_path, encoding='utf-8') as f:
                 imported_aliases = json.load(f)
-            
+
             existing_aliases = self._load_aliases()
-            
+
             for name, alias_data in imported_aliases.items():
                 if name not in existing_aliases or overwrite:
                     existing_aliases[name] = alias_data
-            
+
             return self._save_aliases(existing_aliases)
-            
+
         except Exception as e:
             print(f"Error importing aliases: {e}")
             return False

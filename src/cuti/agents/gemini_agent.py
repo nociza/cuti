@@ -2,27 +2,27 @@
 Gemini CLI agent implementation.
 """
 
-import subprocess
 import asyncio
-import json
 import os
-from typing import AsyncGenerator, Optional, Dict, Any, List
+import subprocess
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
+from ..core.models import ExecutionResult, QueuedPrompt
 from .base import (
-    BaseAgent, 
-    AgentCapability, 
-    AgentMetadata, 
+    AgentCapability,
+    AgentExecutionContext,
+    AgentMetadata,
     AgentStatus,
-    AgentConfig,
-    AgentExecutionContext
+    BaseAgent,
 )
-from ..core.models import QueuedPrompt, ExecutionResult
 
 
 class GeminiAgent(BaseAgent):
     """Gemini CLI agent implementation."""
-    
+
+    _api_key: str
+
     def _initialize_metadata(self) -> AgentMetadata:
         return AgentMetadata(
             name="Gemini",
@@ -49,25 +49,25 @@ class GeminiAgent(BaseAgent):
             supported_languages=["Python", "JavaScript", "TypeScript", "Java", "C++", "Go", "Rust", "Ruby", "PHP", "Swift"],
             special_features=["Long context window", "Multimodal understanding", "Code execution", "Function calling"]
         )
-    
+
     async def initialize(self) -> bool:
         """Initialize the Gemini agent."""
         try:
             self.status = AgentStatus.INITIALIZING
-            
+
             # Check for API key
             api_key = self.config.api_key or os.environ.get(self.config.api_key_env or 'GOOGLE_API_KEY')
             if not api_key:
                 print("Gemini API key not found. Set GOOGLE_API_KEY environment variable.")
                 self.status = AgentStatus.OFFLINE
                 return False
-            
+
             # Store API key for later use
             self._api_key = api_key
-            
+
             # Test connection
             is_working = await self._test_connection()
-            
+
             if is_working:
                 self.status = AgentStatus.AVAILABLE
                 self._initialized = True
@@ -75,12 +75,12 @@ class GeminiAgent(BaseAgent):
             else:
                 self.status = AgentStatus.OFFLINE
                 return False
-                
+
         except Exception as e:
             self.status = AgentStatus.ERROR
             print(f"Error initializing Gemini agent: {e}")
             return False
-    
+
     async def _test_connection(self) -> bool:
         """Test Gemini CLI connection."""
         try:
@@ -89,23 +89,23 @@ class GeminiAgent(BaseAgent):
             return "OK" in result or "ok" in result.lower()
         except Exception:
             return False
-    
-    async def _run_gemini_command(self, prompt: str, context_files: Optional[List[str]] = None) -> str:
+
+    async def _run_gemini_command(self, prompt: str, context_files: list[str] | None = None) -> str:
         """Run Gemini CLI command."""
         try:
             # Prepare command
             cmd = ["gemini", prompt]
-            
+
             # Add context files if provided
             if context_files:
                 for file in context_files:
                     if Path(file).exists():
                         cmd.extend(["-f", file])
-            
+
             # Set environment with API key
             env = os.environ.copy()
             env['GOOGLE_API_KEY'] = self._api_key
-            
+
             # Run command
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -114,37 +114,39 @@ class GeminiAgent(BaseAgent):
                 env=env,
                 cwd=self.config.working_directory
             )
-            
+            if process.stdout is None or process.stderr is None:
+                raise RuntimeError("Gemini process did not expose stdout/stderr")
+
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(),
                 timeout=self.config.timeout
             )
-            
+
             if process.returncode != 0:
                 error_msg = stderr.decode() if stderr else "Unknown error"
                 raise RuntimeError(f"Gemini command failed: {error_msg}")
-            
+
             return stdout.decode()
-            
+
         except asyncio.TimeoutError:
-            raise RuntimeError(f"Gemini command timed out after {self.config.timeout} seconds")
+            raise RuntimeError(f"Gemini command timed out after {self.config.timeout} seconds") from None
         except Exception as e:
-            raise RuntimeError(f"Error running Gemini command: {str(e)}")
-    
+            raise RuntimeError(f"Error running Gemini command: {str(e)}") from e
+
     async def execute_prompt(
-        self, 
+        self,
         prompt: QueuedPrompt,
         context: AgentExecutionContext
     ) -> ExecutionResult:
         """Execute a prompt with Gemini."""
-        
+
         # Track execution
         self.add_execution(prompt.id, prompt)
-        
+
         try:
             # Prepare enhanced prompt with context
             enhanced_prompt = await self._prepare_prompt(prompt, context)
-            
+
             # Execute with Gemini
             start_time = asyncio.get_event_loop().time()
             output = await self._run_gemini_command(
@@ -152,10 +154,10 @@ class GeminiAgent(BaseAgent):
                 enhanced_prompt.context_files
             )
             execution_time = asyncio.get_event_loop().time() - start_time
-            
+
             # Estimate tokens (rough approximation)
             estimated_tokens = len(enhanced_prompt.content.split()) + len(output.split())
-            
+
             # Store output in shared context if in collaboration mode
             if context.collaboration_mode:
                 from .context import SharedMemoryManager
@@ -166,15 +168,15 @@ class GeminiAgent(BaseAgent):
                     output,
                     self.name
                 )
-            
+
             return ExecutionResult(
                 success=True,
                 output=output,
-                error=None,
+                error="",
                 execution_time=execution_time,
                 tokens_used=estimated_tokens
             )
-            
+
         except Exception as e:
             return ExecutionResult(
                 success=False,
@@ -185,34 +187,34 @@ class GeminiAgent(BaseAgent):
             )
         finally:
             self.remove_execution(prompt.id)
-    
+
     async def stream_prompt(
         self,
         prompt: QueuedPrompt,
         context: AgentExecutionContext
     ) -> AsyncGenerator[str, None]:
         """Stream execution results from Gemini."""
-        
+
         # Track execution
         self.add_execution(prompt.id, prompt)
-        
+
         try:
             # Prepare enhanced prompt
             enhanced_prompt = await self._prepare_prompt(prompt, context)
-            
+
             # Prepare command for streaming
             cmd = ["gemini", enhanced_prompt.content]
-            
+
             # Add context files if provided
             if enhanced_prompt.context_files:
                 for file in enhanced_prompt.context_files:
                     if Path(file).exists():
                         cmd.extend(["-f", file])
-            
+
             # Set environment with API key
             env = os.environ.copy()
             env['GOOGLE_API_KEY'] = self._api_key
-            
+
             # Create subprocess for streaming
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -221,31 +223,33 @@ class GeminiAgent(BaseAgent):
                 env=env,
                 cwd=self.config.working_directory
             )
-            
+            if process.stdout is None or process.stderr is None:
+                raise RuntimeError("Gemini stream process did not expose stdout/stderr")
+
             # Stream output
             while True:
                 line = await process.stdout.readline()
                 if not line:
                     break
                 yield line.decode()
-            
+
             # Wait for process to complete
             await process.wait()
-            
+
             if process.returncode != 0:
                 stderr = await process.stderr.read()
                 yield f"\nError: {stderr.decode()}"
-                
+
         except Exception as e:
             yield f"\nError during streaming: {str(e)}"
         finally:
             self.remove_execution(prompt.id)
-    
+
     async def health_check(self) -> bool:
         """Check Gemini agent health."""
         try:
             is_working = await self._test_connection()
-            
+
             if is_working:
                 self._health_check_failures = 0
                 if self.status == AgentStatus.ERROR:
@@ -256,11 +260,11 @@ class GeminiAgent(BaseAgent):
                 if self._health_check_failures >= 3:
                     self.status = AgentStatus.ERROR
                 return False
-                
+
         except Exception:
             self._health_check_failures += 1
             return False
-    
+
     async def is_installed(self) -> bool:
         """Check if Gemini CLI is installed."""
         try:
@@ -273,7 +277,7 @@ class GeminiAgent(BaseAgent):
             return result.returncode == 0
         except (subprocess.SubprocessError, FileNotFoundError):
             return False
-    
+
     async def install(self) -> bool:
         """Install Gemini CLI."""
         try:
@@ -284,7 +288,7 @@ class GeminiAgent(BaseAgent):
                 text=True,
                 timeout=30
             )
-            
+
             if result.returncode == 0:
                 print("Gemini CLI installed successfully")
                 return True
@@ -292,76 +296,76 @@ class GeminiAgent(BaseAgent):
                 print(f"Failed to install Gemini CLI: {result.stderr}")
                 print(f"Please install manually: {self.metadata.installation_command}")
                 return False
-                
+
         except Exception as e:
             print(f"Error installing Gemini CLI: {e}")
             print(f"Please install manually: {self.metadata.installation_command}")
             return False
-    
+
     async def can_handle_task(self, prompt: QueuedPrompt) -> float:
         """Gemini-specific task confidence assessment."""
         content_lower = prompt.content.lower()
-        
+
         # Very high confidence for data analysis
         if any(keyword in content_lower for keyword in [
             'analyze', 'data', 'statistics', 'insights', 'trends', 'pattern'
         ]):
             return 0.95
-        
+
         # High confidence for multimodal tasks
         if any(keyword in content_lower for keyword in [
             'image', 'video', 'audio', 'multimodal', 'visual'
         ]):
             return 0.9
-        
+
         # High confidence for large context tasks
         if any(keyword in content_lower for keyword in [
             'large', 'context', 'document', 'corpus', 'dataset'
         ]):
             return 0.9
-        
+
         # Good for code generation
         if any(keyword in content_lower for keyword in [
             'code', 'function', 'implement', 'create', 'build'
         ]):
             return 0.85
-        
+
         # Good for general tasks
         return 0.7
-    
+
     async def _prepare_prompt(
         self,
         prompt: QueuedPrompt,
         context: AgentExecutionContext
     ) -> QueuedPrompt:
         """Prepare prompt with context and collaboration info."""
-        
+
         # Get system prompt
         system_prompt = await self.prepare_system_prompt(context)
-        
+
         # Create enhanced content
         enhanced_content = ""
-        
+
         # Add system prompt if in collaboration mode
         if context.collaboration_mode and system_prompt:
             enhanced_content += f"System Context: {system_prompt}\n\n"
-        
+
         # Add main content
         enhanced_content += prompt.content
-        
+
         # Add shared memory if available
         if context.shared_memory:
             enhanced_content += "\n\nShared Context:\n"
             for key, value in context.shared_memory.items():
                 if not key.startswith('_'):  # Skip private keys
                     enhanced_content += f"- {key}: {value}\n"
-        
+
         # Add collaboration data
         if context.collaboration_mode and context.coordination_data:
             enhanced_content += "\n\nCollaboration Info:\n"
             for key, value in context.coordination_data.items():
                 enhanced_content += f"- {key}: {value}\n"
-        
+
         # Create new prompt with enhanced content
         enhanced_prompt = QueuedPrompt(
             content=enhanced_content,
@@ -371,10 +375,10 @@ class GeminiAgent(BaseAgent):
             max_retries=prompt.max_retries,
             estimated_tokens=prompt.estimated_tokens
         )
-        
+
         # Copy over other attributes
         enhanced_prompt.id = prompt.id
         enhanced_prompt.status = prompt.status
         enhanced_prompt.created_at = prompt.created_at
-        
+
         return enhanced_prompt

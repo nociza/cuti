@@ -6,7 +6,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI
@@ -21,7 +20,6 @@ from .api.ops import router as ops_router
 from .routes import main_router
 
 
-
 def _resolve_storage_dir(storage_dir: str, working_directory: Path) -> Path:
     override = os.getenv("CLAUDE_QUEUE_STORAGE_DIR")
     if override:
@@ -34,7 +32,7 @@ def _resolve_storage_dir(storage_dir: str, working_directory: Path) -> Path:
 
 def create_app(
     storage_dir: str = "~/.cuti",
-    working_directory: Optional[str] = None,
+    working_directory: str | None = None,
 ) -> FastAPI:
     """Create the passive cuti ops console."""
 

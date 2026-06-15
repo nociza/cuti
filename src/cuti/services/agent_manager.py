@@ -3,28 +3,28 @@ Claude Code Agent Manager - Manages custom AI agents for specialized tasks.
 """
 
 import json
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 
 class Agent:
     """Represents a Claude Code agent configuration."""
-    
+
     def __init__(
         self,
         name: str,
         description: str,
         prompt: str,
-        capabilities: List[str] = None,
-        tools: List[str] = None,
-        context_files: List[str] = None,
-        working_directory: Optional[str] = None,
-        environment: Dict[str, str] = None,
-        created_at: Optional[datetime] = None,
-        updated_at: Optional[datetime] = None,
-        **kwargs
-    ):
+        capabilities: list[str] | None = None,
+        tools: list[str] | None = None,
+        context_files: list[str] | None = None,
+        working_directory: str | None = None,
+        environment: dict[str, str] | None = None,
+        created_at: datetime | None = None,
+        updated_at: datetime | None = None,
+        **kwargs: Any,
+    ) -> None:
         self.name = name
         self.description = description
         self.prompt = prompt
@@ -35,8 +35,8 @@ class Agent:
         self.environment = environment or {}
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert agent to dictionary."""
         return {
             "name": self.name,
@@ -50,22 +50,23 @@ class Agent:
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Agent":
+    def from_dict(cls, data: dict[str, Any]) -> "Agent":
         """Create agent from dictionary."""
-        if data.get("created_at"):
-            data["created_at"] = datetime.fromisoformat(data["created_at"])
-        if data.get("updated_at"):
-            data["updated_at"] = datetime.fromisoformat(data["updated_at"])
-        return cls(**data)
+        agent_data = data.copy()
+        if agent_data.get("created_at"):
+            agent_data["created_at"] = datetime.fromisoformat(agent_data["created_at"])
+        if agent_data.get("updated_at"):
+            agent_data["updated_at"] = datetime.fromisoformat(agent_data["updated_at"])
+        return cls(**agent_data)
 
 
 class ClaudeAgentManager:
     """Manages Claude Code agents for specialized tasks."""
-    
+
     # Default agents that come pre-configured
-    DEFAULT_AGENTS = [
+    DEFAULT_AGENTS: list[dict[str, Any]] = [
         {
             "name": "code-reviewer",
             "description": "Reviews code for quality, security, and best practices",
@@ -102,21 +103,21 @@ class ClaudeAgentManager:
             "tools": ["read", "grep", "edit", "bash"]
         }
     ]
-    
-    def __init__(self, storage_dir: str = "~/.cuti"):
+
+    def __init__(self, storage_dir: str = "~/.cuti") -> None:
         """Initialize the agent manager."""
         self.storage_dir = Path(storage_dir).expanduser()
         self.agents_file = self.storage_dir / "agents.json"
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Load agents or initialize with defaults
         self.agents = self._load_agents()
-    
-    def _load_agents(self) -> Dict[str, Agent]:
+
+    def _load_agents(self) -> dict[str, Agent]:
         """Load agents from storage."""
         if self.agents_file.exists():
             try:
-                with open(self.agents_file, 'r') as f:
+                with open(self.agents_file) as f:
                     data = json.load(f)
                     return {
                         name: Agent.from_dict(agent_data)
@@ -124,52 +125,52 @@ class ClaudeAgentManager:
                     }
             except Exception:
                 pass
-        
+
         # Initialize with default agents
-        agents = {}
+        agents: dict[str, Agent] = {}
         for agent_data in self.DEFAULT_AGENTS:
             agent = Agent(**agent_data)
             agents[agent.name] = agent
-        
+
         self._save_agents(agents)
         return agents
-    
-    def _save_agents(self, agents: Dict[str, Agent] = None):
+
+    def _save_agents(self, agents: dict[str, Agent] | None = None) -> None:
         """Save agents to storage."""
         if agents is None:
             agents = self.agents
-        
+
         data = {
             name: agent.to_dict()
             for name, agent in agents.items()
         }
-        
+
         with open(self.agents_file, 'w') as f:
             json.dump(data, f, indent=2)
-    
-    def list_agents(self) -> List[Agent]:
+
+    def list_agents(self) -> list[Agent]:
         """List all available agents."""
         return list(self.agents.values())
-    
-    def get_agent(self, name: str) -> Optional[Agent]:
+
+    def get_agent(self, name: str) -> Agent | None:
         """Get a specific agent by name."""
         return self.agents.get(name)
-    
+
     def create_agent(
         self,
         name: str,
         description: str,
         prompt: str,
-        capabilities: List[str] = None,
-        tools: List[str] = None,
-        context_files: List[str] = None,
-        working_directory: Optional[str] = None,
-        environment: Dict[str, str] = None,
+        capabilities: list[str] | None = None,
+        tools: list[str] | None = None,
+        context_files: list[str] | None = None,
+        working_directory: str | None = None,
+        environment: dict[str, str] | None = None,
     ) -> Agent:
         """Create a new agent."""
         if name in self.agents:
             raise ValueError(f"Agent '{name}' already exists")
-        
+
         agent = Agent(
             name=name,
             description=description,
@@ -180,28 +181,28 @@ class ClaudeAgentManager:
             working_directory=working_directory,
             environment=environment,
         )
-        
+
         self.agents[name] = agent
         self._save_agents()
         return agent
-    
+
     def update_agent(
         self,
         name: str,
-        description: Optional[str] = None,
-        prompt: Optional[str] = None,
-        capabilities: Optional[List[str]] = None,
-        tools: Optional[List[str]] = None,
-        context_files: Optional[List[str]] = None,
-        working_directory: Optional[str] = None,
-        environment: Optional[Dict[str, str]] = None,
+        description: str | None = None,
+        prompt: str | None = None,
+        capabilities: list[str] | None = None,
+        tools: list[str] | None = None,
+        context_files: list[str] | None = None,
+        working_directory: str | None = None,
+        environment: dict[str, str] | None = None,
     ) -> Agent:
         """Update an existing agent."""
         if name not in self.agents:
             raise ValueError(f"Agent '{name}' not found")
-        
+
         agent = self.agents[name]
-        
+
         if description is not None:
             agent.description = description
         if prompt is not None:
@@ -216,40 +217,40 @@ class ClaudeAgentManager:
             agent.working_directory = working_directory
         if environment is not None:
             agent.environment = environment
-        
+
         agent.updated_at = datetime.now()
         self._save_agents()
         return agent
-    
-    def delete_agent(self, name: str):
+
+    def delete_agent(self, name: str) -> None:
         """Delete an agent."""
         if name not in self.agents:
             raise ValueError(f"Agent '{name}' not found")
-        
+
         # Don't allow deleting default agents
         if any(a["name"] == name for a in self.DEFAULT_AGENTS):
             raise ValueError(f"Cannot delete default agent '{name}'")
-        
+
         del self.agents[name]
         self._save_agents()
-    
-    def search_agents(self, query: str) -> List[Agent]:
+
+    def search_agents(self, query: str) -> list[Agent]:
         """Search agents by name or description."""
         query_lower = query.lower()
         results = []
-        
+
         for agent in self.agents.values():
-            if (query_lower in agent.name.lower() or 
+            if (query_lower in agent.name.lower() or
                 query_lower in agent.description.lower() or
                 any(query_lower in cap.lower() for cap in agent.capabilities)):
                 results.append(agent)
-        
+
         return results
-    
-    def get_agent_suggestions(self, prefix: str) -> List[Dict[str, str]]:
+
+    def get_agent_suggestions(self, prefix: str) -> list[dict[str, str]]:
         """Get agent suggestions for autocomplete."""
         suggestions = []
-        
+
         if prefix == '_all' or prefix == '':
             # Return all agents if no prefix
             for agent in self.agents.values():
@@ -268,5 +269,5 @@ class ClaudeAgentManager:
                         "description": agent.description,
                         "command": f"@{agent.name}"
                     })
-        
+
         return suggestions[:8]  # Limit to 8 suggestions

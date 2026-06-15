@@ -2,33 +2,33 @@
 Claude Code Agent Manager - Reads and manages Claude Code agents from .claude/agents directories.
 """
 
+import asyncio
 import os
 import re
 import shutil
-import yaml
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 import subprocess
-import asyncio
+from pathlib import Path
+from typing import Any
+
+import yaml  # type: ignore[import-untyped]
 
 
 class ClaudeAgent:
     """Represents a Claude Code agent from markdown files."""
-    
+
     def __init__(
         self,
         name: str,
         description: str = "",
         prompt: str = "",
-        file_path: Optional[Path] = None,
+        file_path: Path | None = None,
         is_local: bool = False,
         is_builtin: bool = False,
-        capabilities: Optional[List[str]] = None,
-        tools: Optional[List[str]] = None,
+        capabilities: list[str] | None = None,
+        tools: list[str] | None = None,
         agent_type: str = "claude",
-        **kwargs
-    ):
+        **kwargs: Any,
+    ) -> None:
         self.name = name
         self.description = description
         self.prompt = prompt
@@ -39,13 +39,13 @@ class ClaudeAgent:
         # Use provided capabilities/tools or extract from prompt
         self.capabilities = capabilities if capabilities is not None else self._extract_capabilities(prompt)
         self.tools = tools if tools is not None else self._extract_tools(prompt)
-    
-    def _extract_capabilities(self, prompt: str) -> List[str]:
+
+    def _extract_capabilities(self, prompt: str) -> list[str]:
         """Extract capabilities from the agent prompt."""
         capabilities = []
         # Look for common capability keywords
         capability_keywords = [
-            'code review', 'testing', 'documentation', 'refactoring', 
+            'code review', 'testing', 'documentation', 'refactoring',
             'debugging', 'security', 'performance', 'design', 'architecture'
         ]
         prompt_lower = prompt.lower()
@@ -53,8 +53,8 @@ class ClaudeAgent:
             if keyword in prompt_lower:
                 capabilities.append(keyword.replace(' ', '-'))
         return capabilities
-    
-    def _extract_tools(self, prompt: str) -> List[str]:
+
+    def _extract_tools(self, prompt: str) -> list[str]:
         """Extract mentioned tools from the agent prompt."""
         tools = []
         # Look for tool mentions
@@ -64,8 +64,8 @@ class ClaudeAgent:
             if tool in prompt_lower:
                 tools.append(tool)
         return tools
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert agent to dictionary."""
         return {
             "name": self.name,
@@ -82,69 +82,69 @@ class ClaudeAgent:
 
 class ClaudeCodeAgentManager:
     """Manages Claude Code agents from .claude/agents directories."""
-    
-    def __init__(self, working_directory: Optional[str] = None):
+
+    def __init__(self, working_directory: str | None = None) -> None:
         """Initialize the agent manager."""
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
-        
+
         # Use environment variable for storage directory if set (for containers)
         storage_override = os.getenv("CLAUDE_CONFIG_DIR")
         if storage_override:
             self.local_agents_dir = Path(storage_override) / "agents"
         else:
             self.local_agents_dir = self.working_dir / ".claude" / "agents"
-            
+
         self.global_agents_dir = Path.home() / ".claude" / "agents"
         # Get built-in agents directory from package
+        self.builtin_agents_dir: Path | None
         try:
-            import cuti
-            package_dir = Path(cuti.__file__).parent
+            package_dir = Path(__file__).resolve().parent.parent
             self.builtin_agents_dir = package_dir / "builtin_agents"
-        except:
+        except Exception:
             self.builtin_agents_dir = None
-        self.agents: Dict[str, ClaudeAgent] = {}
+        self.agents: dict[str, ClaudeAgent] = {}
         self.gemini_available = self._check_gemini_cli()
         self._ensure_directories()
         self._load_agents()
-    
+
     def _check_gemini_cli(self) -> bool:
         """Check if Gemini CLI is installed and available."""
         try:
             result = subprocess.run(['which', 'gemini'], capture_output=True, text=True)
             return result.returncode == 0
-        except:
+        except Exception:
             return False
-    
-    def _ensure_directories(self):
+
+    def _ensure_directories(self) -> None:
         """Ensure necessary directories exist and copy built-in agents if needed."""
         # Create local agents directory if it doesn't exist
         self.local_agents_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Copy built-in agents to local directory if they don't exist
         if self.builtin_agents_dir and self.builtin_agents_dir.exists():
             for builtin_agent in self.builtin_agents_dir.glob("*.md"):
                 local_agent_path = self.local_agents_dir / builtin_agent.name
                 if not local_agent_path.exists():
                     shutil.copy2(builtin_agent, local_agent_path)
-    
-    def _load_agents(self):
+
+    def _load_agents(self) -> None:
         """Load agents from built-in, global, and local directories."""
         self.agents = {}
-        
+
         # Load built-in agents first (lowest priority)
         if self.builtin_agents_dir and self.builtin_agents_dir.exists():
             for agent_file in self.builtin_agents_dir.glob("*.md"):
                 agent = self._parse_agent_file(agent_file, is_local=False, is_builtin=True)
                 if agent:
                     self.agents[agent.name] = agent
-        
+
         # Load global agents (medium priority)
         if self.global_agents_dir.exists():
             for agent_file in self.global_agents_dir.glob("*.md"):
                 agent = self._parse_agent_file(agent_file, is_local=False, is_builtin=False)
                 if agent:
                     self.agents[agent.name] = agent
-        
+
         # Load local agents (highest priority - override others if same name)
         if self.local_agents_dir.exists():
             for agent_file in self.local_agents_dir.glob("*.md"):
@@ -154,7 +154,7 @@ class ClaudeCodeAgentManager:
                     if self._is_builtin_copy(agent_file):
                         agent.is_builtin = True
                     self.agents[agent.name] = agent
-    
+
     def _is_builtin_copy(self, file_path: Path) -> bool:
         """Check if a local agent file is a copy of a built-in agent."""
         if not self.builtin_agents_dir:
@@ -165,11 +165,11 @@ class ClaudeCodeAgentManager:
             try:
                 content = file_path.read_text()
                 return 'builtin: true' in content or content == builtin_path.read_text()
-            except:
+            except Exception:
                 return False
         return False
-    
-    def _parse_agent_file(self, file_path: Path, is_local: bool, is_builtin: bool = False) -> Optional[ClaudeAgent]:
+
+    def _parse_agent_file(self, file_path: Path, is_local: bool, is_builtin: bool = False) -> ClaudeAgent | None:
         """Parse an agent markdown file with optional YAML frontmatter."""
         try:
             content = file_path.read_text()
@@ -177,14 +177,14 @@ class ClaudeCodeAgentManager:
             description = ""
             capabilities = None
             tools = None
-            
+
             # Detect if this is a Gemini agent based on filename or content
             agent_type = "claude"
             if "gemini" in name.lower():
                 agent_type = "gemini"
             elif "gemini" in content.lower()[:500]:  # Check first 500 chars
                 agent_type = "gemini"
-            
+
             # Check for YAML frontmatter
             if content.startswith('---'):
                 try:
@@ -193,7 +193,7 @@ class ClaudeCodeAgentManager:
                     if len(parts) >= 3:
                         frontmatter = yaml.safe_load(parts[1])
                         prompt = parts[2].strip()
-                        
+
                         # Extract metadata from frontmatter
                         name = frontmatter.get('name', name)
                         description = frontmatter.get('description', '')
@@ -203,7 +203,7 @@ class ClaudeCodeAgentManager:
                         agent_type = frontmatter.get('agent_type', agent_type)
                     else:
                         prompt = content
-                except:
+                except Exception:
                     # If YAML parsing fails, treat entire content as prompt
                     prompt = content
             else:
@@ -219,7 +219,7 @@ class ClaudeCodeAgentManager:
                     elif line and not line.startswith('```'):
                         description = line
                         break
-            
+
             return ClaudeAgent(
                 name=name,
                 description=description or f"Agent: {name}",
@@ -234,35 +234,35 @@ class ClaudeCodeAgentManager:
         except Exception as e:
             print(f"Error parsing agent file {file_path}: {e}")
             return None
-    
-    def reload_agents(self):
+
+    def reload_agents(self) -> None:
         """Reload agents from disk."""
         self._load_agents()
-    
-    def list_agents(self) -> List[ClaudeAgent]:
+
+    def list_agents(self) -> list[ClaudeAgent]:
         """List all available agents."""
         return list(self.agents.values())
-    
-    def get_agent(self, name: str) -> Optional[ClaudeAgent]:
+
+    def get_agent(self, name: str) -> ClaudeAgent | None:
         """Get a specific agent by name."""
         return self.agents.get(name)
-    
-    def search_agents(self, query: str) -> List[ClaudeAgent]:
+
+    def search_agents(self, query: str) -> list[ClaudeAgent]:
         """Search agents by name or description."""
         query_lower = query.lower()
         results = []
-        
+
         for agent in self.agents.values():
-            if (query_lower in agent.name.lower() or 
+            if (query_lower in agent.name.lower() or
                 query_lower in agent.description.lower()):
                 results.append(agent)
-        
+
         return results
-    
-    def get_agent_suggestions(self, prefix: str) -> List[Dict[str, str]]:
+
+    def get_agent_suggestions(self, prefix: str) -> list[dict[str, str]]:
         """Get agent suggestions for autocomplete."""
         suggestions = []
-        
+
         if prefix == '_all' or prefix == '':
             # Return all agents if no prefix
             for agent in self.agents.values():
@@ -283,23 +283,23 @@ class ClaudeCodeAgentManager:
                         "command": f"@{agent.name}",
                         "is_local": str(agent.is_local)  # Convert boolean to string
                     })
-        
+
         return suggestions[:8]  # Limit to 8 suggestions
-    
-    async def create_agent_with_claude(self, name: str, description: str) -> Dict[str, Any]:
+
+    async def create_agent_with_claude(self, name: str, description: str) -> dict[str, Any]:
         """Create an agent using Claude Code's /agent command."""
         try:
             # Ensure the local agents directory exists
             self.local_agents_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Create the agent using Claude Code CLI
             # Using a simple prompt that asks Claude to create the agent
             prompt = f"/agent create {name} \"{description}\""
-            
+
             # Run Claude with the agent creation command
             # Note: We need to run this in the proper working directory
             cmd = ["claude", "-m", "opus"]
-            
+
             # Create a subprocess with the command
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -308,13 +308,12 @@ class ClaudeCodeAgentManager:
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir)
             )
-            
+
             # Send the agent creation command
             stdout, stderr = await process.communicate(input=prompt.encode())
-            
+
             # Check if the command was successful
             if process.returncode != 0:
-                error_msg = stderr.decode() if stderr else "Unknown error"
                 # If the /agent command doesn't exist yet, fall back to creating a basic agent file
                 # This allows the system to work even before Claude fully implements /agent
                 agent_content = f"""# {name}
@@ -341,17 +340,17 @@ Your primary responsibilities:
 - Use appropriate tools for each task
 - Explain your reasoning when it helps understanding
 """
-                
+
                 # Write the agent file
                 agent_file = self.local_agents_dir / f"{name}.md"
                 agent_file.write_text(agent_content)
-            
+
             # Wait a moment for file system
             await asyncio.sleep(0.5)
-            
+
             # Reload agents to pick up the new one
             self.reload_agents()
-            
+
             # Check if the agent was created
             agent = self.get_agent(name)
             if agent:
@@ -363,16 +362,16 @@ Your primary responsibilities:
             else:
                 return {
                     "success": False,
-                    "message": f"Failed to create agent"
+                    "message": "Failed to create agent"
                 }
-                
+
         except Exception as e:
             return {
                 "success": False,
                 "message": f"Error creating agent: {str(e)}"
             }
-    
-    def delete_agent(self, name: str) -> Dict[str, Any]:
+
+    def delete_agent(self, name: str) -> dict[str, Any]:
         """Delete an agent file."""
         agent = self.get_agent(name)
         if not agent:
@@ -380,13 +379,13 @@ Your primary responsibilities:
                 "success": False,
                 "message": f"Agent '{name}' not found"
             }
-        
+
         if not agent.file_path or not agent.file_path.exists():
             return {
                 "success": False,
-                "message": f"Agent file not found"
+                "message": "Agent file not found"
             }
-        
+
         try:
             # Only allow deleting local agents that are not built-in
             if not agent.is_local:
@@ -394,19 +393,19 @@ Your primary responsibilities:
                     "success": False,
                     "message": "Cannot delete global agents. Only local agents can be deleted."
                 }
-            
+
             if agent.is_builtin:
                 return {
                     "success": False,
                     "message": "Cannot delete built-in agents provided by cuti."
                 }
-            
+
             # Delete the file
             agent.file_path.unlink()
-            
+
             # Reload agents
             self.reload_agents()
-            
+
             return {
                 "success": True,
                 "message": f"Agent '{name}' deleted successfully"
@@ -416,8 +415,8 @@ Your primary responsibilities:
                 "success": False,
                 "message": f"Error deleting agent: {str(e)}"
             }
-    
-    def update_agent(self, name: str, new_content: str) -> Dict[str, Any]:
+
+    def update_agent(self, name: str, new_content: str) -> dict[str, Any]:
         """Update an agent's content."""
         agent = self.get_agent(name)
         if not agent:
@@ -425,30 +424,36 @@ Your primary responsibilities:
                 "success": False,
                 "message": f"Agent '{name}' not found"
             }
-        
+
         if not agent.is_local:
             return {
                 "success": False,
                 "message": "Cannot edit global agents. Only local agents can be modified."
             }
-        
+
         if agent.is_builtin:
             return {
                 "success": False,
                 "message": "Cannot edit built-in agents. Create a custom copy instead."
             }
-        
+        if agent.file_path is None:
+            return {
+                "success": False,
+                "message": f"Agent '{name}' does not have an editable file path"
+            }
+
         try:
             # Write the new content
             agent.file_path.write_text(new_content)
-            
+
             # Reload agents
             self.reload_agents()
-            
+            updated_agent = self.get_agent(name) or agent
+
             return {
                 "success": True,
                 "message": f"Agent '{name}' updated successfully",
-                "agent": self.get_agent(name).to_dict()
+                "agent": updated_agent.to_dict()
             }
         except Exception as e:
             return {

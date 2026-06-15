@@ -6,7 +6,6 @@ import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -21,11 +20,11 @@ history_app = typer.Typer(help="Inspect Claude Code chat history and resume sess
 console = Console()
 
 
-def _workspace_path_override(workspace: Optional[str]) -> Path:
+def _workspace_path_override(workspace: str | None) -> Path:
     return Path(workspace).expanduser().resolve() if workspace else Path.cwd().resolve()
 
 
-def _resolve_session_identifier(identifier: str, sessions: List[SessionSummary]) -> SessionSummary:
+def _resolve_session_identifier(identifier: str, sessions: list[SessionSummary]) -> SessionSummary:
     if not sessions:
         raise typer.BadParameter("No Claude sessions available")
 
@@ -57,9 +56,9 @@ def _format_timestamp(value: datetime) -> str:
 @history_app.command("list")
 def list_sessions(
     limit: int = typer.Option(10, help="Number of sessions to show"),
-    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
     all_workspaces: bool = typer.Option(False, "--all", help="Show sessions for every recorded workspace"),
-):
+) -> None:
     """Display Claude sessions for the current workspace."""
 
     service = ClaudeHistoryService(_workspace_path_override(workspace))
@@ -93,9 +92,9 @@ def list_sessions(
 def show_session(
     session: str = typer.Argument("latest", help="Session id, numeric index, or 'latest'"),
     limit: int = typer.Option(40, help="Number of messages to display"),
-    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
     all_workspaces: bool = typer.Option(False, "--all", help="Search across every recorded workspace"),
-):
+) -> None:
     """Show the last few messages from a Claude session."""
 
     service = ClaudeHistoryService(_workspace_path_override(workspace))
@@ -122,9 +121,9 @@ def show_session(
 @history_app.command("resume")
 def resume_session(
     session: str = typer.Argument("latest", help="Session id, numeric index, or 'latest'"),
-    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace path (defaults to cwd)"),
     all_workspaces: bool = typer.Option(False, "--all", help="Search across every recorded workspace"),
-):
+) -> None:
     """Resume a Claude session using the official CLI."""
 
     if not shutil.which("claude"):

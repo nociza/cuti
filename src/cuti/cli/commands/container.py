@@ -2,23 +2,23 @@
 Container management commands for cuti.
 """
 
-import subprocess
 import json
-from pathlib import Path
-from typing import Dict, List, Optional
+import subprocess
 from collections import defaultdict
+from pathlib import Path
+from typing import Any
 
 import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 app = typer.Typer(help="Container management commands")
 console = Console()
 
 
-def get_container_info() -> Dict[str, List[Dict]]:
+def get_container_info() -> dict[str, list[dict[str, Any]]]:
     """Get information about all cuti-dev containers grouped by workspace."""
     try:
         # Get all containers using cuti-dev-universal image
@@ -39,7 +39,7 @@ def get_container_info() -> Dict[str, List[Dict]]:
         if result.returncode != 0 or not result.stdout.strip():
             return {}
 
-        containers_by_workspace = defaultdict(list)
+        containers_by_workspace: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
 
         # Parse each container's JSON
         for line in result.stdout.strip().split('\n'):
@@ -108,7 +108,7 @@ def get_container_info() -> Dict[str, List[Dict]]:
 
 @app.command()
 def start(
-    command: Optional[str] = typer.Argument(None, help="Command to run in container"),
+    command: str | None = typer.Argument(None, help="Command to run in container"),
     rebuild: bool = typer.Option(
         False, "--rebuild", help="Force rebuild the container image"
     ),
@@ -121,7 +121,7 @@ def start(
         "--claw",
         help="Start in OpenClaw mode instead of the default Claude Code mode",
     ),
-):
+) -> None:
     """Start a new container for the current workspace."""
     from ...services.devcontainer import DevContainerService, is_running_in_container
 
@@ -185,7 +185,7 @@ def status(
         False, "--verbose", "-v", help="Show detailed information"
     ),
     json_output: bool = typer.Option(False, "--json", help="Output in JSON format"),
-):
+) -> None:
     """Show status of all cuti containers grouped by workspace."""
 
     containers = get_container_info()
@@ -273,12 +273,12 @@ def status(
 
 @app.command()
 def stop(
-    container_id: Optional[str] = typer.Argument(
+    container_id: str | None = typer.Argument(
         None, help="Container ID to stop (or current if inside container)"
     ),
     all: bool = typer.Option(False, "--all", "-a", help="Stop all cuti containers"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
-):
+) -> None:
     """Stop running cuti containers."""
 
     if all:
@@ -349,11 +349,11 @@ def stop(
 
 @app.command()
 def enter(
-    container_id: Optional[str] = typer.Argument(None, help="Container ID to enter"),
-    workspace: Optional[str] = typer.Option(
+    container_id: str | None = typer.Argument(None, help="Container ID to enter"),
+    workspace: str | None = typer.Option(
         None, "--workspace", "-w", help="Enter container for specific workspace"
     ),
-):
+) -> None:
     """Enter an existing cuti container."""
 
     containers = get_container_info()
@@ -408,7 +408,7 @@ def cleanup(
         7, "--days", "-d", help="Remove containers older than N days"
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
-):
+) -> None:
     """Clean up old stopped cuti containers."""
 
     # Get all stopped containers
@@ -437,7 +437,7 @@ def cleanup(
         try:
             container = json.loads(line)
             to_remove.append(container['ID'][:12])
-        except:
+        except Exception:
             continue
 
     if not to_remove:

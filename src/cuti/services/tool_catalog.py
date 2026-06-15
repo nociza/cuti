@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
-AVAILABLE_TOOLS: List[Dict[str, str]] = [
+AVAILABLE_TOOLS: list[dict[str, str]] = [
     {
         "name": "ast-grep",
         "display_name": "AST Grep",
@@ -155,7 +155,7 @@ def get_tools_config_path() -> Path:
 
 
 
-def load_tools_config() -> Dict[str, Any]:
+def load_tools_config() -> dict[str, Any]:
     """Load persisted tool selection state."""
 
     config_path = get_tools_config_path()
@@ -169,7 +169,7 @@ def load_tools_config() -> Dict[str, Any]:
 
 
 
-def save_tools_config(config: Dict[str, Any]) -> None:
+def save_tools_config(config: dict[str, Any]) -> None:
     """Persist tool selection state."""
 
     config_path = get_tools_config_path()

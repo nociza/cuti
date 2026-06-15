@@ -2,14 +2,15 @@
 Queue management service - high-level queue operations.
 """
 
+from collections.abc import Callable
 from datetime import datetime
-from typing import Optional, Callable, Dict, Any
+from typing import Any
 
-from ..core.models import QueuedPrompt, QueueState, PromptStatus
-from ..core.storage import PromptStorage
-from ..core.queue import QueueProcessor
-from ..core.config import CutiConfig
 from ..core.claude_interface import ClaudeCodeInterface
+from ..core.config import CutiConfig
+from ..core.models import PromptStatus, QueuedPrompt, QueueState
+from ..core.queue import QueueProcessor
+from ..core.storage import PromptStorage
 
 
 class QueueManager:
@@ -28,38 +29,48 @@ class QueueManager:
             check_interval=check_interval,
             timeout=timeout,
         )
-        
-        self.storage = PromptStorage(storage_dir)
-        self.claude_interface = ClaudeCodeInterface(claude_command, timeout)
-        self.processor = QueueProcessor(
-            self.storage, self.claude_interface, check_interval
-        )
-        
-        self.state: Optional[QueueState] = None
 
-    def start(self, callback: Optional[Callable[[QueueState], None]] = None) -> None:
+        self.storage = PromptStorage(storage_dir)
+        self._claude_interface: ClaudeCodeInterface | None = None
+        self._processor: QueueProcessor | None = None
+
+        self.state: QueueState | None = None
+
+    @property
+    def claude_interface(self) -> ClaudeCodeInterface:
+        """Create the Claude executor only when execution is requested."""
+        if self._claude_interface is None:
+            self._claude_interface = ClaudeCodeInterface(
+                self.config.claude_command, self.config.timeout
+            )
+        return self._claude_interface
+
+    @property
+    def processor(self) -> QueueProcessor:
+        """Create the queue processor lazily so passive commands stay available."""
+        if self._processor is None:
+            self._processor = QueueProcessor(
+                self.storage, self.claude_interface, self.config.check_interval
+            )
+        return self._processor
+
+    def start(self, callback: Callable[[QueueState], None] | None = None) -> None:
         """Start the queue processing loop."""
         self.processor.start(callback)
 
     def stop(self) -> None:
         """Stop the queue processing loop."""
-        self.processor.stop()
+        if self._processor is not None:
+            self._processor.stop()
 
     def add_prompt(self, prompt: QueuedPrompt) -> bool:
         """Add a prompt to the queue."""
         try:
-            if not self.state:
-                self.state = self.storage.load_queue_state()
+            self.state = self.storage.load_queue_state()
 
             self.state.add_prompt(prompt)
 
-            success = self.storage.save_queue_state(self.state)
-            if success:
-                print(f"✓ Added prompt {prompt.id} to queue")
-            else:
-                print(f"✗ Failed to save prompt {prompt.id}")
-
-            return success
+            return self.storage.save_queue_state(self.state)
 
         except Exception as e:
             print(f"Error adding prompt: {e}")
@@ -68,8 +79,7 @@ class QueueManager:
     def remove_prompt(self, prompt_id: str) -> bool:
         """Remove a prompt from the queue."""
         try:
-            if not self.state:
-                self.state = self.storage.load_queue_state()
+            self.state = self.storage.load_queue_state()
 
             prompt = self.state.get_prompt(prompt_id)
             if prompt:
@@ -97,8 +107,7 @@ class QueueManager:
 
     def get_status(self) -> QueueState:
         """Get current queue status."""
-        if not self.state:
-            self.state = self.storage.load_queue_state()
+        self.state = self.storage.load_queue_state()
         return self.state
 
     def create_prompt_template(self, filename: str, priority: int = 0) -> str:
@@ -106,25 +115,25 @@ class QueueManager:
         file_path = self.storage.create_prompt_template(filename, priority)
         return str(file_path)
 
-    def get_rate_limit_info(self) -> Dict[str, Any]:
+    def get_rate_limit_info(self) -> dict[str, Any]:
         """Get basic rate limit information for testing."""
-        if not self.state:
-            self.state = self.storage.load_queue_state()
+        self.state = self.storage.load_queue_state()
 
         current_time = datetime.now()
         rate_limited_prompts = [
             p for p in self.state.prompts if p.status == PromptStatus.RATE_LIMITED
         ]
 
-        info = {
+        prompts_info: list[dict[str, Any]] = []
+        info: dict[str, Any] = {
             "current_time": current_time,
             "has_rate_limited_prompts": len(rate_limited_prompts) > 0,
             "rate_limited_count": len(rate_limited_prompts),
-            "prompts": [],
+            "prompts": prompts_info,
         }
 
         for prompt in rate_limited_prompts:
-            info["prompts"].append(
+            prompts_info.append(
                 {
                     "id": prompt.id,
                     "rate_limited_at": prompt.rate_limited_at,

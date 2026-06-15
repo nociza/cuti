@@ -127,7 +127,7 @@ OpenClaw's source-backed command families are exposed directly (`models`, `mcp`,
 > **Note:** This project is under active development. Contributions welcome!
 
 ```bash
-uv install -e .
+uv sync --extra dev
 ```
 
 Submit PRs to [GitHub](https://github.com/nociza/cuti) | Report issues in [Issues](https://github.com/nociza/cuti/issues)

@@ -2,16 +2,15 @@
 """Test the hierarchical todo system functionality directly."""
 
 import sys
-import json
 from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, '/workspace/src')
 
-from cuti.services.todo_service import TodoService
+from cuti.core.todo_models import TodoItem, TodoList, TodoPriority, TodoStatus
 from cuti.services.claude_todo_sync import ClaudeTodoSync
 from cuti.services.goal_parser import GoalParser
-from cuti.core.todo_models import TodoItem, TodoList, TodoStatus, TodoPriority
+from cuti.services.todo_service import TodoService
 
 
 def _run_goal_sync():

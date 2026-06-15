@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
-
 
 CONTAINER_MODE_CLAUDE = "claude-code"
 CONTAINER_MODE_OPENCLAW = "openclaw"
@@ -24,15 +23,15 @@ class ProviderMetadata:
     experimental: bool = False
     experimental_note: str = ""
     default_enabled: bool = False
-    instruction_files: Tuple[str, ...] = ()
-    commands: Tuple[str, ...] = ()
-    setup_command: Optional[str] = None
+    instruction_files: tuple[str, ...] = ()
+    commands: tuple[str, ...] = ()
+    setup_command: str | None = None
     setup_hint: str = ""
-    update_command: Optional[str] = None
+    update_command: str | None = None
     update_hint: str = ""
 
 
-KNOWN_PROVIDERS: Dict[str, ProviderMetadata] = {
+KNOWN_PROVIDERS: dict[str, ProviderMetadata] = {
     "claude": ProviderMetadata(
         name="claude",
         title="Anthropic Claude Code",
@@ -106,11 +105,11 @@ KNOWN_PROVIDERS: Dict[str, ProviderMetadata] = {
 class ProviderManager:
     """Manage enabled agent providers stored under ~/.cuti/providers.json."""
 
-    def __init__(self, storage_dir: Optional[Path] = None):
+    def __init__(self, storage_dir: Path | None = None):
         self.storage_dir = Path(storage_dir or Path.home() / ".cuti")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.config_path = self.storage_dir / "providers.json"
-        self._providers: Dict[str, Dict[str, object]] = {}
+        self._providers: dict[str, dict[str, object]] = {}
         self._load()
 
     def _load(self) -> None:
@@ -143,13 +142,13 @@ class ProviderManager:
             f"Unknown provider '{provider}'. Available providers: {available}"
         )
 
-    def known_providers(self) -> Dict[str, ProviderMetadata]:
+    def known_providers(self) -> dict[str, ProviderMetadata]:
         return KNOWN_PROVIDERS
 
     def get_metadata(self, provider: str) -> ProviderMetadata:
         return KNOWN_PROVIDERS[self._canonical_name(provider)]
 
-    def get_state(self, provider: str) -> Dict[str, object]:
+    def get_state(self, provider: str) -> dict[str, object]:
         return self._providers.get(self._canonical_name(provider), {}).copy()
 
     def has_explicit_state(self, provider: str) -> bool:
@@ -171,10 +170,10 @@ class ProviderManager:
             return bool(state.get("enabled"))
         return KNOWN_PROVIDERS[canonical].default_enabled
 
-    def selected_providers(self) -> List[str]:
+    def selected_providers(self) -> list[str]:
         return [name for name in KNOWN_PROVIDERS if self.is_enabled(name)]
 
-    def selected_providers_for_mode(self, mode: str) -> List[str]:
+    def selected_providers_for_mode(self, mode: str) -> list[str]:
         """Return provider IDs that should be wired into a container mode."""
 
         if mode not in KNOWN_CONTAINER_MODES:
@@ -200,7 +199,7 @@ class ProviderManager:
             if name != "openclaw" and self.is_enabled(name)
         ]
 
-    def primary_provider(self) -> Optional[str]:
+    def primary_provider(self) -> str | None:
         selected = self.selected_providers()
         if not selected:
             return None
@@ -209,10 +208,10 @@ class ProviderManager:
         return selected[0]
 
     def provider_instruction_files(
-        self, providers: Optional[Iterable[str]] = None
-    ) -> List[str]:
+        self, providers: Iterable[str] | None = None
+    ) -> list[str]:
         selected = providers or self.selected_providers()
-        files: List[str] = []
+        files: list[str] = []
         seen = set()
         for provider in selected:
             for filename in self.get_metadata(provider).instruction_files:

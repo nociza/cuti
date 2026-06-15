@@ -4,12 +4,12 @@ Claude Code Settings Manager - Manages .claude/settings.local.json configuration
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 
 class ClaudeSettingsManager:
     """Manages Claude Code settings for projects."""
-    
+
     # Default settings based on user's configuration
     DEFAULT_SETTINGS = {
         "cleanupPeriodDays": 180,
@@ -28,25 +28,25 @@ class ClaudeSettingsManager:
         "model": "opus",
         "forceLoginMethod": "claudeai"
     }
-    
-    def __init__(self, working_directory: Optional[str] = None):
+
+    def __init__(self, working_directory: str | None = None):
         """Initialize the settings manager."""
         import os
         self.working_dir = Path(working_directory) if working_directory else Path.cwd()
-        
+
         # Use environment variable for storage directory if set (for containers)
         storage_override = os.getenv("CLAUDE_CONFIG_DIR")
         if storage_override:
             self.claude_dir = Path(storage_override)
         else:
             self.claude_dir = self.working_dir / ".claude"
-            
+
         self.settings_file = self.claude_dir / "settings.local.json"
         self.global_settings_file = Path.home() / ".claude" / "settings.json"
-        
+
         # Ensure directory and settings exist
         self.ensure_claude_directory()
-    
+
     def ensure_claude_directory(self) -> bool:
         """Ensure .claude directory exists in the project."""
         # Create directory if it doesn't exist
@@ -56,7 +56,7 @@ class ClaudeSettingsManager:
             except Exception as e:
                 print(f"Error creating .claude directory: {e}")
                 return False
-        
+
         # Always check if settings file needs to be created
         if not self.settings_file.exists():
             try:
@@ -68,40 +68,40 @@ class ClaudeSettingsManager:
             except Exception as e:
                 print(f"Error creating settings file: {e}")
                 return False
-        
+
         return True
-    
-    def get_current_settings(self) -> Dict[str, Any]:
+
+    def get_current_settings(self) -> dict[str, Any]:
         """Get current settings from file or defaults."""
         if self.settings_file.exists():
             try:
-                with open(self.settings_file, 'r') as f:
+                with open(self.settings_file) as f:
                     return json.load(f)
             except Exception as e:
                 print(f"Error reading settings: {e}")
-        
+
         # Check global settings
         if self.global_settings_file.exists():
             try:
-                with open(self.global_settings_file, 'r') as f:
+                with open(self.global_settings_file) as f:
                     return json.load(f)
             except Exception:
                 pass
-        
+
         return self.DEFAULT_SETTINGS.copy()
-    
-    def save_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+
+    def save_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Save settings to local file."""
         if not self.ensure_claude_directory():
             return {
                 "success": False,
                 "message": "Failed to create .claude directory"
             }
-        
+
         try:
             with open(self.settings_file, 'w') as f:
                 json.dump(settings, f, indent=2)
-            
+
             return {
                 "success": True,
                 "message": "Settings saved successfully",
@@ -112,11 +112,11 @@ class ClaudeSettingsManager:
                 "success": False,
                 "message": f"Error saving settings: {str(e)}"
             }
-    
-    def update_setting(self, key: str, value: Any) -> Dict[str, Any]:
+
+    def update_setting(self, key: str, value: Any) -> dict[str, Any]:
         """Update a specific setting."""
         settings = self.get_current_settings()
-        
+
         # Handle nested keys (e.g., "env.CLAUDE_CODE_ENABLE_TELEMETRY")
         if '.' in key:
             keys = key.split('.')
@@ -128,10 +128,10 @@ class ClaudeSettingsManager:
             current[keys[-1]] = value
         else:
             settings[key] = value
-        
+
         return self.save_settings(settings)
-    
-    def initialize_project_settings(self) -> Dict[str, Any]:
+
+    def initialize_project_settings(self) -> dict[str, Any]:
         """Initialize project with default Claude settings."""
         # Always ensure the directory exists first
         if not self.ensure_claude_directory():
@@ -139,23 +139,23 @@ class ClaudeSettingsManager:
                 "success": False,
                 "message": "Failed to create .claude directory"
             }
-        
+
         if self.settings_file.exists():
             return {
                 "success": False,
                 "message": "Settings file already exists",
                 "path": str(self.settings_file)
             }
-        
+
         result = self.save_settings(self.DEFAULT_SETTINGS)
         if result.get("success"):
             print(f"📝 Initialized project Claude settings at {self.settings_file}")
         return result
-    
-    def get_essential_settings(self) -> Dict[str, Any]:
+
+    def get_essential_settings(self) -> dict[str, Any]:
         """Get essential Claude settings for UI display."""
         settings = self.get_current_settings()
-        
+
         return {
             "model": settings.get("model", "opus"),
             "cleanupPeriodDays": settings.get("cleanupPeriodDays", 180),
@@ -168,11 +168,11 @@ class ClaudeSettingsManager:
             "errorReporting": settings.get("env", {}).get("DISABLE_ERROR_REPORTING", "0") == "0",
             "autoUpdater": settings.get("env", {}).get("DISABLE_AUTOUPDATER", "0") == "0"
         }
-    
-    def set_essential_settings(self, essential: Dict[str, Any]) -> Dict[str, Any]:
+
+    def set_essential_settings(self, essential: dict[str, Any]) -> dict[str, Any]:
         """Set essential settings from UI."""
         settings = self.get_current_settings()
-        
+
         # Update main settings
         if "model" in essential:
             settings["model"] = essential["model"]
@@ -182,28 +182,28 @@ class ClaudeSettingsManager:
             settings["includeCoAuthoredBy"] = essential["includeCoAuthoredBy"]
         if "forceLoginMethod" in essential:
             settings["forceLoginMethod"] = essential["forceLoginMethod"]
-        
+
         # Update environment variables
         if "env" not in settings:
             settings["env"] = {}
-        
+
         if "telemetry" in essential:
             settings["env"]["CLAUDE_CODE_ENABLE_TELEMETRY"] = "1" if essential["telemetry"] else "0"
             settings["env"]["DISABLE_TELEMETRY"] = "0" if essential["telemetry"] else "1"
-        
+
         if "autoInstall" in essential:
             settings["env"]["CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL"] = "0" if essential["autoInstall"] else "1"
-        
+
         if "maintainWorkingDir" in essential:
             settings["env"]["CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR"] = "1" if essential["maintainWorkingDir"] else "0"
-        
+
         if "costWarnings" in essential:
             settings["env"]["DISABLE_COST_WARNINGS"] = "0" if essential["costWarnings"] else "1"
-        
+
         if "errorReporting" in essential:
             settings["env"]["DISABLE_ERROR_REPORTING"] = "0" if essential["errorReporting"] else "1"
-        
+
         if "autoUpdater" in essential:
             settings["env"]["DISABLE_AUTOUPDATER"] = "0" if essential["autoUpdater"] else "1"
-        
+
         return self.save_settings(settings)

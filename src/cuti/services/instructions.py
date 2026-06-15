@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any
 
 from .providers import ProviderManager
 
@@ -11,7 +12,7 @@ DEFAULT_INSTRUCTION_FILES: Sequence[str] = ("CLAUDE.md", "AGENTS.md", "TOOLS.md"
 TOOLS_SECTION_HEADER = "## Available CLI Tools"
 
 
-def _build_tools_section(tools: List[Dict[str, Any]]) -> str:
+def _build_tools_section(tools: list[dict[str, Any]]) -> str:
     content = f"\n{TOOLS_SECTION_HEADER}\n\n"
     content += "The following CLI tools are available in the development environment:\n\n"
 
@@ -28,17 +29,17 @@ def _build_tools_section(tools: List[Dict[str, Any]]) -> str:
 
 
 def update_instruction_files_with_tools(
-    tools: List[Dict[str, Any]],
+    tools: list[dict[str, Any]],
     *,
     workspace: Path = Path("/workspace"),
-    instruction_files: Optional[Iterable[str]] = None,
-    provider_storage_dir: Optional[Path] = None,
-) -> List[Path]:
+    instruction_files: Iterable[str] | None = None,
+    provider_storage_dir: Path | None = None,
+) -> list[Path]:
     """Update any existing provider instruction files with the enabled tool list."""
 
-    updated_paths: List[Path] = []
+    updated_paths: list[Path] = []
     tools_content = _build_tools_section(tools)
-    resolved_files: List[str] = []
+    resolved_files: list[str] = []
     seen = set()
 
     if instruction_files is not None:

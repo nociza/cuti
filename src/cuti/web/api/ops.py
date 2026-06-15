@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Request
 
@@ -40,7 +40,7 @@ PROVIDER_INSTRUCTION_FILES = (
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "note": 2}
 
 
-def _isoformat(value: Any) -> Optional[str]:
+def _isoformat(value: Any) -> str | None:
     if value is None:
         return None
     if hasattr(value, "isoformat"):
@@ -48,7 +48,7 @@ def _isoformat(value: Any) -> Optional[str]:
     return str(value)
 
 
-def _serialize_queue_prompt(prompt: Any) -> Dict[str, Any]:
+def _serialize_queue_prompt(prompt: Any) -> dict[str, Any]:
     return {
         "id": prompt.id,
         "content": prompt.content,
@@ -60,7 +60,7 @@ def _serialize_queue_prompt(prompt: Any) -> Dict[str, Any]:
     }
 
 
-def _serialize_history_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+def _serialize_history_entry(entry: dict[str, Any]) -> dict[str, Any]:
     return {
         "content": entry.get("content", ""),
         "working_directory": entry.get("working_directory"),
@@ -71,7 +71,7 @@ def _serialize_history_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _queue_summary(request: Request) -> Dict[str, Any]:
+def _queue_summary(request: Request) -> dict[str, Any]:
     queue_manager = request.app.state.queue_manager
     detail = "The ops console is passive. Use the CLI or container session to process queued prompts."
     status_counts = {status.value: 0 for status in PromptStatus}
@@ -115,7 +115,7 @@ def _queue_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-def _history_summary(request: Request) -> Dict[str, Any]:
+def _history_summary(request: Request) -> dict[str, Any]:
     history_manager = request.app.state.history_manager
     history = [
         _serialize_history_entry(entry)
@@ -134,7 +134,7 @@ def _history_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-def _session_summary(request: Request) -> Dict[str, Any]:
+def _session_summary(request: Request) -> dict[str, Any]:
     logs_reader = request.app.state.claude_logs_reader
     current_session_id = logs_reader.get_current_session_id()
     sessions = logs_reader.get_all_sessions()[:6]
@@ -149,7 +149,7 @@ def _session_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-def _provider_summary(request: Request) -> Dict[str, Any]:
+def _provider_summary(request: Request) -> dict[str, Any]:
     service = ProviderHostService(
         working_directory=str(request.app.state.working_directory)
     )
@@ -166,11 +166,11 @@ def _provider_summary(request: Request) -> Dict[str, Any]:
     }
 
 
-def _tools_summary() -> Dict[str, Any]:
+def _tools_summary() -> dict[str, Any]:
     config = load_tools_config()
     enabled = set(config.get("enabled_tools", []))
     auto_install = set(config.get("auto_install", []))
-    items: List[Dict[str, Any]] = []
+    items: list[dict[str, Any]] = []
     installed_count = 0
 
     for tool in AVAILABLE_TOOLS:
@@ -202,13 +202,13 @@ def _tools_summary() -> Dict[str, Any]:
 
 
 def _workspace_summary(
-    request: Request, selected_instruction_files: List[str], tools_enabled: bool
-) -> Dict[str, Any]:
+    request: Request, selected_instruction_files: list[str], tools_enabled: bool
+) -> dict[str, Any]:
     working_directory = Path(request.app.state.working_directory)
-    files: List[Dict[str, Any]] = []
-    missing_selected_files: List[str] = []
-    stale_files: List[str] = []
-    missing_tools_sections: List[str] = []
+    files: list[dict[str, Any]] = []
+    missing_selected_files: list[str] = []
+    stale_files: list[str] = []
+    missing_tools_sections: list[str] = []
 
     for name in INSTRUCTION_FILES:
         path = working_directory / name
@@ -258,9 +258,9 @@ def _action_item(
     title: str,
     detail: str,
     *,
-    command: Optional[str] = None,
-    source: Optional[str] = None,
-) -> Dict[str, Any]:
+    command: str | None = None,
+    source: str | None = None,
+) -> dict[str, Any]:
     return {
         "severity": severity,
         "title": title,
@@ -271,14 +271,14 @@ def _action_item(
 
 
 def _attention_items(
-    providers: Dict[str, Any],
-    queue: Dict[str, Any],
-    history: Dict[str, Any],
-    tools: Dict[str, Any],
-    workspace: Dict[str, Any],
-    sessions: Dict[str, Any],
-) -> List[Dict[str, Any]]:
-    items: List[Dict[str, Any]] = []
+    providers: dict[str, Any],
+    queue: dict[str, Any],
+    history: dict[str, Any],
+    tools: dict[str, Any],
+    workspace: dict[str, Any],
+    sessions: dict[str, Any],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
 
     if not providers["selected_providers"]:
         items.append(
@@ -393,8 +393,8 @@ def _attention_items(
     return items[:8]
 
 
-def _recommended_commands(attention_items: List[Dict[str, Any]]) -> List[str]:
-    commands: List[str] = []
+def _recommended_commands(attention_items: list[dict[str, Any]]) -> list[str]:
+    commands: list[str] = []
     for candidate in [item.get("command") for item in attention_items] + [
         "cuti providers doctor",
         "cuti start",
@@ -406,7 +406,7 @@ def _recommended_commands(attention_items: List[Dict[str, Any]]) -> List[str]:
 
 
 @router.get("/summary")
-async def ops_summary(request: Request) -> Dict[str, Any]:
+async def ops_summary(request: Request) -> dict[str, Any]:
     """Return the passive operations summary used by the web console."""
 
     providers = _provider_summary(request)

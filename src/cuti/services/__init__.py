@@ -2,11 +2,11 @@
 Business logic services for cuti.
 """
 
-from .queue_service import QueueManager
 from .aliases import PromptAliasManager
 from .history import PromptHistoryManager
-from .task_expansion import TaskExpansionEngine
 from .monitoring import SystemMonitor
+from .queue_service import QueueManager
+from .task_expansion import TaskExpansionEngine
 
 __all__ = [
     "QueueManager",

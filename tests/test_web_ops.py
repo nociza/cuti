@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.testclient import TestClient
 
-from cuti.core.models import QueueState, QueuedPrompt
+from cuti.core.models import QueuedPrompt, QueueState
 from cuti.web.api.ops import router as ops_router
 from cuti.web.routes import main_router
 

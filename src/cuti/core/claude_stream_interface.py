@@ -3,17 +3,15 @@ Enhanced streaming interface for Claude Code that captures all intermediate step
 tool usage, and provides real-time updates to the UI.
 """
 
-import os
-import sys
-import json
 import asyncio
-import subprocess
-from pathlib import Path
-from typing import AsyncIterator, Dict, Any, Optional, List
-from datetime import datetime
-from dataclasses import dataclass
-from enum import Enum
+import os
 import re
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any
 
 
 class StreamEventType(Enum):
@@ -40,16 +38,16 @@ class StreamEvent:
     """A streaming event with metadata."""
     type: StreamEventType
     content: str = ""
-    metadata: Dict[str, Any] = None
-    timestamp: str = None
-    
-    def __post_init__(self):
+    metadata: dict[str, Any] | None = None
+    timestamp: str | None = None
+
+    def __post_init__(self) -> None:
         if self.timestamp is None:
             self.timestamp = datetime.now().isoformat()
         if self.metadata is None:
             self.metadata = {}
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.type.value,
             "content": self.content,
@@ -60,8 +58,8 @@ class StreamEvent:
 
 class ClaudeStreamInterface:
     """Streaming interface that captures all Claude's intermediate steps."""
-    
-    def __init__(self, claude_command: str = "claude"):
+
+    def __init__(self, claude_command: str = "claude") -> None:
         if claude_command == "claude":
             in_container = os.environ.get("CUTI_IN_CONTAINER") == "true"
             if in_container and os.path.exists("/usr/local/bin/claude"):
@@ -71,40 +69,40 @@ class ClaudeStreamInterface:
                 shared_cli = Path.home() / ".cuti" / "claude-cli" / "bin" / "claude"
                 if shared_cli.exists():
                     claude_command = str(shared_cli)
-        
+
         self.claude_command = claude_command
-        self.current_tool = None
+        self.current_tool: str | None = None
         self.tool_depth = 0
-        
+
     async def stream_with_steps(self,
                                 prompt: str,
                                 working_dir: str = ".",
-                                context_files: Optional[List[str]] = None,
+                                context_files: list[str] | None = None,
                                 capture_all: bool = True) -> AsyncIterator[StreamEvent]:
         """Stream Claude's response with all intermediate steps.
-        
+
         Args:
             prompt: The prompt to send to Claude
             working_dir: Working directory for execution
             context_files: Optional list of files to include as context
             capture_all: Whether to capture all output including tool usage
-            
+
         Yields:
             StreamEvent objects with detailed step information
         """
-        
+
         # Prepare the command
         cmd = [self.claude_command]
-        
+
         # Add context files if provided
         full_prompt = prompt
         if context_files:
             for file in context_files:
                 if Path(file).exists():
                     full_prompt = f"@{file} {full_prompt}"
-        
+
         cmd.append(full_prompt)
-        
+
         # Change to working directory
         original_cwd = os.getcwd()
         try:
@@ -112,24 +110,24 @@ class ClaudeStreamInterface:
             if not working_path.exists():
                 working_path.mkdir(parents=True, exist_ok=True)
             os.chdir(working_path)
-            
+
             # Send initialization event
             yield StreamEvent(
                 type=StreamEventType.INIT,
                 content="Starting Claude...",
                 metadata={"working_dir": str(working_path)}
             )
-            
+
             # Start the process with proper pipe configuration and verbose mode
             env = {**os.environ}
             env['CLAUDE_EXPERIMENTAL_STREAMING'] = '1'  # Enable experimental streaming if available
             env['CLAUDE_DEBUG'] = '1'  # Enable debug mode for more detailed output
             env['CLAUDE_VERBOSE'] = '1'  # Enable verbose mode
-            
+
             # Add verbose flag to command if supported
             if '--verbose' not in cmd:
                 cmd.insert(1, '--verbose')
-            
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -137,27 +135,30 @@ class ClaudeStreamInterface:
                 stdin=asyncio.subprocess.PIPE,
                 env=env
             )
-            
-            # Create tasks for reading stdout and stderr
-            stdout_task = asyncio.create_task(self._read_stdout(process))
-            stderr_task = asyncio.create_task(self._read_stderr(process))
-            
+            stdout = process.stdout
+            stderr = process.stderr
+            if stdout is None or stderr is None:
+                yield StreamEvent(
+                    type=StreamEventType.ERROR,
+                    content="Claude process did not provide output streams",
+                )
+                return
+
             # Process output streams
-            buffer = ""
             line_count = 0
-            
+
             while True:
                 # Check if process has finished
                 if process.returncode is not None:
                     break
-                
+
                 try:
                     # Read from stdout with timeout
                     line = await asyncio.wait_for(
-                        process.stdout.readline(),
+                        stdout.readline(),
                         timeout=0.1
                     )
-                    
+
                     if not line:
                         # Check if process is still running
                         if process.returncode is None:
@@ -165,14 +166,14 @@ class ClaudeStreamInterface:
                             continue
                         else:
                             break
-                    
+
                     line_str = line.decode('utf-8', errors='replace')
                     line_count += 1
-                    
+
                     # Parse and yield events based on line content
                     async for event in self._parse_line(line_str, line_count):
                         yield event
-                    
+
                 except asyncio.TimeoutError:
                     # No output available, check if still running
                     if process.returncode is not None:
@@ -183,19 +184,19 @@ class ClaudeStreamInterface:
                         type=StreamEventType.ERROR,
                         content=f"Stream error: {str(e)}"
                     )
-            
+
             # Wait for process to complete
             returncode = await process.wait()
-            
+
             # Read any remaining output
-            remaining_stdout = await process.stdout.read()
+            remaining_stdout = await stdout.read()
             if remaining_stdout:
-                for line in remaining_stdout.decode('utf-8', errors='replace').splitlines():
-                    async for event in self._parse_line(line, line_count):
+                for remaining_line in remaining_stdout.decode('utf-8', errors='replace').splitlines():
+                    async for event in self._parse_line(remaining_line, line_count):
                         yield event
-            
+
             # Read stderr for any errors
-            stderr_output = await process.stderr.read()
+            stderr_output = await stderr.read()
             if stderr_output:
                 stderr_text = stderr_output.decode('utf-8', errors='replace')
                 if stderr_text.strip():
@@ -204,14 +205,14 @@ class ClaudeStreamInterface:
                         content=stderr_text,
                         metadata={"source": "stderr"}
                     )
-            
+
             # Send completion event
             yield StreamEvent(
                 type=StreamEventType.COMPLETE,
                 content="Response complete",
                 metadata={"exit_code": returncode, "lines_processed": line_count}
             )
-            
+
         except Exception as e:
             yield StreamEvent(
                 type=StreamEventType.ERROR,
@@ -221,20 +222,20 @@ class ClaudeStreamInterface:
         finally:
             # Return to original directory
             os.chdir(original_cwd)
-    
+
     async def _parse_line(self, line: str, line_num: int) -> AsyncIterator[StreamEvent]:
         """Parse a line of output and yield appropriate events.
-        
+
         This method detects various patterns in Claude's output to identify
         tool usage, file operations, command execution, etc.
         """
-        
+
         line = line.rstrip()
-        
+
         # Skip empty lines
         if not line:
             return
-        
+
         # Detect tool usage patterns - expanded to catch more Claude output patterns
         tool_patterns = {
             r"Using tool:?\s*(\w+)": StreamEventType.TOOL_START,
@@ -246,7 +247,7 @@ class ClaudeStreamInterface:
             r"Let me use (\w+)": StreamEventType.TOOL_START,
             r"Using (\w+) to": StreamEventType.TOOL_START,
         }
-        
+
         for pattern, event_type in tool_patterns.items():
             match = re.search(pattern, line, re.IGNORECASE)
             if match:
@@ -258,10 +259,9 @@ class ClaudeStreamInterface:
                     metadata={"tool": tool_name, "line": line_num}
                 )
                 return
-        
+
         # Detect file operations
-        if re.search(r"Reading\s+file:?\s*(.+)", line, re.IGNORECASE):
-            match = re.search(r"Reading\s+file:?\s*(.+)", line, re.IGNORECASE)
+        if match := re.search(r"Reading\s+file:?\s*(.+)", line, re.IGNORECASE):
             file_path = match.group(1).strip()
             yield StreamEvent(
                 type=StreamEventType.READING_FILE,
@@ -269,9 +269,8 @@ class ClaudeStreamInterface:
                 metadata={"file": file_path, "operation": "read"}
             )
             return
-        
-        if re.search(r"Writing\s+to\s+file:?\s*(.+)", line, re.IGNORECASE):
-            match = re.search(r"Writing\s+to\s+file:?\s*(.+)", line, re.IGNORECASE)
+
+        if match := re.search(r"Writing\s+to\s+file:?\s*(.+)", line, re.IGNORECASE):
             file_path = match.group(1).strip()
             yield StreamEvent(
                 type=StreamEventType.WRITING_FILE,
@@ -279,10 +278,9 @@ class ClaudeStreamInterface:
                 metadata={"file": file_path, "operation": "write"}
             )
             return
-        
+
         # Detect command execution
-        if re.search(r"Running\s+command:?\s*(.+)", line, re.IGNORECASE):
-            match = re.search(r"Running\s+command:?\s*(.+)", line, re.IGNORECASE)
+        if match := re.search(r"Running\s+command:?\s*(.+)", line, re.IGNORECASE):
             command = match.group(1).strip()
             yield StreamEvent(
                 type=StreamEventType.RUNNING_COMMAND,
@@ -290,9 +288,8 @@ class ClaudeStreamInterface:
                 metadata={"command": command}
             )
             return
-        
-        if re.search(r"^\$\s+(.+)", line):
-            match = re.search(r"^\$\s+(.+)", line)
+
+        if match := re.search(r"^\$\s+(.+)", line):
             command = match.group(1).strip()
             yield StreamEvent(
                 type=StreamEventType.RUNNING_COMMAND,
@@ -300,7 +297,7 @@ class ClaudeStreamInterface:
                 metadata={"command": command, "shell": True}
             )
             return
-        
+
         # Detect command output (indented lines often indicate output)
         if line.startswith("  ") or line.startswith("\t"):
             yield StreamEvent(
@@ -309,7 +306,7 @@ class ClaudeStreamInterface:
                 metadata={"indented": True}
             )
             return
-        
+
         # Detect thinking/planning
         thinking_patterns = [
             r"Thinking",
@@ -322,7 +319,7 @@ class ClaudeStreamInterface:
             r"Next,",
             r"Now,",
         ]
-        
+
         for pattern in thinking_patterns:
             if re.search(pattern, line, re.IGNORECASE):
                 yield StreamEvent(
@@ -331,7 +328,7 @@ class ClaudeStreamInterface:
                     metadata={"pattern": pattern}
                 )
                 return
-        
+
         # Detect progress indicators
         if "%" in line or re.search(r"\d+/\d+", line):
             yield StreamEvent(
@@ -340,7 +337,7 @@ class ClaudeStreamInterface:
                 metadata={"has_percentage": "%" in line}
             )
             return
-        
+
         # Detect errors
         if any(word in line.lower() for word in ["error", "failed", "exception", "traceback"]):
             yield StreamEvent(
@@ -349,7 +346,7 @@ class ClaudeStreamInterface:
                 metadata={"severity": "error"}
             )
             return
-        
+
         # Detect warnings
         if any(word in line.lower() for word in ["warning", "warn", "caution"]):
             yield StreamEvent(
@@ -358,30 +355,30 @@ class ClaudeStreamInterface:
                 metadata={"severity": "warning"}
             )
             return
-        
+
         # Default to text output
         yield StreamEvent(
             type=StreamEventType.TEXT,
             content=line,
             metadata={"line": line_num}
         )
-    
-    async def _read_stdout(self, process):
+
+    async def _read_stdout(self, stdout: asyncio.StreamReader) -> None:
         """Read stdout in background."""
         try:
             while True:
-                line = await process.stdout.readline()
+                line = await stdout.readline()
                 if not line:
                     break
-        except:
+        except Exception:
             pass
-    
-    async def _read_stderr(self, process):
+
+    async def _read_stderr(self, stderr: asyncio.StreamReader) -> None:
         """Read stderr in background."""
         try:
             while True:
-                line = await process.stderr.readline()
+                line = await stderr.readline()
                 if not line:
                     break
-        except:
+        except Exception:
             pass

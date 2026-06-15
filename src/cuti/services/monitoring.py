@@ -3,15 +3,15 @@ System monitoring and metrics collection.
 """
 
 import json
+import sqlite3
 import time
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-import psutil
-import subprocess
-from dataclasses import dataclass, asdict
 from threading import Lock
-import sqlite3
+from typing import Any
+
+import psutil  # type: ignore[import-untyped]
 
 
 @dataclass
@@ -27,7 +27,7 @@ class SystemMetrics:
     disk_total_gb: float
     network_sent_mb: float
     network_recv_mb: float
-    load_average: Optional[List[float]] = None
+    load_average: list[float] | None = None
 
 
 @dataclass
@@ -35,7 +35,7 @@ class ClaudeCodeMetrics:
     """Claude Code specific metrics."""
     timestamp: datetime
     tokens_used: int
-    tokens_remaining: Optional[int]
+    tokens_remaining: int | None
     requests_made: int
     successful_requests: int
     failed_requests: int
@@ -46,19 +46,19 @@ class ClaudeCodeMetrics:
 
 class SystemMonitor:
     """Monitor system performance and Claude Code usage."""
-    
-    def __init__(self, base_dir: str = "~/.cuti"):
+
+    def __init__(self, base_dir: str = "~/.cuti") -> None:
         self.base_dir = Path(base_dir).expanduser()
         self.metrics_db = self.base_dir / "metrics.db"
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self._lock = Lock()
-        self._network_counters = None
-        self._last_network_time = None
-        
+        self._network_counters: Any | None = None
+        self._last_network_time: float | None = None
+
         self._init_database()
-        
-    def _init_database(self):
+
+    def _init_database(self) -> None:
         """Initialize metrics database."""
         with sqlite3.connect(self.metrics_db) as conn:
             # System metrics table
@@ -78,7 +78,7 @@ class SystemMonitor:
                     load_average TEXT
                 )
             """)
-            
+
             # Claude Code metrics table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS claude_metrics (
@@ -94,7 +94,7 @@ class SystemMonitor:
                     cost_estimate REAL DEFAULT 0
                 )
             """)
-            
+
             # Token usage tracking table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS token_usage (
@@ -108,8 +108,8 @@ class SystemMonitor:
                     model_used TEXT
                 )
             """)
-            
-            # Performance events table  
+
+            # Performance events table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS performance_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,43 +119,43 @@ class SystemMonitor:
                     severity TEXT DEFAULT 'info'
                 )
             """)
-            
+
             # Create indexes
             conn.execute("CREATE INDEX IF NOT EXISTS idx_system_timestamp ON system_metrics(timestamp)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_claude_timestamp ON claude_metrics(timestamp)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_token_timestamp ON token_usage(timestamp)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_events_timestamp ON performance_events(timestamp)")
-            
+
             conn.commit()
-    
-    def get_system_metrics(self) -> Dict[str, Any]:
+
+    def get_system_metrics(self) -> dict[str, Any]:
         """Get current system metrics."""
         try:
             # CPU
             cpu_percent = psutil.cpu_percent(interval=1)
-            
+
             # Memory
             memory = psutil.virtual_memory()
             memory_percent = memory.percent
             memory_used_gb = memory.used / (1024**3)
             memory_total_gb = memory.total / (1024**3)
-            
+
             # Disk
             disk = psutil.disk_usage('/')
             disk_percent = (disk.used / disk.total) * 100
             disk_used_gb = disk.used / (1024**3)
             disk_total_gb = disk.total / (1024**3)
-            
+
             # Network
             network_sent_mb, network_recv_mb = self._get_network_usage()
-            
+
             # Load average (Unix-like systems only)
             load_average = None
             try:
                 load_average = list(psutil.getloadavg())
             except (AttributeError, OSError):
                 pass  # Windows doesn't support load average
-            
+
             metrics = SystemMetrics(
                 timestamp=datetime.now(),
                 cpu_percent=round(cpu_percent, 2),
@@ -169,45 +169,45 @@ class SystemMonitor:
                 network_recv_mb=round(network_recv_mb, 2),
                 load_average=load_average
             )
-            
+
             # Store in database
             self._store_system_metrics(metrics)
-            
+
             return asdict(metrics)
-            
+
         except Exception as e:
             print(f"Error getting system metrics: {e}")
             return {}
-    
+
     def _get_network_usage(self) -> tuple[float, float]:
         """Get network usage in MB/s."""
         try:
             current_counters = psutil.net_io_counters()
             current_time = time.time()
-            
+
             if self._network_counters and self._last_network_time:
                 time_delta = current_time - self._last_network_time
                 if time_delta > 0:
                     sent_delta = current_counters.bytes_sent - self._network_counters.bytes_sent
                     recv_delta = current_counters.bytes_recv - self._network_counters.bytes_recv
-                    
+
                     sent_mb_per_sec = (sent_delta / (1024**2)) / time_delta
                     recv_mb_per_sec = (recv_delta / (1024**2)) / time_delta
-                    
+
                     self._network_counters = current_counters
                     self._last_network_time = current_time
-                    
+
                     return sent_mb_per_sec, recv_mb_per_sec
-            
+
             # First run or error case
             self._network_counters = current_counters
             self._last_network_time = current_time
             return 0.0, 0.0
-            
+
         except Exception:
             return 0.0, 0.0
-    
-    def _store_system_metrics(self, metrics: SystemMetrics):
+
+    def _store_system_metrics(self, metrics: SystemMetrics) -> None:
         """Store system metrics in database."""
         try:
             with sqlite3.connect(self.metrics_db) as conn:
@@ -233,7 +233,7 @@ class SystemMonitor:
                 conn.commit()
         except Exception as e:
             print(f"Error storing system metrics: {e}")
-    
+
     def record_claude_request(
         self,
         prompt_id: str,
@@ -244,13 +244,13 @@ class SystemMonitor:
         rate_limited: bool = False,
         model: str = "claude-3",
         cost_per_input_token: float = 0.000015,
-        cost_per_output_token: float = 0.000075
-    ):
+        cost_per_output_token: float = 0.000075,
+    ) -> None:
         """Record a Claude Code request for monitoring."""
         try:
             total_tokens = input_tokens + output_tokens
             cost = (input_tokens * cost_per_input_token) + (output_tokens * cost_per_output_token)
-            
+
             with sqlite3.connect(self.metrics_db) as conn:
                 # Record token usage
                 conn.execute("""
@@ -267,27 +267,33 @@ class SystemMonitor:
                     cost,
                     model
                 ))
-                
+
                 # Update Claude metrics summary
                 self._update_claude_metrics_summary(conn, response_time, success, rate_limited)
-                
+
                 conn.commit()
-                
+
         except Exception as e:
             print(f"Error recording Claude request: {e}")
-    
-    def _update_claude_metrics_summary(self, conn, response_time: float, success: bool, rate_limited: bool):
+
+    def _update_claude_metrics_summary(
+        self,
+        conn: sqlite3.Connection,
+        response_time: float,
+        success: bool,
+        rate_limited: bool,
+    ) -> None:
         """Update Claude metrics summary."""
         today = datetime.now().date()
-        
+
         # Get or create today's metrics
         cursor = conn.execute("""
-            SELECT * FROM claude_metrics 
-            WHERE DATE(timestamp) = ? 
-            ORDER BY timestamp DESC 
+            SELECT * FROM claude_metrics
+            WHERE DATE(timestamp) = ?
+            ORDER BY timestamp DESC
             LIMIT 1
         """, (today,))
-        
+
         row = cursor.fetchone()
         if row:
             # Update existing
@@ -295,13 +301,13 @@ class SystemMonitor:
             new_successful = row[5] + (1 if success else 0)
             new_failed = row[6] + (1 if not success and not rate_limited else 0)
             new_rate_limited = row[7] + (1 if rate_limited else 0)
-            
+
             # Calculate new average response time
             old_avg = row[8] or 0
             new_avg = ((old_avg * (new_requests - 1)) + response_time) / new_requests
-            
+
             conn.execute("""
-                UPDATE claude_metrics 
+                UPDATE claude_metrics
                 SET requests_made = ?, successful_requests = ?, failed_requests = ?,
                     rate_limited_requests = ?, avg_response_time = ?
                 WHERE id = ?
@@ -321,25 +327,25 @@ class SystemMonitor:
                 1 if rate_limited else 0,
                 response_time
             ))
-    
-    def get_token_usage_stats(self, days: int = 30) -> Dict[str, Any]:
+
+    def get_token_usage_stats(self, days: int = 30) -> dict[str, Any]:
         """Get token usage statistics."""
         try:
             with sqlite3.connect(self.metrics_db) as conn:
                 start_date = datetime.now() - timedelta(days=days)
-                
+
                 # Daily usage
                 cursor = conn.execute("""
-                    SELECT DATE(timestamp) as date, 
+                    SELECT DATE(timestamp) as date,
                            SUM(total_tokens) as tokens,
                            SUM(cost) as cost,
                            COUNT(*) as requests
-                    FROM token_usage 
+                    FROM token_usage
                     WHERE timestamp >= ?
                     GROUP BY DATE(timestamp)
                     ORDER BY date DESC
                 """, (start_date,))
-                
+
                 daily_usage = [
                     {
                         'date': row[0],
@@ -349,17 +355,17 @@ class SystemMonitor:
                     }
                     for row in cursor
                 ]
-                
+
                 # Total stats
                 cursor = conn.execute("""
                     SELECT SUM(total_tokens) as total_tokens,
                            SUM(cost) as total_cost,
                            COUNT(*) as total_requests,
                            AVG(total_tokens) as avg_tokens_per_request
-                    FROM token_usage 
+                    FROM token_usage
                     WHERE timestamp >= ?
                 """, (start_date,))
-                
+
                 row = cursor.fetchone()
                 totals = {
                     'total_tokens': row[0] or 0,
@@ -367,18 +373,18 @@ class SystemMonitor:
                     'total_requests': row[2] or 0,
                     'avg_tokens_per_request': row[3] or 0
                 }
-                
+
                 # Model breakdown
                 cursor = conn.execute("""
-                    SELECT model_used, 
+                    SELECT model_used,
                            SUM(total_tokens) as tokens,
                            SUM(cost) as cost,
                            COUNT(*) as requests
-                    FROM token_usage 
+                    FROM token_usage
                     WHERE timestamp >= ?
                     GROUP BY model_used
                 """, (start_date,))
-                
+
                 model_breakdown = [
                     {
                         'model': row[0],
@@ -388,46 +394,46 @@ class SystemMonitor:
                     }
                     for row in cursor
                 ]
-                
+
                 return {
                     'daily_usage': daily_usage,
                     'totals': totals,
                     'model_breakdown': model_breakdown,
                     'period_days': days
                 }
-                
+
         except Exception as e:
             print(f"Error getting token usage stats: {e}")
             return {}
-    
-    def get_performance_metrics(self, hours: int = 24) -> Dict[str, Any]:
+
+    def get_performance_metrics(self, hours: int = 24) -> dict[str, Any]:
         """Get performance metrics for the specified time period."""
         try:
             with sqlite3.connect(self.metrics_db) as conn:
                 start_time = datetime.now() - timedelta(hours=hours)
-                
+
                 # System performance trends
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("""
                     SELECT timestamp, cpu_percent, memory_percent, disk_percent
-                    FROM system_metrics 
+                    FROM system_metrics
                     WHERE timestamp >= ?
                     ORDER BY timestamp
                 """, (start_time,))
-                
+
                 system_trends = [dict(row) for row in cursor]
-                
+
                 # Claude performance
                 cursor = conn.execute("""
-                    SELECT timestamp, avg_response_time, successful_requests, 
+                    SELECT timestamp, avg_response_time, successful_requests,
                            failed_requests, rate_limited_requests
-                    FROM claude_metrics 
+                    FROM claude_metrics
                     WHERE timestamp >= ?
                     ORDER BY timestamp
                 """, (start_time,))
-                
+
                 claude_performance = [dict(row) for row in cursor]
-                
+
                 # Calculate averages for the period
                 cursor = conn.execute("""
                     SELECT AVG(cpu_percent) as avg_cpu,
@@ -435,25 +441,30 @@ class SystemMonitor:
                            AVG(disk_percent) as avg_disk,
                            MAX(cpu_percent) as max_cpu,
                            MAX(memory_percent) as max_memory
-                    FROM system_metrics 
+                    FROM system_metrics
                     WHERE timestamp >= ?
                 """, (start_time,))
-                
+
                 row = cursor.fetchone()
                 system_averages = dict(row) if row else {}
-                
+
                 return {
                     'system_trends': system_trends,
                     'claude_performance': claude_performance,
                     'system_averages': system_averages,
                     'period_hours': hours
                 }
-                
+
         except Exception as e:
             print(f"Error getting performance metrics: {e}")
             return {}
-    
-    def log_performance_event(self, event_type: str, event_data: Dict[str, Any], severity: str = 'info'):
+
+    def log_performance_event(
+        self,
+        event_type: str,
+        event_data: dict[str, Any],
+        severity: str = 'info',
+    ) -> None:
         """Log a performance-related event."""
         try:
             with sqlite3.connect(self.metrics_db) as conn:
@@ -469,55 +480,55 @@ class SystemMonitor:
                 conn.commit()
         except Exception as e:
             print(f"Error logging performance event: {e}")
-    
-    def get_recent_events(self, limit: int = 50) -> List[Dict[str, Any]]:
+
+    def get_recent_events(self, limit: int = 50) -> list[dict[str, Any]]:
         """Get recent performance events."""
         try:
             with sqlite3.connect(self.metrics_db) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("""
                     SELECT timestamp, event_type, event_data, severity
-                    FROM performance_events 
-                    ORDER BY timestamp DESC 
+                    FROM performance_events
+                    ORDER BY timestamp DESC
                     LIMIT ?
                 """, (limit,))
-                
+
                 events = []
                 for row in cursor:
                     event = dict(row)
                     try:
                         event['event_data'] = json.loads(event['event_data'])
-                    except:
+                    except Exception:
                         pass  # Keep as string if not valid JSON
                     events.append(event)
-                
+
                 return events
-                
+
         except Exception as e:
             print(f"Error getting recent events: {e}")
             return []
-    
-    def cleanup_old_metrics(self, days_to_keep: int = 90):
+
+    def cleanup_old_metrics(self, days_to_keep: int = 90) -> None:
         """Clean up old metrics data."""
         try:
             cutoff_date = datetime.now() - timedelta(days=days_to_keep)
-            
+
             with sqlite3.connect(self.metrics_db) as conn:
                 # Clean up old system metrics
                 cursor = conn.execute("DELETE FROM system_metrics WHERE timestamp < ?", (cutoff_date,))
                 system_deleted = cursor.rowcount
-                
+
                 # Clean up old token usage (keep longer - 180 days)
                 token_cutoff = datetime.now() - timedelta(days=180)
                 cursor = conn.execute("DELETE FROM token_usage WHERE timestamp < ?", (token_cutoff,))
                 token_deleted = cursor.rowcount
-                
+
                 # Clean up old events
                 cursor = conn.execute("DELETE FROM performance_events WHERE timestamp < ?", (cutoff_date,))
                 events_deleted = cursor.rowcount
-                
+
                 conn.commit()
-                
+
                 self.log_performance_event(
                     'metrics_cleanup',
                     {
@@ -528,19 +539,19 @@ class SystemMonitor:
                     },
                     'info'
                 )
-                
+
         except Exception as e:
             print(f"Error cleaning up old metrics: {e}")
-    
-    def get_health_check(self) -> Dict[str, Any]:
+
+    def get_health_check(self) -> dict[str, Any]:
         """Get system health status."""
         try:
             system_metrics = self.get_system_metrics()
-            
+
             # Define thresholds
             health_status = "healthy"
             issues = []
-            
+
             # Check CPU usage
             if system_metrics.get('cpu_percent', 0) > 80:
                 health_status = "warning"
@@ -548,7 +559,7 @@ class SystemMonitor:
             elif system_metrics.get('cpu_percent', 0) > 95:
                 health_status = "critical"
                 issues.append("Critical CPU usage")
-            
+
             # Check memory usage
             if system_metrics.get('memory_percent', 0) > 85:
                 health_status = "warning"
@@ -556,7 +567,7 @@ class SystemMonitor:
             elif system_metrics.get('memory_percent', 0) > 95:
                 health_status = "critical"
                 issues.append("Critical memory usage")
-            
+
             # Check disk usage
             if system_metrics.get('disk_percent', 0) > 85:
                 health_status = "warning"
@@ -564,7 +575,7 @@ class SystemMonitor:
             elif system_metrics.get('disk_percent', 0) > 95:
                 health_status = "critical"
                 issues.append("Critical disk usage")
-            
+
             # Check database connectivity
             try:
                 with sqlite3.connect(self.metrics_db, timeout=5) as conn:
@@ -572,50 +583,50 @@ class SystemMonitor:
             except Exception:
                 health_status = "critical"
                 issues.append("Database connectivity issues")
-            
+
             return {
                 'status': health_status,
                 'issues': issues,
                 'timestamp': datetime.now().isoformat(),
                 'system_metrics': system_metrics
             }
-            
+
         except Exception as e:
             return {
                 'status': 'critical',
                 'issues': [f"Health check failed: {str(e)}"],
                 'timestamp': datetime.now().isoformat()
             }
-    
+
     def export_metrics(self, output_file: str, format: str = 'json', days: int = 30) -> bool:
         """Export metrics data to file."""
         try:
             start_date = datetime.now() - timedelta(days=days)
-            
+
             with sqlite3.connect(self.metrics_db) as conn:
                 conn.row_factory = sqlite3.Row
-                
+
                 # Get all metrics
                 system_cursor = conn.execute("""
                     SELECT * FROM system_metrics WHERE timestamp >= ? ORDER BY timestamp
                 """, (start_date,))
                 system_metrics = [dict(row) for row in system_cursor]
-                
+
                 claude_cursor = conn.execute("""
-                    SELECT * FROM claude_metrics WHERE timestamp >= ? ORDER BY timestamp  
+                    SELECT * FROM claude_metrics WHERE timestamp >= ? ORDER BY timestamp
                 """, (start_date,))
                 claude_metrics = [dict(row) for row in claude_cursor]
-                
+
                 token_cursor = conn.execute("""
                     SELECT * FROM token_usage WHERE timestamp >= ? ORDER BY timestamp
                 """, (start_date,))
                 token_usage = [dict(row) for row in token_cursor]
-                
+
                 events_cursor = conn.execute("""
                     SELECT * FROM performance_events WHERE timestamp >= ? ORDER BY timestamp
                 """, (start_date,))
                 events = [dict(row) for row in events_cursor]
-                
+
                 # Prepare export data
                 export_data = {
                     'export_timestamp': datetime.now().isoformat(),
@@ -625,20 +636,20 @@ class SystemMonitor:
                     'token_usage': token_usage,
                     'performance_events': events
                 }
-                
+
                 # Write to file
                 output_path = Path(output_file)
-                
+
                 if format.lower() == 'json':
                     with open(output_path, 'w', encoding='utf-8') as f:
                         json.dump(export_data, f, indent=2, default=str)
                 elif format.lower() == 'csv':
                     import csv
-                    
+
                     # Export each table to separate CSV files
                     base_name = output_path.stem
                     output_dir = output_path.parent
-                    
+
                     for table_name, data in export_data.items():
                         if isinstance(data, list) and data:
                             csv_file = output_dir / f"{base_name}_{table_name}.csv"
@@ -648,9 +659,9 @@ class SystemMonitor:
                                 writer.writerows(data)
                 else:
                     raise ValueError(f"Unsupported format: {format}")
-                
+
                 return True
-                
+
         except Exception as e:
             print(f"Error exporting metrics: {e}")
             return False

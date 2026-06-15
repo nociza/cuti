@@ -2,23 +2,23 @@
 Container status command - shows all cuti containers grouped by workspace.
 """
 
-import subprocess
 import json
-from pathlib import Path
-from typing import Dict, List, Tuple
+import subprocess
 from collections import defaultdict
+from pathlib import Path
+from typing import Any
 
 import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 app = typer.Typer()
 console = Console()
 
 
-def get_container_info() -> Dict[str, List[Dict]]:
+def get_container_info() -> dict[str, list[dict[str, Any]]]:
     """Get information about all cuti-dev containers grouped by workspace."""
     try:
         # Get all containers using cuti-dev-universal image
@@ -28,12 +28,12 @@ def get_container_info() -> Dict[str, List[Dict]]:
             text=True,
             timeout=5
         )
-        
+
         if result.returncode != 0 or not result.stdout.strip():
             return {}
-        
-        containers_by_workspace = defaultdict(list)
-        
+
+        containers_by_workspace: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+
         # Parse each container's JSON
         for line in result.stdout.strip().split('\n'):
             if not line:
@@ -41,7 +41,7 @@ def get_container_info() -> Dict[str, List[Dict]]:
             try:
                 container = json.loads(line)
                 container_id = container.get('ID', '')[:12]
-                
+
                 # Get detailed inspect info for mount paths
                 inspect_result = subprocess.run(
                     ["docker", "inspect", container_id],
@@ -49,21 +49,18 @@ def get_container_info() -> Dict[str, List[Dict]]:
                     text=True,
                     timeout=5
                 )
-                
+
                 if inspect_result.returncode == 0:
                     inspect_data = json.loads(inspect_result.stdout)[0]
-                    
+
                     # Find the workspace mount
                     workspace_path = None
                     for mount in inspect_data.get('Mounts', []):
                         if mount.get('Destination') == '/workspace':
                             workspace_path = mount.get('Source')
                             break
-                    
+
                     if workspace_path:
-                        # Extract project name from path
-                        project_name = Path(workspace_path).name
-                        
                         container_info = {
                             'id': container_id,
                             'name': container.get('Names', 'unknown'),
@@ -71,14 +68,14 @@ def get_container_info() -> Dict[str, List[Dict]]:
                             'created': container.get('CreatedAt', 'unknown'),
                             'workspace_path': workspace_path
                         }
-                        
+
                         containers_by_workspace[workspace_path].append(container_info)
             except (json.JSONDecodeError, KeyError, TypeError) as e:
                 console.print(f"[yellow]Warning: Could not parse container info: {e}[/yellow]")
                 continue
-        
+
         return dict(containers_by_workspace)
-        
+
     except subprocess.TimeoutExpired:
         console.print("[red]Error: Docker command timed out[/red]")
         return {}
@@ -93,25 +90,25 @@ def get_container_info() -> Dict[str, List[Dict]]:
 @app.command()
 def status(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed information"),
-    json_output: bool = typer.Option(False, "--json", help="Output in JSON format")
-):
+    json_output: bool = typer.Option(False, "--json", help="Output in JSON format"),
+) -> None:
     """Show status of all cuti containers grouped by workspace."""
-    
+
     containers = get_container_info()
-    
+
     if json_output:
         import json as json_lib
         console.print(json_lib.dumps(containers, indent=2))
         return
-    
+
     if not containers:
         console.print("[yellow]No cuti containers are currently running[/yellow]")
         return
-    
+
     # Create summary panel
     total_containers = sum(len(c) for c in containers.values())
     total_workspaces = len(containers)
-    
+
     summary = Panel(
         f"[bold cyan]Container Summary[/bold cyan]\n"
         f"Total Containers: [green]{total_containers}[/green]\n"
@@ -121,7 +118,7 @@ def status(
     )
     console.print(summary)
     console.print()
-    
+
     # Create table for each workspace
     for workspace_path, container_list in sorted(containers.items()):
         # Create a table for this workspace
@@ -133,14 +130,14 @@ def status(
             header_style="bold magenta",
             title_style="bold blue"
         )
-        
+
         table.add_column("Container ID", style="cyan", width=14)
         table.add_column("Name", style="green")
         table.add_column("Status", style="yellow")
-        
+
         if verbose:
             table.add_column("Created", style="dim")
-        
+
         # Add rows for each container
         for container in container_list:
             if verbose:
@@ -156,10 +153,10 @@ def status(
                     container['name'],
                     container['status']
                 )
-        
+
         console.print(table)
         console.print()
-    
+
     # Add helpful commands
     console.print("[dim]Commands:[/dim]")
     console.print("[dim]• Stop a container: docker stop <container-id>[/dim]")
@@ -169,37 +166,37 @@ def status(
 
 @app.command()
 def stop_all(
-    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")
-):
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+) -> None:
     """Stop all running cuti containers."""
-    
+
     containers = get_container_info()
-    
+
     if not containers:
         console.print("[yellow]No cuti containers are currently running[/yellow]")
         return
-    
+
     total_containers = sum(len(c) for c in containers.values())
-    
+
     if not force:
         console.print(f"[yellow]This will stop {total_containers} container(s) across {len(containers)} workspace(s)[/yellow]")
         if not typer.confirm("Continue?"):
             raise typer.Abort()
-    
+
     console.print("[cyan]Stopping all cuti containers...[/cyan]")
-    
+
     # Get all container IDs
     all_ids = []
     for container_list in containers.values():
         all_ids.extend([c['id'] for c in container_list])
-    
+
     # Stop all containers
     result = subprocess.run(
         ["docker", "stop"] + all_ids,
         capture_output=True,
         text=True
     )
-    
+
     if result.returncode == 0:
         console.print(f"[green]✅ Successfully stopped {total_containers} container(s)[/green]")
     else:
@@ -210,22 +207,22 @@ def stop_all(
 @app.command()
 def cleanup(
     days: int = typer.Option(7, "--days", "-d", help="Remove containers older than N days"),
-    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")
-):
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+) -> None:
     """Clean up old stopped cuti containers."""
-    
+
     # Get all stopped containers
     result = subprocess.run(
-        ["docker", "ps", "-a", "--filter", "ancestor=cuti-dev-universal", 
+        ["docker", "ps", "-a", "--filter", "ancestor=cuti-dev-universal",
          "--filter", "status=exited", "--format", "json"],
         capture_output=True,
         text=True
     )
-    
+
     if result.returncode != 0 or not result.stdout.strip():
         console.print("[yellow]No stopped cuti containers found[/yellow]")
         return
-    
+
     to_remove = []
     for line in result.stdout.strip().split('\n'):
         try:
@@ -234,24 +231,24 @@ def cleanup(
             # Docker's CreatedAt format: "2024-01-15 10:30:45 -0500 EST"
             # For simplicity, we'll remove all stopped containers
             to_remove.append(container['ID'][:12])
-        except:
+        except Exception:
             continue
-    
+
     if not to_remove:
         console.print("[yellow]No stopped containers to clean up[/yellow]")
         return
-    
+
     if not force:
         console.print(f"[yellow]This will remove {len(to_remove)} stopped container(s)[/yellow]")
         if not typer.confirm("Continue?"):
             raise typer.Abort()
-    
+
     result = subprocess.run(
         ["docker", "rm"] + to_remove,
         capture_output=True,
         text=True
     )
-    
+
     if result.returncode == 0:
         console.print(f"[green]✅ Removed {len(to_remove)} stopped container(s)[/green]")
     else:
