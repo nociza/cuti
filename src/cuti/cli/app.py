@@ -214,7 +214,7 @@ if providers_app:
     )
 if openclaw_app:
     app.add_typer(
-        openclaw_app, name="openclaw", help="Run OpenClaw inside the Qt container"
+        openclaw_app, name="openclaw", help="Run OpenClaw inside the cuti OpenClaw container"
     )
 if history_app:
     app.add_typer(

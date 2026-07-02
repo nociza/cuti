@@ -12,7 +12,7 @@ from rich.console import Console
 from ...services.provider_host import ProviderHostService
 
 app = typer.Typer(
-    help="Run OpenClaw inside the cuti Qt container with provider state and dependencies wired automatically.",
+    help="Run OpenClaw inside the cuti provider-aware container with provider state and dependencies wired automatically.",
     invoke_without_command=True,
     no_args_is_help=False,
 )
@@ -72,14 +72,14 @@ def main(
     update: bool = typer.Option(
         False,
         "--update",
-        help="Run `openclaw update` inside the Qt container.",
+        help="Run `openclaw update` inside the cuti OpenClaw container.",
     ),
     version: bool = typer.Option(
         False,
         "--version",
         "-V",
         "-v",
-        help="Print the OpenClaw CLI version from inside the Qt container.",
+        help="Print the OpenClaw CLI version from inside the cuti OpenClaw container.",
     ),
 ) -> None:
     """Capture OpenClaw root flags before dispatching to a command wrapper."""
@@ -203,7 +203,7 @@ def onboard(
         metavar="[EXTRA...]",
     ),
 ) -> None:
-    """Run OpenClaw onboarding in the Qt container."""
+    """Run OpenClaw onboarding in the cuti OpenClaw container."""
 
     args = ["onboard"]
     if install_daemon:
@@ -233,7 +233,7 @@ def doctor(
     ),
     rebuild: bool = typer.Option(False, "--rebuild", help="Rebuild the container image first."),
 ) -> None:
-    """Run OpenClaw doctor in the Qt container."""
+    """Run OpenClaw doctor in the cuti OpenClaw container."""
 
     args = ["doctor"]
     if repair:
@@ -447,7 +447,7 @@ def _make_forward_command(
         no_docker_socket: bool = typer.Option(
             False,
             "--no-docker-socket",
-            help="Do not mount the host Docker socket into the Qt container.",
+            help="Do not mount the host Docker socket into the cuti OpenClaw container.",
         ),
     ) -> None:
         _run_openclaw(
@@ -463,7 +463,7 @@ def _make_forward_command(
 
 
 # Mirrors OpenClaw's source-defined command descriptor surface. Plugin-added
-# command roots can still be reached through `qt-openclaw run <command> ...`.
+# command roots can still be reached through `cuti openclaw run <command> ...`.
 _SOURCE_BACKED_FORWARD_COMMANDS = [
     ("setup", "Initialize OpenClaw local config and workspace.", True),
     ("configure", "Run OpenClaw's interactive configuration flow.", True),
@@ -561,7 +561,7 @@ def run(
     rebuild: bool = typer.Option(False, "--rebuild", help="Rebuild the container image first."),
     interactive: bool = typer.Option(False, "--interactive", "-i", help="Allocate a TTY."),
 ) -> None:
-    """Run any OpenClaw CLI command inside the Qt container."""
+    """Run any OpenClaw CLI command inside the cuti OpenClaw container."""
 
     forwarded = _collect_forwarded(ctx, args)
     _run_openclaw(forwarded, rebuild=rebuild, interactive=interactive)
