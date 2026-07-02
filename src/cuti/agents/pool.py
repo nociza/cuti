@@ -1,5 +1,5 @@
 """
-Agent pool management for multi-agent orchestration.
+Agent pool management for experimental local agent workflows.
 """
 
 import asyncio

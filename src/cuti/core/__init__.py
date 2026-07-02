@@ -1,5 +1,5 @@
 """
-Core functionality for cuti - data models, queue management, storage, and configuration.
+Core functionality for cuti - data models, legacy queue storage, and configuration.
 """
 
 from .config import CutiConfig

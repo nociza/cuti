@@ -16,7 +16,7 @@ def main() -> None:
     """Main entry point for uvx cuti command."""
     parser = argparse.ArgumentParser(
         prog="cuti",
-        description="Production-ready cuti system with a read-only ops console",
+        description="Provider-aware AI development runtime with a read-only ops console",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -25,9 +25,9 @@ Examples:
   uvx cuti --host 0.0.0.0     # Bind to all interfaces
   uvx cuti /path/to/project   # Start ops console for specific directory
 
-The ops console is read-only. Use the CLI for provider changes, auth, and queue execution.
-Claude workspace state will be inspected from the working directory you specify (or current directory).
-Access the console at http://localhost:8000
+    The ops console is read-only. Use the CLI for provider changes, auth, and native provider execution.
+    Claude workspace state will be inspected from the working directory you specify (or current directory).
+    Access the console at http://localhost:8000
         """
     )
 
@@ -35,7 +35,7 @@ Access the console at http://localhost:8000
         "working_directory",
         nargs="?",
         default=None,
-        help="Working directory for Claude Code (default: current directory)"
+        help="Workspace to inspect (default: current directory)"
     )
     parser.add_argument(
         "--host",

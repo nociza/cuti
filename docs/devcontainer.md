@@ -98,16 +98,16 @@ cuti container
 # Inside container, all commands work:
 cuti web          # Start read-only ops console (accessible at http://localhost:8000)
 cuti cli          # Start interactive CLI
-cuti agent list   # List available agents
+cuti providers list # Inspect provider selection
 claude --help     # Use Claude CLI (already authenticated)
 ```
 
 ### Non-Interactive Commands
 ```bash
-# Run cuti commands
-cuti container "cuti add 'Review this code and suggest improvements'"
-cuti container "cuti start"
-cuti container "cuti status"
+# Run provider-native commands
+cuti container "claude -p 'Review this code and suggest improvements'"
+cuti container "codex exec 'summarize this repository'"
+cuti container "cuti providers doctor"
 
 # Run Claude directly
 cuti container "claude 'What does this project do?'"
@@ -628,8 +628,8 @@ To improve dev container support:
 
 ## Related Documentation
 
-- [Todo System](todo-system.md) - Task management in cuti
-- [Rate Limit Handling](rate-limit-handling.md) - How cuti handles API limits
+- [Legacy Todo Helpers](todo-system.md) - Local todo helpers and legacy queue conversion
+- [Legacy Queue Rate Limit Handling](rate-limit-handling.md) - Older Claude queue retry behavior
 - [Main README](../README.md) - Project overview
 
 ## License

@@ -1,5 +1,5 @@
 """
-Queue-related CLI commands.
+Legacy Claude queue-related CLI commands.
 """
 
 import json
@@ -18,7 +18,7 @@ from ...services.history import PromptHistoryManager
 from ...services.queue_service import QueueManager
 from ...services.todo_service import TodoService
 
-queue_app = typer.Typer(help="Queue management commands")
+queue_app = typer.Typer(help="Legacy Claude queue commands")
 console = Console()
 
 
@@ -40,7 +40,7 @@ def start_queue(
     timeout: int = typer.Option(3600, help="Command timeout in seconds"),
     verbose: bool = typer.Option(False, "-v", "--verbose", help="Verbose output"),
 ) -> None:
-    """Start the queue processor."""
+    """Run the legacy Claude queue processor."""
     # Use environment variable if set, otherwise use provided storage_dir
     actual_storage_dir = os.getenv("CLAUDE_QUEUE_STORAGE_DIR", storage_dir)
     manager = QueueManager(actual_storage_dir, claude_command, check_interval, timeout)
@@ -53,7 +53,7 @@ def start_queue(
     try:
         manager.start(callback=status_callback if verbose else None)
     except KeyboardInterrupt:
-        rprint("\n[yellow]Queue processor stopped by user[/yellow]")
+        rprint("\n[yellow]Legacy queue processor stopped by user[/yellow]")
 
 
 @queue_app.command("add")
@@ -66,7 +66,7 @@ def add_prompt(
     estimated_tokens: int | None = typer.Option(None, "-t", "--estimated-tokens", help="Estimated tokens"),
     storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ) -> None:
-    """Add a prompt to the queue (supports aliases)."""
+    """Add a prompt to the legacy Claude queue (supports aliases)."""
     # Use current directory if not specified
     if working_dir is None:
         working_dir = os.getcwd()
@@ -95,7 +95,7 @@ def add_prompt(
 
     success = manager.add_prompt(queued_prompt)
     if success:
-        rprint(f"[green]✓[/green] Added prompt [bold]{queued_prompt.id}[/bold] to queue")
+        rprint(f"[green]✓[/green] Added prompt [bold]{queued_prompt.id}[/bold] to legacy queue")
     else:
         rprint("[red]✗ Failed to add prompt[/red]")
         raise typer.Exit(1)
@@ -120,7 +120,7 @@ def show_status(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
     storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ) -> None:
-    """Show queue status."""
+    """Show legacy queue status."""
     manager, _, _ = get_managers(storage_dir)
     state = manager.get_status()
     stats = state.get_stats()
@@ -186,7 +186,7 @@ def remove_prompt(
     prompt_id: str = typer.Argument(..., help="Prompt ID to remove"),
     storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ) -> None:
-    """Remove/cancel a prompt from the queue."""
+    """Remove/cancel a prompt from the legacy queue."""
     manager, _, _ = get_managers(storage_dir)
 
     success = manager.remove_prompt(prompt_id)
@@ -202,7 +202,7 @@ def list_prompts(
     status_filter: str | None = typer.Option(None, "-s", "--status", help="Filter by status"),
     storage_dir: str = typer.Option(".cuti", help="Storage directory"),
 ) -> None:
-    """List all prompts in the queue."""
+    """List all prompts in the legacy queue."""
     manager, _, _ = get_managers(storage_dir)
     state = manager.get_status()
 
@@ -217,7 +217,7 @@ def list_prompts(
         rprint(f"[yellow]No prompts found{filter_msg}[/yellow]")
         return
 
-    table = Table(title="Prompt Queue")
+    table = Table(title="Legacy Prompt Queue")
     table.add_column("ID", style="cyan")
     table.add_column("Status", style="magenta")
     table.add_column("Priority", style="blue")
@@ -255,7 +255,7 @@ def add_from_todo(
     priority: int = typer.Option(0, "-p", "--priority", help="Priority for prompts"),
     storage_dir: str = typer.Option(".cuti", help="Storage directory"),  # Changed default
 ) -> None:
-    """Create queue prompts from todo items."""
+    """Create legacy queue prompts from todo items."""
     manager, _, _ = get_managers(storage_dir)
     todo_service = TodoService(storage_dir)
 
@@ -303,4 +303,4 @@ def add_from_todo(
             rprint(f"[red]✗[/red] Failed to add prompt for todo: {todo.id}")
 
     if added_count > 0:
-        rprint(f"\n[green]Added {added_count} prompt(s) to queue from todos[/green]")
+        rprint(f"\n[green]Added {added_count} prompt(s) to legacy queue from todos[/green]")

@@ -95,7 +95,7 @@ function updateHeader(summary) {
     }
     if (queue) {
         const queued = summary?.queue?.status_counts?.queued || 0;
-        queue.textContent = summary?.queue?.available ? `${queued} queued` : 'queue unavailable';
+        queue.textContent = summary?.queue?.available ? `${queued} legacy queued` : 'legacy queue unavailable';
     }
     if (selected) {
         selected.textContent = selectedProviders.length ? selectedProviders.join(', ') : 'No providers selected';

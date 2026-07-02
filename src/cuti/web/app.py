@@ -38,7 +38,7 @@ def create_app(
 
     app = FastAPI(
         title="cuti Ops Console",
-        description="Read-only workspace operations console for provider readiness, queue state, and drift.",
+        description="Read-only workspace operations console for provider readiness, native activity, legacy queue state, and drift.",
         version="0.1.0",
     )
     app.add_middleware(
@@ -59,7 +59,7 @@ def create_app(
     except RuntimeError as exc:
         queue_warning = str(exc)
         print(f"Warning: {queue_warning}")
-        print("The ops console will still load, but queue inspection is limited until Claude is available.")
+        print("The ops console will still load, but legacy queue inspection is limited until Claude is available.")
 
     app.state.queue_manager = queue_manager
     app.state.queue_warning = queue_warning
@@ -111,7 +111,7 @@ def main() -> None:
         print(f"Working Directory: {working_dir}")
     print(f"Ops Console: http://{host}:{port}")
     print(f"API Docs: http://{host}:{port}/docs")
-    print("This UI is read-only. Use the CLI for provider changes, auth, and queue execution.")
+    print("This UI is read-only. Use provider CLIs for execution and the cuti CLI for provider changes/auth.")
     print()
 
     try:

@@ -1,6 +1,6 @@
-# Rate Limit Handling
+# Legacy Claude Queue Rate Limit Handling
 
-Cuti automatically handles Claude rate limits with intelligent retry logic.
+This page documents the older Cuti-managed Claude queue. It remains available for compatibility, but new automation should prefer provider-native execution such as Claude Code background sessions, Claude Code resume, Codex `exec`, Codex automations, or OpenClaw tasks.
 
 ## How it works
 
@@ -9,9 +9,9 @@ When Claude returns a rate limit message like:
 Claude usage limit reached. Your limit will reset at 9pm (America/New_York).
 ```
 
-Cuti will:
+Cuti's legacy queue will:
 1. Parse the exact reset time with timezone
-2. Pause the queue and wait for the reset
+2. Pause the legacy queue and wait for the reset
 3. Display countdown to next retry
 4. Automatically resume with "continue" after reset
 
@@ -21,7 +21,7 @@ Cuti will:
 - `Your limit will reset at 11:30pm (America/Los_Angeles)`
 - Generic rate limit messages (5-minute cooldown)
 
-## Queue behavior
+## Legacy queue behavior
 
 Rate-limited prompts:
 - Keep their position in the queue
@@ -34,10 +34,10 @@ Rate-limited prompts:
 
 Check rate limit status:
 ```bash
-cuti status
+cuti queue status
 ```
 
-The web UI shows:
+The ops console shows:
 - Rate-limited prompts
 - Reset times
 - Automatic retry schedule

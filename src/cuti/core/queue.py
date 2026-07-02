@@ -1,5 +1,5 @@
 """
-Core queue processing logic.
+Legacy Claude queue processing logic.
 """
 
 import signal
@@ -15,7 +15,7 @@ from .storage import PromptStorage
 
 
 class QueueProcessor:
-    """Core queue processing engine."""
+    """Legacy queue processing engine."""
 
     def __init__(
         self,
@@ -39,7 +39,7 @@ class QueueProcessor:
 
     def start(self, callback: Callable[[QueueState], None] | None = None) -> None:
         """Start the queue processing loop."""
-        print("Starting Queue Processor...")
+        print("Starting legacy queue processor...")
 
         is_working, message = self.claude_interface.test_connection()
         if not is_working:
@@ -49,7 +49,7 @@ class QueueProcessor:
         print(f"✓ {message}")
 
         self.state = self.storage.load_queue_state()
-        print(f"✓ Loaded queue with {len(self.state.prompts)} prompts")
+        print(f"✓ Loaded legacy queue with {len(self.state.prompts)} prompts")
 
         self.running = True
 
@@ -84,7 +84,7 @@ class QueueProcessor:
             self.storage.save_queue_state(self.state)
             print("✓ Queue state saved")
 
-        print("Queue processor stopped")
+            print("Legacy queue processor stopped")
 
     def _process_queue_iteration(
         self, callback: Callable[[QueueState], None] | None = None

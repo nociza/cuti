@@ -1,5 +1,5 @@
 """
-Task routing and coordination for multi-agent systems.
+Task routing and coordination for experimental local agent workflows.
 """
 
 import asyncio
@@ -252,7 +252,7 @@ class TaskRouter:
 
 
 class CoordinationEngine:
-    """Coordinates multi-agent collaboration."""
+    """Coordinates experimental local agent collaboration."""
 
     def __init__(self, agent_pool: AgentPool, router: TaskRouter):
         self.agent_pool = agent_pool

@@ -128,7 +128,7 @@ def test_ops_route_renders_workspace_ops_console(tmp_path: Path, monkeypatch) ->
 
     assert response.status_code == 200
     assert "Workspace Ops Console" in response.text
-    assert "Action queue" in response.text
+    assert "Attention items" in response.text
     assert "Suggested commands" in response.text
 
 

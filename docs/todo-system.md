@@ -1,6 +1,6 @@
-# Todo System
+# Legacy Todo Helpers
 
-Cuti includes a hierarchical todo list system for tracking tasks and goals.
+Cuti includes a local hierarchical todo helper for tracking tasks and goals. This is a compatibility feature, not the core product direction. Prefer provider-native todo/progress surfaces when Claude Code, Codex, OpenClaw, or another provider already exposes them.
 
 ## Architecture
 
@@ -37,12 +37,12 @@ cuti todo session --new "Feature Development"
 cuti todo session --show
 ```
 
-### Queue Integration
+### Legacy Queue Integration
 ```bash
-# Convert todo to queue prompt
+# Convert todo to legacy queue prompt
 cuti queue from-todo <todo-id>
 
-# Queue all pending todos
+# Add all pending todos to the legacy queue
 cuti queue from-todo --all-pending
 ```
 
@@ -108,11 +108,7 @@ Completion: 40%
 
 ## Claude Integration
 
-Claude Code automatically:
-- Checks `.cuti/GOAL.md` for tasks
-- Updates todo status when completing work
-- Creates sub-tasks for complex goals
-- Uses todo context for better task understanding
+Claude Code has its own native planning, todo, and session mechanisms. Cuti's local todo helpers can still provide workspace context, but they should not be treated as a replacement for provider-native progress tracking.
 
 See `CLAUDE.md` for Claude-specific instructions.
 
@@ -122,4 +118,4 @@ See `CLAUDE.md` for Claude-specific instructions.
 2. **Update status regularly**: Mark tasks as in_progress/completed
 3. **Use priorities**: Focus on critical/high priority items
 4. **Create sessions**: Group related work together
-5. **Convert to prompts**: Queue todos for automated processing
+5. **Prefer native execution**: Use provider-native sessions/tasks for automated work; convert todos to the legacy queue only for compatibility workflows

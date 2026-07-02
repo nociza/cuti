@@ -1,4 +1,4 @@
-# Cuti - AI Development Environment & Multi-Agent Orchestration
+# Cuti - Provider-Aware AI Development Runtime
 
 <div align="center">
 
@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/pypi/dm/cuti?color=green&label=Downloads%2FMonth)](https://pypi.org/project/cuti/)
 [![Downloads Total](https://static.pepy.tech/badge/cuti)](https://pepy.tech/project/cuti)
 
-**Instant containerized development with Claude Code by default, plus provider-aware agent tooling**
+**Instant containerized development with Claude Code by default, plus provider-aware runtime wiring for Codex, OpenClaw, Hermes, and OpenCode**
 
 [PyPI](https://pypi.org/project/cuti/) • [Documentation](https://cutils.org/) • [GitHub](https://github.com/nociza/cuti)
 
@@ -42,21 +42,21 @@ That's it! You now have a fully configured AI-powered coding environment with:
 
 The Docker container provides isolated, reproducible AI-assisted development with Claude Code mode as the default. Each `cuti container` run refreshes Claude Code in the persistent container runtime when Claude Code mode is active, so subsequent containers pick up the newest available Claude CLI without a rebuild.
 
-## 🌟 Key Features - AI Agent Orchestration & Automation
+## 🌟 Key Features - Provider Runtime & Observability
 
-Build with multiple AI models and intelligent task management:
-- **Multi-agent orchestration** - Claude API, Gemini integration
-- **Command queuing system** with priority execution
-- **Read-only ops console** - Launch with `cuti web` to inspect provider readiness, queue state, recent activity, and workspace drift
-- **Smart rate limiting** - Automatic retry & backoff
-- **Task automation** - Built-in todo system for AI agents
+Run native AI coding tools in a consistent local environment:
+- **Provider-aware containers** - Claude Code by default, with opt-in Codex, OpenClaw, Hermes, and OpenCode wiring
+- **Read-only ops console** - Launch with `cuti web` to inspect provider readiness, recent native activity, legacy queue state, and workspace drift
+- **Persistent provider state** - Mount auth, config, skills, and runtime installs across container sessions
+- **Native CLI coordination** - Use Claude Code, Codex, OpenClaw, and other provider CLIs directly instead of reimplementing their agent loops
 - **Claude version switching** - Easy CLI version management
 - **Agent providers** - Run Claude Code mode by default, switch to OpenClaw mode with `cuti container --openclaw`, and add Codex, Claude Code, OpenCode, or other providers through `cuti providers ...`
 - **Provider-aware setup** - cuti mounts provider auth/config/skills, persistent CLI runtimes, and workspace instruction files for enabled tools
 - **Turnkey OpenClaw** - Run the current OpenClaw gateway, channels, browser, plugins, and voice-call flows with `qt-openclaw ...` or `qt-OpenClaw ...`
 - **Claude chat history** - `cuti history` shows transcripts and reopens old Claude Code sessions
+- **Legacy queue helpers** - Existing queue and todo commands remain available for compatibility, but new automation should prefer provider-native background/session features
 
-Perfect for AI-powered development, automation workflows, and LLM orchestration.
+Perfect for local AI-powered development environments where provider setup, state, and workspace visibility need to be repeatable.
 
 ## 🤖 Agent Providers
 
@@ -118,8 +118,8 @@ OpenClaw's source-backed command families are exposed directly (`models`, `mcp`,
 | [Claude Authentication](docs/claude-container-auth.md) | Anthropic API & Claude CLI setup |
 | [Claude Account Switching](docs/claude-account-switching.md) | Manage multiple Claude accounts |
 | [Claude API Keys](docs/claude-api-keys.md) | Anthropic & AWS Bedrock API key management |
-| [Task Management](docs/todo-system.md) | AI agent todo system |
-| [Rate Limit Handling](docs/rate-limit-handling.md) | Smart API throttling & retry logic |
+| [Legacy Task Helpers](docs/todo-system.md) | Local todo helpers and legacy queue conversion |
+| [Legacy Queue Rate Limits](docs/rate-limit-handling.md) | Older Claude queue retry behavior |
 | [Claude Chat History](docs/claude-history.md) | Inspect & resume Claude Code sessions |
 
 ## 🤝 Contributing

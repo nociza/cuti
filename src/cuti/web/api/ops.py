@@ -73,13 +73,13 @@ def _serialize_history_entry(entry: dict[str, Any]) -> dict[str, Any]:
 
 def _queue_summary(request: Request) -> dict[str, Any]:
     queue_manager = request.app.state.queue_manager
-    detail = "The ops console is passive. Use the CLI or container session to process queued prompts."
+    detail = "Legacy Claude queue inspection only. Prefer provider-native sessions, background tasks, and automation for new work."
     status_counts = {status.value: 0 for status in PromptStatus}
 
     if not queue_manager:
         warning = getattr(request.app.state, "queue_warning", None)
         if warning:
-            detail = f"{detail} Queue inspection is unavailable: {warning}"
+            detail = f"{detail} Legacy queue inspection is unavailable: {warning}"
         return {
             "available": False,
             "processor_mode": "passive",
@@ -308,8 +308,8 @@ def _attention_items(
         items.append(
             _action_item(
                 "warning",
-                "Queue is rate limited",
-                f"Claude reported a rate limit. Next reset: {reset_time}.",
+                "Legacy queue is rate limited",
+                f"Claude reported a rate limit while processing the legacy queue. Next reset: {reset_time}.",
                 source="queue",
             )
         )
@@ -372,9 +372,9 @@ def _attention_items(
         items.append(
             _action_item(
                 "note",
-                "Queued work has not produced history yet",
-                "The queue has prompts, but there is no recent prompt history recorded for this workspace.",
-                command="cuti start",
+                "Legacy queue has stored prompts",
+                "The legacy queue has prompts, but there is no recent prompt history recorded for this workspace.",
+                command="cuti queue status --detailed",
                 source="history",
             )
         )
@@ -397,7 +397,6 @@ def _recommended_commands(attention_items: list[dict[str, Any]]) -> list[str]:
     commands: list[str] = []
     for candidate in [item.get("command") for item in attention_items] + [
         "cuti providers doctor",
-        "cuti start",
         "cuti container",
     ]:
         if candidate and candidate not in commands:

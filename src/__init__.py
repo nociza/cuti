@@ -1,5 +1,5 @@
 """
-cuti - Production-ready claude code utils with command queuing, web interface, and monitoring.
+cuti - Provider-aware local AI development runtime and ops console.
 """
 
 # This file is intentionally minimal - the main package is in src/cuti/

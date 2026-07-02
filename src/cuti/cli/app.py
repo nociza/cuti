@@ -101,7 +101,7 @@ else:
 
 app = typer.Typer(
     name="cuti",
-    help="Production-ready AI command queue and orchestration system",
+    help="Provider-aware AI development runtime and read-only ops console",
     rich_markup_mode="rich",
 )
 
@@ -127,7 +127,7 @@ def main(
     ),
 ) -> None:
     """
-    cuti - Production-ready AI command queue and orchestration system
+    cuti - Provider-aware AI development runtime and read-only ops console
 
     Use --help with any command for more information.
     """
@@ -146,7 +146,7 @@ def get_manager(
     check_interval: int = 30,
     timeout: int = 3600,
 ) -> QueueManager:
-    """Get or create queue manager instance."""
+    """Get or create legacy queue manager instance."""
     global _manager
     if _manager is None:
         _manager = QueueManager(
@@ -182,10 +182,10 @@ def show_version() -> None:
 
 
 # Add sub-applications
-app.add_typer(queue_app, name="queue", help="Queue management commands")
+app.add_typer(queue_app, name="queue", help="Legacy Claude queue commands")
 app.add_typer(alias_app, name="alias", help="Alias management commands")
-app.add_typer(agent_app, name="agent", help="Agent system commands")
-app.add_typer(todo_app, name="todo", help="Todo list management commands")
+app.add_typer(agent_app, name="agent", help="Experimental local agent library commands")
+app.add_typer(todo_app, name="todo", help="Legacy todo helper commands")
 if devcontainer_app:
     app.add_typer(devcontainer_app, name="devcontainer", help="DevContainer management")
 if container_app:

@@ -1,5 +1,5 @@
 """
-Multi-agent orchestration system for cuti.
+Experimental local agent library for legacy Cuti workflows.
 """
 
 from .base import (

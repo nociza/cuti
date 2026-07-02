@@ -1,5 +1,5 @@
 """
-Queue management service - high-level queue operations.
+Legacy Claude queue service - high-level queue operations.
 """
 
 from collections.abc import Callable

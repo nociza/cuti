@@ -33,8 +33,8 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "websockets>=12.0",
 ]
-description = "Production-ready Claude Code utilities with command queuing, prompt aliases, web interface, and monitoring."
-keywords = ["ai", "automation", "claude", "cli", "orchestration", "queue"]
+description = "Provider-aware local AI development runtime with containers, auth/config mounting, and a read-only ops console."
+keywords = ["ai", "claude", "codex", "container", "developer-tools", "ops-console"]
 license = "Apache-2.0"
 name = "cuti"
 readme = "README.md"

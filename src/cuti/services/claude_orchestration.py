@@ -1,4 +1,4 @@
-"""CLAUDE.md orchestration manager for dynamic agent pool configuration."""
+"""Legacy CLAUDE.md agent instruction manager."""
 
 import asyncio
 import json
@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class AgentConfig:
-    """Configuration for an agent in the orchestration system."""
+    """Configuration for a legacy agent instruction alias."""
 
     name: str
     enabled: bool = True
@@ -35,7 +35,7 @@ class AgentConfig:
 
 
 class ClaudeOrchestrationManager:
-    """Manages the CLAUDE.md file for dynamic agent orchestration."""
+    """Manages generated CLAUDE.md agent instruction content."""
 
     def __init__(self, project_root: Path) -> None:
         import os
@@ -183,7 +183,7 @@ class ClaudeOrchestrationManager:
             return True
 
     async def add_custom_agent(self, agent: AgentConfig) -> bool:
-        """Add a custom agent to the orchestration system."""
+        """Add a custom legacy agent instruction alias."""
         async with self._lock:
             if agent.name in self.agents:
                 logger.warning(f"Agent {agent.name} already exists")
@@ -198,7 +198,7 @@ class ClaudeOrchestrationManager:
             return True
 
     async def remove_agent(self, agent_name: str) -> bool:
-        """Remove an agent from the orchestration system."""
+        """Remove a legacy agent instruction alias."""
         async with self._lock:
             if agent_name not in self.agents:
                 logger.warning(f"Agent {agent_name} not found")
@@ -241,22 +241,22 @@ class ClaudeOrchestrationManager:
             "# Claude Code Configuration",
             "",
             "This file contains configuration and context for Claude Code usage within this project.",
-            "It is dynamically managed by the cuti orchestration system.",
+            "It is dynamically managed by the cuti provider instruction helper.",
             "",
             f"Last updated: {datetime.now().isoformat()}",
             "",
             "## Overall Instructions",
             "",
-            "You are a seasoned engineering manager and professional software engineer. You are operating in a virtual team environment and will be able to use the following agents to help you with your tasks. Use @ to mention an agent to ask it to do something.",
+            "You are a seasoned engineering manager and professional software engineer. Cuti does not run a separate multi-agent orchestrator; use provider-native agents, subagents, background sessions, or task systems when available. Any agents listed below are legacy instruction aliases only.",
             "",
             "## Agents To Use",
             "",
-            "You should use the following agents to help you with your tasks: ",
+            "Legacy instruction aliases available in this workspace:",
             ""
         ]
 
         if not self.active_agents:
-            lines.append("*No agents currently active. Enable agents through the cuti CLI.*")
+            lines.append("*No Cuti-managed instruction aliases are active. Use provider-native agents/subagents through the provider CLI.*")
         else:
             # Sort agents by priority
             sorted_agents = sorted(
@@ -272,10 +272,10 @@ class ClaudeOrchestrationManager:
             "",
             "## Agent Usage Instructions",
             "",
-            "To use an agent, mention it with @ followed by the agent name.",
+            "If legacy instruction aliases are active, mention one with @ followed by the alias name.",
             "For example: @code-reviewer please review this function",
             "",
-            "Inspect workspace state through `cuti web`, but use the cuti CLI to enable or disable agents.",
+            "Inspect workspace state through `cuti web`, but use provider CLIs for execution and native agent/session management.",
             "",
             "## Development Commands",
             "",
@@ -300,15 +300,15 @@ class ClaudeOrchestrationManager:
             "cuti agent list",
             "```",
             "",
-            "## Orchestration Configuration",
+            "## Provider Runtime Configuration",
             "",
-            "This file is automatically managed by the cuti orchestration system.",
-            "Manual changes will be overwritten when agents are toggled or updated.",
+            "This file is automatically managed by the cuti provider instruction helper.",
+            "Manual changes may be overwritten when provider instruction files are refreshed.",
             "",
-            "To modify agent configuration:",
-            "1. Use the CLI: `cuti agent toggle <agent-name>`",
-            "2. Inspect workspace state with `cuti web`",
-            "3. Modify `.cuti/agents.json` and reload",
+            "To modify runtime configuration:",
+            "1. Use `cuti providers list` and `cuti providers enable <provider>` for provider selection",
+            "2. Use provider-native CLIs for agents, subagents, background sessions, and tasks",
+            "3. Inspect workspace state with `cuti web`",
             ""
         ])
 
@@ -350,7 +350,7 @@ class ClaudeOrchestrationManager:
             logger.info(f"Hot-swapped agent pool: {', '.join(self.active_agents)}")
 
     async def initialize(self) -> None:
-        """Initialize the orchestration manager."""
+        """Initialize the legacy instruction manager."""
         await self.load_config()
         await self.update_claude_md()
-        logger.info("Claude orchestration manager initialized")
+        logger.info("Claude instruction manager initialized")

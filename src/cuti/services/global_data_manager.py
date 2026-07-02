@@ -97,7 +97,7 @@ class GlobalDataManager:
         if not readme_path.exists():
             readme_content = """# Cuti Global Data Directory
 
-This directory contains global data for the cuti orchestration system.
+This directory contains global data for the cuti provider runtime and ops console.
 
 ## Contents
 

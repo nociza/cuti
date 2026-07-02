@@ -2159,7 +2159,7 @@ if cuti_provider_selected claude; then
     else
         echo "❌ Claude CLI not found in PATH!"
         echo "   Expected at /usr/local/bin/claude"
-        echo "   This will prevent queue execution and limit ops console visibility"
+        echo "   This will prevent legacy queue inspection and limit ops console visibility"
     fi
 fi
 

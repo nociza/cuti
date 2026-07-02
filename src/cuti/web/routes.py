@@ -29,7 +29,7 @@ async def ops_console(request: Request) -> HTMLResponse:
         "ops.html",
         "ops",
         page_title="Workspace Ops Console",
-        page_description="Inspect provider readiness, queue state, recent activity, and workspace drift. Use the CLI for changes.",
+        page_description="Inspect provider readiness, recent native activity, legacy queue state, and workspace drift. Use provider CLIs for execution.",
     )
 
 
