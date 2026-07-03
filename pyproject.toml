@@ -58,7 +58,7 @@ cuti     = "cuti.cli.app:app"
 cuti-web = "cuti.web.app:main"
 
 [project.urls]
-Documentation = "https://github.com/nociza/cuti/blob/main/README.md"
+Documentation = "https://cutils.org/"
 Homepage      = "https://github.com/nociza/cuti"
 Issues        = "https://github.com/nociza/cuti/issues"
 Repository    = "https://github.com/nociza/cuti"

@@ -1,145 +1,216 @@
-# Cuti - Provider-Aware AI Development Runtime
-
 <div align="center">
+
+# cuti
+
+**Provider-aware AI development runtime.**
+Containerized [Claude Code](https://claude.com/claude-code) by default — with runtime wiring for Codex, OpenClaw, Hermes, and OpenCode.
 
 [![PyPI Version](https://img.shields.io/pypi/v/cuti?color=blue&label=PyPI)](https://pypi.org/project/cuti/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/cuti)](https://pypi.org/project/cuti/)
 [![License](https://img.shields.io/pypi/l/cuti)](https://github.com/nociza/cuti/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/pypi/dm/cuti?color=green&label=Downloads%2FMonth)](https://pypi.org/project/cuti/)
-[![Downloads Total](https://static.pepy.tech/badge/cuti)](https://pepy.tech/project/cuti)
 
-**Instant containerized development with Claude Code by default, plus provider-aware runtime wiring for Codex, OpenClaw, Hermes, and OpenCode**
-
-[PyPI](https://pypi.org/project/cuti/) • [Documentation](https://cutils.org/) • [GitHub](https://github.com/nociza/cuti)
+[Quick Start](#-quick-start) • [Why cuti](#-why-cuti) • [Providers](#-agent-providers) • [Ops Console](#-ops-console) • [Commands](#-command-reference) • [Docs](#-documentation)
 
 </div>
 
-## 📊 Download Trends
+---
 
-<div align="center">
-
-[![Downloads](https://img.shields.io/pypi/dm/cuti?style=for-the-badge&color=blue&label=Monthly)](https://pypi.org/project/cuti/)
-[![Downloads](https://img.shields.io/pypi/dw/cuti?style=for-the-badge&color=green&label=Weekly)](https://pypi.org/project/cuti/)
-
-</div>
-
-## 🚀 Quick Start - Docker Container with Claude Code
+## 🚀 Quick Start
 
 ```bash
-# Install Python package from PyPI
-uv tool install cuti
+# Install from PyPI
+uv tool install cuti        # or: pip install cuti
 
-# Launch Docker development environment with Claude
+# Launch a containerized dev environment with Claude Code
 cuti container
 ```
 
-That's it! You now have a fully configured AI-powered coding environment with:
-- ✅ **Claude Code CLI** pre-configured with Anthropic integration
-- ✅ **Persistent authentication** for Claude API across sessions  
-- ✅ **Python 3.11**, **Node.js 20**, and essential dev tools
-- ✅ **Custom prompt** showing `cuti:~/path $`
-- ✅ **Auto-mounts** current directory for seamless workflow
+That's it. You're dropped into an isolated container with:
 
-The Docker container provides isolated, reproducible AI-assisted development with Claude Code mode as the default. Each `cuti container` run refreshes Claude Code in the persistent container runtime when Claude Code mode is active, so subsequent containers pick up the newest available Claude CLI without a rebuild.
+- ✅ **Claude Code CLI** pre-installed and kept up to date automatically
+- ✅ **Persistent authentication** — log in once, reuse across every container session
+- ✅ **Your current directory mounted** at `/workspace` for a seamless workflow
+- ✅ **Python 3.11, Node.js 20**, and essential dev tools ready to go
+- ✅ **A `cuti:~/path $` prompt** so you always know you're inside the sandbox
 
-## 🌟 Key Features - Provider Runtime & Observability
+> **Prerequisites:** a Docker-compatible runtime. On macOS, cuti auto-configures [Colima](https://github.com/abiosoft/colima) for you (or use Docker Desktop and pass `--skip-colima`).
 
-Run native AI coding tools in a consistent local environment:
-- **Provider-aware containers** - Claude Code by default, with opt-in Codex, OpenClaw, Hermes, and OpenCode wiring
-- **Read-only ops console** - Launch with `cuti web` to inspect provider readiness, recent native activity, legacy queue state, and workspace drift
-- **Persistent provider state** - Mount auth, config, skills, and runtime installs across container sessions
-- **Native CLI coordination** - Use Claude Code, Codex, OpenClaw, and other provider CLIs directly instead of reimplementing their agent loops
-- **Claude version switching** - Easy CLI version management
-- **Agent providers** - Run Claude Code mode by default, switch to OpenClaw mode with `cuti container --openclaw`, and add Codex, Claude Code, OpenCode, or other providers through `cuti providers ...`
-- **Provider-aware setup** - cuti mounts provider auth/config/skills, persistent CLI runtimes, and workspace instruction files for enabled tools
-- **Turnkey OpenClaw** - Run the current OpenClaw gateway, channels, browser, plugins, and voice-call flows with `cuti openclaw ...`
-- **Claude chat history** - `cuti history` shows transcripts and reopens old Claude Code sessions
-- **Legacy queue helpers** - Existing queue and todo commands remain available for compatibility, but new automation should prefer provider-native background/session features
+Every `cuti container` run refreshes the Claude Code CLI in a persistent runtime volume, so new containers always pick up the latest version — no image rebuilds required.
 
-Perfect for local AI-powered development environments where provider setup, state, and workspace visibility need to be repeatable.
+## 💡 Why cuti
+
+AI coding CLIs are excellent at running agents. They're less excellent at being **set up the same way, every time, on every machine** — auth tokens, config files, skills, instruction files, and CLI versions all drift.
+
+cuti deliberately does **not** reimplement agent loops, queues, or task systems. Provider CLIs own execution; cuti owns the runtime around them:
+
+| | What cuti does |
+|---|---|
+| 🐳 **Provider-aware containers** | One command to a fully wired environment — Claude Code by default, OpenClaw as an explicit mode, with opt-in Codex, Hermes, and OpenCode |
+| 🔐 **Persistent provider state** | Auth, config, skills, and CLI runtime installs are mounted across container sessions — log in once |
+| 📄 **Instruction file management** | Standard files like `CLAUDE.md`, `AGENTS.md`, `SOUL.md`, and `HERMES.md` are wired per provider automatically |
+| 📊 **Read-only ops console** | `cuti web` shows provider readiness, recent native activity, and workspace drift — without owning execution |
+| 👤 **Claude account & version management** | Switch between Claude accounts, manage API keys, and pin or update CLI versions |
+| 🕘 **Chat history** | `cuti history` browses Claude Code transcripts and reopens old sessions |
 
 ## 🤖 Agent Providers
 
-Claude Code mode is the default for `cuti container`. OpenClaw is a separate mode, started explicitly with `cuti container --openclaw` or `cuti container --claw`.
+cuti knows how to wire five provider CLIs into its containers:
+
+| Provider | CLI | Status | Enabled by default |
+|----------|-----|--------|:-:|
+| **Claude Code** | `claude` | Stable | ✅ |
+| **Codex** | `codex` | Stable | opt-in |
+| **OpenClaw** | `openclaw` | Stable | opt-in (own mode) |
+| **Hermes** | `hermes` | Experimental | opt-in |
+| **OpenCode** | `opencode` | Stable | opt-in |
+
+For each enabled provider, cuti handles the container wiring: auth and config mounts, persistent CLI installs under `~/.cuti/provider-runtimes/`, and the provider's instruction files in your workspace.
+
+### Container modes
+
+`cuti container` runs in one of two modes:
+
+- **Claude Code mode** (default) — Claude Code plus any enabled add-on providers except OpenClaw.
+- **OpenClaw mode** (`cuti container --openclaw` or `--claw`) — OpenClaw, plus any add-ons you've explicitly enabled.
 
 ```bash
+# Inspect and manage providers
 cuti providers list
-cuti providers doctor
+cuti providers doctor                  # host-side readiness check
+cuti providers status openclaw
 
-# Default mode: Claude Code. This also refreshes Claude Code for future containers.
-cuti container
-
-# OpenClaw mode: OpenClaw only unless add-ons are explicitly enabled.
-cuti container --openclaw
-
-# Add-ons for OpenClaw mode are read from provider config.
-cuti providers enable claude
+# Enable add-ons, then launch the mode you want
 cuti providers enable codex
-cuti providers enable opencode
 cuti providers enable hermes
-cuti container --openclaw
+cuti container                         # Claude Code mode (default)
+cuti container --openclaw              # OpenClaw mode
 
-# Provider setup/update helpers still run in the right mode automatically.
+# Auth and updates run in the right mode automatically
 cuti providers auth claude --login
-cuti openclaw onboard
-cuti openclaw up
 cuti providers update codex
-cuti providers update openclaw
-cuti providers update hermes
+cuti providers update hermes           # follows Hermes' native `hermes update` path
 ```
 
-When selected for the current mode, `cuti` handles the provider-specific container wiring for auth, config mounts, persistent CLI installation, and standard instruction files such as `CLAUDE.md`, `AGENTS.md`, `.hermes.md`, `HERMES.md`, `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, `USER.md`, and `HEARTBEAT.md`. OpenClaw installs under `~/.cuti/provider-runtimes/openclaw`, keeps runtime state under `~/.openclaw`, and runs `openclaw doctor --non-interactive` during install/update/bootstrap. Hermes is currently marked experimental in cuti, but its state persists under `~/.hermes`, including Hermes profiles under `~/.hermes/profiles`. `~/.openclaw` is mounted when available so `hermes claw migrate --dry-run` can inspect OpenClaw data before migration, and `cuti providers update hermes` follows Hermes' native `hermes update` path so bundled skills and profile state stay aligned with upstream behavior.
+**Provider state at a glance:**
 
-### OpenClaw Container
+- **Claude Code** — Linux-side credentials persist under `~/.cuti/claude-linux`, so container logins survive rebuilds.
+- **OpenClaw** — installs under `~/.cuti/provider-runtimes/openclaw`, keeps state under `~/.openclaw`, and runs `openclaw doctor --non-interactive` on install, update, and bootstrap.
+- **Hermes** *(experimental)* — state persists under `~/.hermes` (including profiles in `~/.hermes/profiles`). When `~/.openclaw` exists it's mounted read-only so `hermes claw migrate --dry-run` can inspect OpenClaw data before migrating.
 
-Use `cuti openclaw` for the current OpenClaw runtime.
+### OpenClaw runtime
+
+`cuti openclaw` runs the full OpenClaw stack — gateway, channels, browser automation, plugins, and voice calls — inside the cuti container, enabling the OpenClaw provider automatically:
 
 ```bash
-cuti openclaw onboard
-cuti openclaw up
-cuti openclaw channels-login --channel whatsapp
+cuti openclaw onboard                              # first-time setup
+cuti openclaw up                                   # onboard → doctor → gateway
+cuti openclaw channels-login --channel whatsapp    # QR/browser channel auth
 cuti openclaw browser start
 cuti openclaw plugins install @openclaw/voice-call
 cuti openclaw voice-setup
-cuti openclaw voicecall status
 cuti openclaw dashboard --no-open
 ```
 
-The command enables the OpenClaw provider automatically and runs inside OpenClaw mode, with `~/.openclaw`, `~/.agents`, and the persistent OpenClaw CLI runtime mounted for reuse.
-OpenClaw's source-backed command families are exposed directly (`models`, `mcp`, `sandbox`, `memory`, `wiki`, `approvals`, `nodes`, `devices`, `hooks`, `webhooks`, `tasks`, `cron`, `security`, `secrets`, and more). For plugin commands added by future OpenClaw releases, use `cuti openclaw run <command> ...`; it forwards raw arguments to the installed OpenClaw CLI without requiring a cuti release.
+OpenClaw's native command families are exposed directly (`models`, `mcp`, `sandbox`, `memory`, `wiki`, `approvals`, `nodes`, `devices`, `hooks`, `webhooks`, `tasks`, `cron`, `security`, `secrets`, and more). For anything newer than the current cuti release:
+
+```bash
+cuti openclaw run <command> ...    # forwards raw args to the installed OpenClaw CLI
+```
+
+## 📊 Ops Console
+
+```bash
+cuti web    # http://127.0.0.1:8000
+```
+
+A **strictly read-only** dashboard for your workspace — it never executes anything on your behalf:
+
+- **Provider readiness matrix** — which CLIs are installed, authenticated, and up to date
+- **Attention items** — prioritized drift warnings with suggested terminal commands
+- **Recent native activity** — prompt history and Claude Code session trail
+- **Workspace drift** — instruction file status and enabled-but-missing tools
+
+Execution stays where it belongs: in the provider CLIs.
+
+## 📖 Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `cuti container` | Launch the containerized dev environment (`--openclaw` for OpenClaw mode) |
+| `cuti containers` | Manage running containers: `status`, `stop`, `enter`, `cleanup` |
+| `cuti providers` | Provider selection and lifecycle: `list`, `enable`, `disable`, `status`, `doctor`, `auth`, `update` |
+| `cuti openclaw` | Run OpenClaw commands inside the cuti OpenClaw container |
+| `cuti web` | Start the read-only ops console |
+| `cuti claude` | Manage Claude accounts and API keys: `list`, `use`, `save`, `add-api-key`, `update`, … |
+| `cuti history` | Browse Claude chat history and resume sessions |
+| `cuti tools` | Manage workspace CLI tools |
+| `cuti sync` | Sync usage data |
+| `cuti settings` / `favorites` / `alias` | Global settings, favorite prompts, and prompt aliases |
+| `cuti queue` / `todo` / `agent` | **Legacy** — kept for compatibility; prefer provider-native background/session features |
+
+Run `cuti --help` or `cuti <command> --help` for full details.
 
 ## 📚 Documentation
 
-### 📖 Documentation Guides
+Full documentation lives at **[cutils.org](https://cutils.org/)**. Guides in this repo:
+
+### Getting started
 
 | Guide | Description |
 |-------|-------------|
 | [Docker Container Setup](docs/devcontainer.md) | Container runtime, provider selection, mounts, and auth |
-| [Claude Authentication](docs/claude-container-auth.md) | Anthropic API & Claude CLI setup |
-| [Claude Account Switching](docs/claude-account-switching.md) | Manage multiple Claude accounts |
-| [Claude API Keys](docs/claude-api-keys.md) | Anthropic & AWS Bedrock API key management |
+| [Container Management](docs/container.md) | Named containers, status, cleanup |
+| [Container Status Commands](docs/container-status-command.md) | `cuti containers status/stop/enter` reference |
+
+### Claude Code
+
+| Guide | Description |
+|-------|-------------|
+| [Claude Authentication](docs/claude-container-auth.md) | Anthropic API & Claude CLI auth inside containers |
+| [Account Quick Start](docs/claude-account-quick-start.md) | Multiple Claude accounts in 5 minutes |
+| [Account Switching](docs/claude-account-switching.md) | Managing multiple Claude accounts in depth |
+| [API Keys](docs/claude-api-keys.md) | Anthropic & AWS Bedrock API key management |
+| [Chat History](docs/claude-history.md) | Inspect & resume Claude Code sessions |
+
+### Workspace tools
+
+| Guide | Description |
+|-------|-------------|
+| [CLI Tools Management](docs/cli-tools-management.md) | Installing and enabling workspace tools |
+| [Automatic Tools Activation](docs/automatic-tools-activation.md) | Shell-hook based tool activation |
+| [Workspace Tools Architecture](docs/workspace-tools-architecture.md) | System/container/workspace tool scopes |
+
+### Legacy
+
+| Guide | Description |
+|-------|-------------|
 | [Legacy Task Helpers](docs/todo-system.md) | Local todo helpers and legacy queue conversion |
 | [Legacy Queue Rate Limits](docs/rate-limit-handling.md) | Older Claude queue retry behavior |
-| [Claude Chat History](docs/claude-history.md) | Inspect & resume Claude Code sessions |
 
 ## 🤝 Contributing
 
-> **Note:** This project is under active development. Contributions welcome!
+Contributions are welcome — this project is under active development.
 
 ```bash
+git clone https://github.com/nociza/cuti.git
+cd cuti
 uv sync --extra dev
+
+# Run the test suite
+uv run --extra dev pytest
 ```
 
-Submit PRs to [GitHub](https://github.com/nociza/cuti) | Report issues in [Issues](https://github.com/nociza/cuti/issues)
+Open a [pull request](https://github.com/nociza/cuti/pulls) or file an [issue](https://github.com/nociza/cuti/issues).
 
 ## 📄 License
 
-Apache 2.0 - See [LICENSE](LICENSE)
+[Apache 2.0](LICENSE)
 
 ---
 
 <div align="center">
 
-**[PyPI](https://pypi.org/project/cuti/)** • **[Issues](https://github.com/nociza/cuti/issues)** • **[Contribute](https://github.com/nociza/cuti)**
+**[PyPI](https://pypi.org/project/cuti/)** • **[Documentation](https://cutils.org/)** • **[Issues](https://github.com/nociza/cuti/issues)**
 
 </div>
