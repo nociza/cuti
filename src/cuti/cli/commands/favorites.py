@@ -148,10 +148,23 @@ def add(
 @app.command()
 def remove(favorite_id: str = typer.Argument(..., help="Favorite prompt ID")) -> None:
     """Remove a favorite prompt."""
-    if typer.confirm(f"Remove favorite '{favorite_id}'?"):
-        # We need to add a remove method to GlobalDataManager
-        # For now, we'll mark it as a TODO
-        console.print("[yellow]Remove functionality to be implemented[/yellow]")
+    manager = GlobalDataManager()
+    favorites = manager.get_favorite_prompts()
+    favorite = next((f for f in favorites if f.id == favorite_id), None)
+
+    if not favorite:
+        console.print(f"[red]Favorite '{favorite_id}' not found[/red]")
+        raise typer.Exit(1)
+
+    if not typer.confirm(f"Remove favorite '{favorite.title}' ({favorite_id})?"):
+        console.print("[yellow]Cancelled[/yellow]")
+        return
+
+    if manager.remove_favorite_prompt(favorite_id):
+        console.print(f"[green]✓[/green] Removed favorite prompt: {favorite_id}")
+    else:
+        console.print(f"[red]Failed to remove favorite '{favorite_id}'[/red]")
+        raise typer.Exit(1)
 
 
 @app.command()

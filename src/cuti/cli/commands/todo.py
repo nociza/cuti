@@ -47,15 +47,16 @@ def add_todo(
 
     # Get the target list
     if list_name:
-        # Find list by name
-        # For now, we'll add to master list
-        target_list = service.get_master_list()
+        target_list = service.get_list_by_name(list_name)
     else:
         # Add to master list by default
         target_list = service.get_master_list()
 
     if not target_list:
-        console.print("[red]No todo list found[/red]")
+        if list_name:
+            console.print(f"[red]Todo list '{list_name}' not found[/red]")
+        else:
+            console.print("[red]No todo list found[/red]")
         raise typer.Exit(1)
 
     target_list.add_todo(todo)
@@ -97,8 +98,7 @@ def list_todos(
     else:
         # Show specific list or master
         if list_name:
-            # TODO: Implement finding list by name
-            target_list = service.get_master_list()
+            target_list = service.get_list_by_name(list_name)
         else:
             target_list = service.get_master_list()
 

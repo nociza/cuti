@@ -97,7 +97,7 @@ cuti container
 
 # Inside container, all commands work:
 cuti web          # Start read-only ops console (accessible at http://localhost:8000)
-cuti cli          # Start interactive CLI
+cuti --help       # Inspect the cuti CLI
 cuti providers list # Inspect provider selection
 claude --help     # Use Claude CLI (already authenticated)
 ```
@@ -634,4 +634,4 @@ To improve dev container support:
 
 ## License
 
-Part of the cuti project - MIT License
+Part of the cuti project - Apache 2.0 License

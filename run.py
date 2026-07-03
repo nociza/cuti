@@ -66,7 +66,7 @@ def setup_environment():
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="cuti - Production-ready queue system",
+        description="cuti - Provider-aware local AI development runtime",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -76,13 +76,13 @@ Examples:
   # Start the web interface
   python run.py web
 
-  # Start the CLI
-  python run.py cli
+  # Inspect CLI commands
+  uv run cuti --help
 
-  # Start queue processor
+  # Start legacy queue processor
   python run.py start
 
-  # Show status
+  # Show legacy queue status
   python run.py status
         """
     )
@@ -99,20 +99,20 @@ Examples:
     web_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
 
     # CLI command
-    cli_parser = subparsers.add_parser('cli', help='Start CLI interface')
+    cli_parser = subparsers.add_parser('cli', help='Run cuti CLI command (defaults to --help)')
     cli_parser.add_argument('cli_args', nargs='*', help='CLI arguments to pass through')
 
-    # Direct queue commands
-    start_parser = subparsers.add_parser('start', help='Start queue processor')
+    # Direct legacy queue commands
+    start_parser = subparsers.add_parser('start', help='Start legacy queue processor')
     start_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     start_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
 
-    status_parser = subparsers.add_parser('status', help='Show queue status')
+    status_parser = subparsers.add_parser('status', help='Show legacy queue status')
     status_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
     status_parser.add_argument('--json', action='store_true', help='Output as JSON')
 
     # Add prompt command
-    add_parser = subparsers.add_parser('add', help='Add prompt to queue')
+    add_parser = subparsers.add_parser('add', help='Add prompt to legacy queue')
     add_parser.add_argument('prompt', help='Prompt text or alias')
     add_parser.add_argument('--priority', '-p', type=int, default=0, help='Priority')
     add_parser.add_argument('--storage-dir', default='.cuti', help='Storage directory (relative to CWD)')
@@ -181,7 +181,7 @@ Examples:
             print("Run: python run.py setup")
             return 1
 
-    # Handle direct queue commands
+    # Handle direct legacy queue commands
     else:
         try:
             from cuti.core.models import QueuedPrompt
@@ -191,7 +191,7 @@ Examples:
             manager = QueueManager(storage_dir=args.storage_dir)
 
             if args.command == 'start':
-                print("🚀 Starting cuti processor...")
+                print("🚀 Starting legacy queue processor...")
                 print(f"📁 Storage directory: {args.storage_dir}")
                 print("Press Ctrl+C to stop")
 
@@ -203,7 +203,7 @@ Examples:
                 try:
                     manager.start(callback=status_callback if args.verbose else None)
                 except KeyboardInterrupt:
-                    print("\n👋 Queue processor stopped")
+                    print("\n👋 Legacy queue processor stopped")
                     return 0
 
             elif args.command == 'status':
@@ -249,7 +249,7 @@ Examples:
 
                 success = manager.add_prompt(queued_prompt)
                 if success:
-                    print(f"✅ Added prompt {queued_prompt.id} to queue")
+                    print(f"✅ Added prompt {queued_prompt.id} to legacy queue")
                 else:
                     print("❌ Failed to add prompt")
                     return 1

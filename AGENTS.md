@@ -30,7 +30,7 @@ Inspect workspace state through `cuti web`, but use provider CLIs for execution 
 python run.py setup
 
 # Development installation with uv
-uv install -e .
+uv pip install -e .
 ```
 
 ### Running the Application
@@ -38,11 +38,11 @@ uv install -e .
 # Start ops console
 python run.py web
 
-# Start CLI
-python run.py cli
+# Inspect CLI
+uv run cuti --help
 
-# Check agent status
-cuti agent list
+# Check provider status
+uv run cuti providers list
 ```
 
 ## Provider Runtime Configuration

@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .. import __version__
 from ..services.claude_logs_reader import ClaudeLogsReader
 from ..services.history import PromptHistoryManager
 from ..services.queue_service import QueueManager
@@ -39,7 +40,7 @@ def create_app(
     app = FastAPI(
         title="cuti Ops Console",
         description="Read-only workspace operations console for provider readiness, native activity, legacy queue state, and drift.",
-        version="0.1.0",
+        version=__version__,
     )
     app.add_middleware(
         CORSMiddleware,

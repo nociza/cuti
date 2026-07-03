@@ -279,22 +279,22 @@ dev-test-web:
     # Run the web interface
     cuti web
 
-# Build, install as tool, and run CLI for testing  
+# Build, install as tool, and inspect CLI for testing
 dev-test-cli:
     #!/usr/bin/env bash
     set -euo pipefail
     
-    echo "🚀 Building, installing, and running cuti CLI..."
+    echo "🚀 Building, installing, and inspecting cuti CLI..."
     
     # First install the development version
     just dev
     
     echo ""
-    echo "💻 Starting CLI interface..."
+    echo "💻 Showing CLI help..."
     echo ""
     
-    # Run the CLI
-    cuti cli
+    # Inspect the CLI
+    cuti --help
 
 # Show current version
 version:

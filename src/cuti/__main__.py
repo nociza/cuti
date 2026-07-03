@@ -9,6 +9,7 @@ import os
 import sys
 from pathlib import Path
 
+from . import __version__
 from .web.app import main as web_main
 
 
@@ -56,7 +57,7 @@ Examples:
     parser.add_argument(
         "--version",
         action="version",
-        version="cuti 0.1.0"
+        version=f"cuti {__version__}"
     )
 
     args = parser.parse_args()

@@ -642,6 +642,17 @@ to remove all stored data. Run `cuti settings` to manage preferences.
 
             conn.commit()
 
+    def remove_favorite_prompt(self, prompt_id: str) -> bool:
+        """Remove a favorite prompt by ID."""
+        with sqlite3.connect(str(self.db_path), timeout=30.0) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('DELETE FROM favorite_prompts WHERE id = ?', (prompt_id,))
+            removed = cursor.rowcount > 0
+            conn.commit()
+
+        return removed
+
     def sync_chat_history(self, project_path: str | None = None) -> int:
         """
         Sync chat history from Claude logs to database.

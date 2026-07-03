@@ -5,6 +5,7 @@ const docs = {
     'claude-account-switching': 'docs/claude-account-switching.md',
     'claude-api-keys': 'docs/claude-api-keys.md',
     'claude-container-auth': 'docs/claude-container-auth.md',
+    'claude-history': 'docs/claude-history.md',
     'cli-tools-management': 'docs/cli-tools-management.md',
     'container-status-command': 'docs/container-status-command.md',
     'container': 'docs/container.md',

@@ -365,6 +365,36 @@ class TodoService:
         finally:
             conn.close()
 
+    def get_list_by_name(self, name: str) -> TodoList | None:
+        """Get a todo list by exact name, case-insensitively.
+
+        The list ID is also accepted so CLI users can pass either value.
+        """
+        search = name.strip()
+        if not search:
+            return None
+
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                '''
+                SELECT id FROM todo_lists
+                WHERE id = ? OR lower(name) = lower(?)
+                ORDER BY is_master DESC, updated_at DESC
+                LIMIT 1
+                ''',
+                (search, search),
+            )
+            row = cursor.fetchone()
+        finally:
+            conn.close()
+
+        if row:
+            return self.get_list(row[0])
+        return None
+
     def get_active_sessions(self) -> list[TodoSession]:
         """Get all active sessions."""
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
