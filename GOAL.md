@@ -1,7 +1,20 @@
 # Project Goals - CUTI Direction
 
 ## Primary Objective
-Focus CUTI on provider-aware runtime setup, observability, and native-session coordination across Claude Code, Codex, OpenClaw, Hermes, and related CLIs. CUTI should not reimplement provider-owned agent loops, queues, todo systems, or background execution.
+Focus CUTI on provider-aware runtime setup, observability, and native-session coordination across Claude Code, Codex, OpenClaw, Hermes, and related CLIs. CUTI should not reimplement provider-owned agent loops, queues, todo systems, permissions, approvals, or background execution.
+
+## Strategic Reframe
+Claude Code now owns much more of the local autonomy surface through native permission modes, including auto mode. That weakens any CUTI thesis based on making Claude autonomous by bypassing approvals.
+
+CUTI's stronger thesis is the runtime/control-plane layer around native providers:
+
+- Reproducible local containers for provider CLIs
+- Persistent auth, config, skills, and runtime installs
+- Readiness, drift, and session visibility across providers
+- Multi-session and worktree coordination without owning provider execution
+- Turnkey OpenClaw deployment, gateway, channel, browser, plugin, voice, node, sandbox, cron, secrets, memory, and wiki operations
+
+OpenClaw deployment support should be treated as the clearest differentiated wedge because OpenClaw has real runtime topology, gateway state, channel auth, plugins, devices, and operational drift that provider-native Claude auto mode does not address.
 
 ## Provider-Native Capabilities (Deprioritized in CUTI)
 Based on current Claude Code and Codex capabilities, these should be treated as low priority or out-of-scope unless CUTI can add clear cross-provider value:
@@ -17,11 +30,13 @@ CUTI should integrate with these areas rather than duplicate them. Differentiate
 ## Priorities
 
 ### P0 - Differentiate CUTI
+- [ ] Make OpenClaw deployment and operations the flagship differentiated path
 - [ ] Make provider-aware containers reliable across Claude Code, Codex, OpenClaw, Hermes, and OpenCode
 - [ ] Surface native provider readiness, auth/config state, and runtime drift in `cuti web`
 - [ ] Ingest native provider session/task signals without owning execution
 - [ ] Establish durable persistence for CUTI-specific provider/runtime metadata
 - [ ] Detect workspace and worktree conflicts across concurrently running native sessions
+- [ ] Prefer Claude native permission modes (`auto`, `acceptEdits`, `plan`) over CUTI-owned approval bypass behavior
 
 ### P1 - High-Value Integrations
 - [ ] Capture and normalize Claude/Codex/OpenClaw progress signals for CUTI dashboards
@@ -65,8 +80,9 @@ CUTI should integrate with these areas rather than duplicate them. Differentiate
 
 - Keep CUTI scope additive to native provider CLIs.
 - Prefer integration points over feature duplication.
+- Treat Claude permission bypass as an explicit compatibility escape hatch, not the product premise.
 - Re-evaluate deprioritized items only if provider-native support drops or exposes gaps critical to CUTI use cases.
 
 ---
-*Last Updated: 2026-07-02*
-*Version: 1.2.0*
+*Last Updated: 2026-07-03*
+*Version: 1.3.0*

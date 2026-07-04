@@ -2,8 +2,8 @@
 
 # cuti
 
-**Provider-aware AI development runtime.**
-Containerized [Claude Code](https://claude.com/claude-code) by default — with runtime wiring for Codex, OpenClaw, Hermes, and OpenCode.
+**Provider runtime and OpenClaw deployment console.**
+Containerized [Claude Code](https://claude.com/claude-code) by default, with provider-aware runtime wiring for OpenClaw, Codex, Hermes, and OpenCode.
 
 [![PyPI Version](https://img.shields.io/pypi/v/cuti?color=blue&label=PyPI)](https://pypi.org/project/cuti/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/cuti)](https://pypi.org/project/cuti/)
@@ -22,32 +22,43 @@ Containerized [Claude Code](https://claude.com/claude-code) by default — with 
 # Install from PyPI
 uv tool install cuti        # or: pip install cuti
 
-# Launch a containerized dev environment with Claude Code
+# Launch a provider-aware Docker development environment.
+# Claude Code mode is the default.
 cuti container
 ```
 
 That's it. You're dropped into an isolated container with:
 
-- ✅ **Claude Code CLI** pre-installed and kept up to date automatically
-- ✅ **Persistent authentication** — log in once, reuse across every container session
+- ✅ **Claude Code CLI** pre-installed, kept up to date automatically, and wired through Claude's native permission modes
+- ✅ **Persistent provider authentication** — log in once, reuse across every container session
 - ✅ **Your current directory mounted** at `/workspace` for a seamless workflow
 - ✅ **Python 3.11, Node.js 20**, and essential dev tools ready to go
 - ✅ **A `cuti:~/path $` prompt** so you always know you're inside the sandbox
 
-> **Prerequisites:** a Docker-compatible runtime. On macOS, cuti auto-configures [Colima](https://github.com/abiosoft/colima) for you (or use Docker Desktop and pass `--skip-colima`).
-
 Every `cuti container` run refreshes the Claude Code CLI in a persistent runtime volume, so new containers always pick up the latest version — no image rebuilds required.
+
+For OpenClaw deployments, start the OpenClaw runtime explicitly:
+
+```bash
+cuti openclaw onboard
+cuti openclaw up
+cuti openclaw dashboard --no-open
+```
+
+> **Prerequisites:** a Docker-compatible runtime. On macOS, cuti auto-configures [Colima](https://github.com/abiosoft/colima) for you (or use Docker Desktop and pass `--skip-colima`).
 
 ## 💡 Why cuti
 
 AI coding CLIs are excellent at running agents. They're less excellent at being **set up the same way, every time, on every machine** — auth tokens, config files, skills, instruction files, and CLI versions all drift.
 
-cuti deliberately does **not** reimplement agent loops, queues, or task systems. Provider CLIs own execution; cuti owns the runtime around them:
+Claude Code now owns more of its autonomy and approval surface through native permission modes such as `auto`, `acceptEdits`, and `plan`. cuti deliberately does **not** reimplement provider-owned agent loops, queues, permissions, approvals, or task systems. Provider CLIs own execution; cuti owns the runtime around them:
 
 | | What cuti does |
 |---|---|
 | 🐳 **Provider-aware containers** | One command to a fully wired environment — Claude Code by default, OpenClaw as an explicit mode, with opt-in Codex, Hermes, and OpenCode |
 | 🔐 **Persistent provider state** | Auth, config, skills, and CLI runtime installs are mounted across container sessions — log in once |
+| 🔒 **Native Claude permissions** | `CUTI_CLAUDE_PERMISSION_MODE` defaults to Claude `auto`, with `acceptEdits`, `plan`, `default`, `dontAsk`, or explicit `bypassPermissions` available |
+| 🕸️ **OpenClaw deployment** | Gateway, channels, browser, plugins, voice-call, nodes, sandbox, cron, secrets, memory, and wiki flows run through `cuti openclaw` |
 | 📄 **Instruction file management** | Standard files like `CLAUDE.md`, `AGENTS.md`, `SOUL.md`, and `HERMES.md` are wired per provider automatically |
 | 📊 **Read-only ops console** | `cuti web` shows provider readiness, recent native activity, and workspace drift — without owning execution |
 | 👤 **Claude account & version management** | Switch between Claude accounts, manage API keys, and pin or update CLI versions |

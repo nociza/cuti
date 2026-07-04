@@ -12,6 +12,22 @@ from pathlib import Path
 from .models import ExecutionResult, QueuedPrompt, RateLimitInfo
 
 
+def _claude_permission_mode() -> str:
+    mode = os.environ.get("CUTI_CLAUDE_PERMISSION_MODE", "auto").strip()
+    if not mode:
+        return "default"
+    aliases = {
+        "accept-edits": "acceptEdits",
+        "acceptedits": "acceptEdits",
+        "dont-ask": "dontAsk",
+        "dontask": "dontAsk",
+        "bypass": "bypassPermissions",
+        "bypass-permissions": "bypassPermissions",
+        "dangerous": "bypassPermissions",
+    }
+    return aliases.get(mode, mode)
+
+
 class ClaudeCodeInterface:
     """Interface for executing prompts via Claude Code CLI."""
 
@@ -61,11 +77,10 @@ class ClaudeCodeInterface:
 
             os.chdir(working_dir)
 
-            cmd = [
-                self.claude_command,
-                "--print",
-                "--dangerously-skip-permissions",
-            ]  # Use --print for non-interactive output and skip permissions
+            cmd = [self.claude_command, "--print"]
+            permission_mode = _claude_permission_mode()
+            if permission_mode != "default":
+                cmd.extend(["--permission-mode", permission_mode])
 
             full_prompt = prompt.content
 

@@ -5,7 +5,11 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from cuti.services.devcontainer import DevContainerService
+from cuti.services.devcontainer import (
+    DevContainerService,
+    get_claude_command,
+    get_claude_permission_mode,
+)
 
 
 class _RunResult:
@@ -43,8 +47,23 @@ def test_generate_dockerfile_uses_provider_installers(tmp_path: Path) -> None:
         in dockerfile
     )
     assert "Claude provider is not selected for this container mode" in dockerfile
+    assert 'CUTI_CLAUDE_PERMISSION_MODE="${CUTI_CLAUDE_PERMISSION_MODE:-auto}"' in dockerfile
+    assert '--permission-mode "$CUTI_CLAUDE_PERMISSION_MODE"' in dockerfile
+    assert 'alias claude="claude --dangerously-skip-permissions"' not in dockerfile
     assert "RUN HOME=/home/cuti /usr/local/bin/cuti-install-claude" not in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
+
+
+def test_claude_permission_mode_defaults_to_auto(monkeypatch) -> None:
+    monkeypatch.delenv("CUTI_CLAUDE_PERMISSION_MODE", raising=False)
+
+    assert get_claude_permission_mode() == "auto"
+
+
+def test_claude_permission_mode_normalizes_legacy_alias(monkeypatch) -> None:
+    monkeypatch.setenv("CUTI_CLAUDE_PERMISSION_MODE", "bypass")
+
+    assert get_claude_permission_mode() == "bypassPermissions"
 
 
 def test_prepare_cloud_provider_mounts_includes_selected_provider_dirs(
@@ -161,6 +180,9 @@ def test_run_in_container_sets_provider_envs(monkeypatch, tmp_path: Path) -> Non
     assert "CUTI_PRIMARY_AGENT_PROVIDER=claude" in docker_args
     assert "CUTI_CONTAINER_MODE=claude-code" in docker_args
     assert "CUTI_CLAUDE_AUTO_UPDATE=true" in docker_args
+    assert "CUTI_CLAUDE_PERMISSION_MODE=auto" in docker_args
+    assert "CLAUDE_CODE_ENABLE_AUTO_MODE=1" in docker_args
+    assert "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true" not in docker_args
     assert "CUTI_ENFORCE_SELECTED_PROVIDERS=true" in docker_args
     assert "CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin" in docker_args
     assert "OPENCLAW_PREFIX=/home/cuti/.cuti-providers/openclaw" in docker_args
@@ -179,6 +201,52 @@ def test_run_in_container_sets_provider_envs(monkeypatch, tmp_path: Path) -> Non
         for arg in docker_args
     )
     assert "HERMES_HOME=/home/cuti/.hermes" in docker_args
+
+
+def test_run_in_container_allows_claude_permission_override(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CUTI_CLAUDE_PERMISSION_MODE", "accept-edits")
+    service = DevContainerService(tmp_path, provider_storage_dir=tmp_path / ".cuti")
+    service.is_macos = False
+    captured_args = {}
+
+    monkeypatch.setattr(service, "_check_tool_available", lambda name: True)
+    monkeypatch.setattr(
+        service, "_build_container_image", lambda image_name, rebuild: True
+    )
+    monkeypatch.setattr(
+        service,
+        "_prepare_cloud_provider_mounts",
+        lambda: (tmp_path / "claude-linux", []),
+    )
+
+    def _fake_subprocess_run(args):
+        captured_args["args"] = args
+        return _RunResult(0)
+
+    monkeypatch.setattr(
+        "cuti.services.devcontainer.subprocess.run", _fake_subprocess_run
+    )
+
+    exit_code = service.run_in_container(command="echo ok", rebuild=False)
+
+    assert exit_code == 0
+    docker_args = captured_args["args"]
+    assert "CUTI_CLAUDE_PERMISSION_MODE=acceptEdits" in docker_args
+    assert "CLAUDE_CODE_ENABLE_AUTO_MODE=1" not in docker_args
+
+
+def test_get_claude_command_uses_configured_permission_mode(monkeypatch) -> None:
+    monkeypatch.setenv("CUTI_IN_CONTAINER", "true")
+    monkeypatch.setenv("CUTI_CLAUDE_PERMISSION_MODE", "plan")
+
+    assert get_claude_command("inspect") == [
+        "claude",
+        "--permission-mode",
+        "plan",
+        "inspect",
+    ]
 
 
 def test_run_in_container_init_script_handles_runtime_provider_installs(

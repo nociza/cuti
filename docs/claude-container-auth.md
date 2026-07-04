@@ -82,7 +82,8 @@ Host (macOS):
 
 - `CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux` - Linux config location
 - `IS_SANDBOX=1` - Enables container mode
-- `CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true` - Allows container user
+- `CUTI_CLAUDE_PERMISSION_MODE=auto` - Requests Claude Code's native auto permission mode by default
+- `CLAUDE_CODE_ENABLE_AUTO_MODE=1` - Enables auto mode for providers that require the flag
 
 ## Benefits
 

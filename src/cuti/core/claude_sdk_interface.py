@@ -102,6 +102,8 @@ class ClaudeSDKInterface:
                      "default",
                      "acceptEdits",
                      "plan",
+                     "auto",
+                     "dontAsk",
                      "bypassPermissions",
                  ] = 'acceptEdits') -> None:
         """Initialize the Claude SDK interface.

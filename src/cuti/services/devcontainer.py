@@ -42,6 +42,16 @@ class DevContainerService:
     CONTAINER_MODE_CLAUDE = PROVIDER_CONTAINER_MODE_CLAUDE
     CONTAINER_MODE_OPENCLAW = PROVIDER_CONTAINER_MODE_OPENCLAW
     PROVIDER_RUNTIME_CONTAINER_DIR = "/home/cuti/.cuti-providers"
+    CLAUDE_PERMISSION_MODE_ENV = "CUTI_CLAUDE_PERMISSION_MODE"
+    DEFAULT_CLAUDE_PERMISSION_MODE = "auto"
+    CLAUDE_PERMISSION_MODES = {
+        "default",
+        "acceptEdits",
+        "plan",
+        "auto",
+        "dontAsk",
+        "bypassPermissions",
+    }
 
     # Simplified Dockerfile template
     DOCKERFILE_TEMPLATE = '''FROM python:3.11-bullseye
@@ -225,8 +235,9 @@ RUN { \
             '#!/bin/bash' \
             'set -euo pipefail' \
             'export IS_SANDBOX=1' \
-            'export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true' \
             'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' \
+            'export CUTI_CLAUDE_PERMISSION_MODE="${CUTI_CLAUDE_PERMISSION_MODE:-auto}"' \
+            'if [ "$CUTI_CLAUDE_PERMISSION_MODE" = "auto" ]; then export CLAUDE_CODE_ENABLE_AUTO_MODE="${CLAUDE_CODE_ENABLE_AUTO_MODE:-1}"; fi' \
             'if [ "${CUTI_ENFORCE_SELECTED_PROVIDERS:-false}" = "true" ]; then' \
             '    case ",${CUTI_AGENT_PROVIDERS:-}," in' \
             '        *,claude,*) ;;' \
@@ -240,6 +251,17 @@ RUN { \
             'if [ ! -x "$CLAUDE_CLI" ]; then' \
             '    echo "Claude CLI not found. Rebuild the container or run: /usr/local/bin/cuti-install-claude" >&2' \
             '    exit 1' \
+            'fi' \
+            'case "${1:-}" in' \
+            '    --help|-h|--version|-v|login|logout|update|doctor|config|mcp|completion|auto-mode) exec "$CLAUDE_CLI" "$@" ;;' \
+            'esac' \
+            'for arg in "$@"; do' \
+            '    case "$arg" in' \
+            '        --permission-mode|--permission-mode=*|--dangerously-skip-permissions|--allow-dangerously-skip-permissions) exec "$CLAUDE_CLI" "$@" ;;' \
+            '    esac' \
+            'done' \
+            'if [ -n "${CUTI_CLAUDE_PERMISSION_MODE:-}" ] && [ "$CUTI_CLAUDE_PERMISSION_MODE" != "default" ]; then' \
+            '    exec "$CLAUDE_CLI" --permission-mode "$CUTI_CLAUDE_PERMISSION_MODE" "$@"' \
             'fi' \
             'exec "$CLAUDE_CLI" "$@"'; \
     } > /usr/local/bin/claude \
@@ -359,7 +381,8 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'if [ -n "${CUTI_CONTAINER_PATH:-}" ]; then export PATH="$CUTI_CONTAINER_PATH:$PATH"; else export PATH="/home/cuti/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; fi' >> ~/.zshrc \\
     && echo 'export PYTHONPATH="/workspace/src:$PYTHONPATH"' >> ~/.zshrc \\
     && echo 'export CUTI_IN_CONTAINER=true' >> ~/.zshrc \\
-    && echo 'export ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS=1' >> ~/.zshrc \\
+    && echo 'export CUTI_CLAUDE_PERMISSION_MODE="${CUTI_CLAUDE_PERMISSION_MODE:-auto}"' >> ~/.zshrc \\
+    && echo 'if [ "$CUTI_CLAUDE_PERMISSION_MODE" = "auto" ]; then export CLAUDE_CODE_ENABLE_AUTO_MODE="${CLAUDE_CODE_ENABLE_AUTO_MODE:-1}"; fi' >> ~/.zshrc \\
     && echo 'export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux' >> ~/.zshrc \\
     && echo 'export CODEX_HOME=/home/cuti/.codex' >> ~/.zshrc \\
     && echo 'export CODEX_INSTALL_DIR=/home/cuti/.cuti-providers/codex/bin' >> ~/.zshrc \\
@@ -375,7 +398,6 @@ RUN sh -c "$(wget -O- https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/t
     && echo 'export PLAYWRIGHT_BROWSERS_PATH=/home/cuti/.openclaw/browser/browsers' >> ~/.zshrc \\
     && echo 'export XDG_CONFIG_HOME=/home/cuti/.config' >> ~/.zshrc \\
     && echo 'export XDG_DATA_HOME=/home/cuti/.local/share' >> ~/.zshrc \\
-    && echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.zshrc \\
     && echo 'alias npm-original="/usr/local/bin/npm-original"' >> ~/.zshrc \\
     && echo 'echo "🚀 Welcome to cuti dev container!"' >> ~/.zshrc \\
     && echo 'echo "Commands: cuti | claude | codex | opencode | openclaw | hermes"' >> ~/.zshrc \\
@@ -398,7 +420,8 @@ CMD ["/bin/zsh", "-l"]
         "runArgs": ["--init"],
         "containerEnv": {
             "CUTI_IN_CONTAINER": "true",
-            "ANTHROPIC_CLAUDE_BYPASS_PERMISSIONS": "1",
+            "CUTI_CLAUDE_PERMISSION_MODE": "auto",
+            "CLAUDE_CODE_ENABLE_AUTO_MODE": "1",
             "PYTHONUNBUFFERED": "1",
         },
         "mounts": [
@@ -502,6 +525,26 @@ CMD ["/bin/zsh", "-l"]
         if "claude" in providers:
             return "claude"
         return providers[0]
+
+    def _claude_permission_mode(self) -> str:
+        """Return the Claude permission mode to request inside cuti containers."""
+
+        mode = os.environ.get(
+            self.CLAUDE_PERMISSION_MODE_ENV,
+            self.DEFAULT_CLAUDE_PERMISSION_MODE,
+        ).strip()
+        if not mode:
+            return "default"
+        aliases = {
+            "accept-edits": "acceptEdits",
+            "acceptedits": "acceptEdits",
+            "dont-ask": "dontAsk",
+            "dontask": "dontAsk",
+            "bypass": "bypassPermissions",
+            "bypass-permissions": "bypassPermissions",
+            "dangerous": "bypassPermissions",
+        }
+        return aliases.get(mode, mode)
 
     def _auto_update_claude_on_start(self) -> bool:
         """Return True when Claude mode should refresh Claude Code at startup."""
@@ -1000,7 +1043,9 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 shutil.copy2(host_plugins_config, dest_plugins_dir / "config.json")
                 print("🔌 Copied plugins config from host")
 
-        # Create or update Linux-specific .claude.json
+        # Create or update Linux-specific .claude.json.
+        # Bypass permissions is now an explicit legacy mode, not the default
+        # container behavior.
         linux_claude_json = linux_claude_dir / ".claude.json"
         config = {}
         if linux_claude_json.exists():
@@ -1010,11 +1055,12 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             except Exception:
                 config = {}
 
-        # Always ensure bypassPermissionsModeAccepted is set
-        # Ensure bypass permissions mode is accepted
-        config['bypassPermissionsModeAccepted'] = True
-        with open(linux_claude_json, 'w') as f:
-            json.dump(config, f, indent=2)
+        if self._claude_permission_mode() == "bypassPermissions":
+            config['bypassPermissionsModeAccepted'] = True
+
+        if config or linux_claude_json.exists():
+            with open(linux_claude_json, 'w') as f:
+                json.dump(config, f, indent=2)
 
         # Check if credentials already exist from previous container sessions
         linux_credentials = linux_claude_dir / ".credentials.json"
@@ -1234,7 +1280,6 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
                 [
                     "export CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux",
                     "export IS_SANDBOX=1",
-                    "export CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
                 ]
             )
         elif provider == "codex":
@@ -1582,6 +1627,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
 
         primary_provider = self._primary_provider()
         auto_update_claude = self._auto_update_claude_on_start()
+        claude_permission_mode = self._claude_permission_mode()
         container_path = self._container_path_value()
         _linux_claude_dir, provider_mount_args = self._prepare_cloud_provider_mounts()
         docker_args = [
@@ -1615,7 +1661,7 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--env",
             "IS_SANDBOX=1",
             "--env",
-            "CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true",
+            f"CUTI_CLAUDE_PERMISSION_MODE={claude_permission_mode}",
             # Don't set CLAUDE_CONFIG_DIR here - let the init script decide based on writability
             "--env",
             "PYTHONUNBUFFERED=1",
@@ -1664,6 +1710,8 @@ RUN chmod +x /tmp/container_tools.sh && /tmp/container_tools.sh
             "--network",
             "host",
         ]
+        if claude_permission_mode == "auto":
+            docker_args.extend(["--env", "CLAUDE_CODE_ENABLE_AUTO_MODE=1"])
         docker_args.extend(provider_mount_args)
 
         if mount_docker_socket:
@@ -1721,6 +1769,9 @@ if [ -n "${CUTI_AGENT_PROVIDERS:-}" ]; then
 else
     echo "🎛️  Container mode: ${CUTI_CONTAINER_MODE:-claude-code}"
     echo "🧩 No agent providers selected"
+fi
+if cuti_provider_selected claude; then
+    echo "🔐 Claude permission mode: ${CUTI_CLAUDE_PERMISSION_MODE:-auto}"
 fi
 
 if [ -d /home/cuti/.cuti-providers ]; then
@@ -2315,10 +2366,33 @@ def is_running_in_container() -> bool:
     return False
 
 
+def get_claude_permission_mode() -> str:
+    """Return the configured Claude permission mode for helper commands."""
+
+    mode = os.environ.get(
+        DevContainerService.CLAUDE_PERMISSION_MODE_ENV,
+        DevContainerService.DEFAULT_CLAUDE_PERMISSION_MODE,
+    ).strip()
+    if not mode:
+        return "default"
+    aliases = {
+        "accept-edits": "acceptEdits",
+        "acceptedits": "acceptEdits",
+        "dont-ask": "dontAsk",
+        "dontask": "dontAsk",
+        "bypass": "bypassPermissions",
+        "bypass-permissions": "bypassPermissions",
+        "dangerous": "bypassPermissions",
+    }
+    return aliases.get(mode, mode)
+
+
 def get_claude_command(prompt: str) -> list[str]:
     """Get Claude command with appropriate flags."""
     cmd = ["claude"]
     if is_running_in_container():
-        cmd.append("--dangerously-skip-permissions")
+        permission_mode = get_claude_permission_mode()
+        if permission_mode != "default":
+            cmd.extend(["--permission-mode", permission_mode])
     cmd.append(prompt)
     return cmd

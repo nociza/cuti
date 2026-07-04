@@ -267,7 +267,10 @@ def status() -> None:
 
     if in_container:
         console.print("\n[green]🚀 You are currently inside the dev container![/green]")
-        console.print("[dim]Claude commands will use --dangerously-skip-permissions[/dim]")
+        console.print(
+            "[dim]Claude commands use CUTI_CLAUDE_PERMISSION_MODE "
+            "(default: auto)[/dim]"
+        )
 
 
 @app.command("devcontainer-init")

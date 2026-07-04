@@ -144,27 +144,32 @@ cuti container "python manage.py runserver"
 
 ### Claude CLI Configuration
 
-The container comes with Claude CLI pre-configured for optimal usage:
+The container comes with Claude CLI pre-configured for native Claude permission modes:
 
-#### Automatic Permissions Bypass
-- **Built-in Alias**: `claude` automatically includes `--dangerously-skip-permissions`
-- No need to manually add the flag for every command
-- Works seamlessly in the containerized environment
+#### Native Permission Mode
+- **Default mode**: `CUTI_CLAUDE_PERMISSION_MODE=auto`
+- **Supported modes**: `default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`
+- **Explicit override**: set `CUTI_CLAUDE_PERMISSION_MODE` before starting the container
 
 ```bash
-# These commands are equivalent in the container:
-claude "Explain this code"                              # Uses alias (recommended)
-claude --dangerously-skip-permissions "Explain this code"  # Explicit flag (not needed)
+# Default: asks Claude Code to use auto mode when available
+cuti container "claude 'Explain this code'"
+
+# Stricter file-editing behavior
+CUTI_CLAUDE_PERMISSION_MODE=acceptEdits cuti container "claude 'Review this diff'"
+
+# Legacy isolated-container behavior, only when explicitly requested
+CUTI_CLAUDE_PERMISSION_MODE=bypassPermissions cuti container "claude 'Run the local test suite'"
 ```
 
 #### Why This Matters
-- The `--dangerously-skip-permissions` flag is required in containers
-- Without it, Claude may fail with permission errors
-- The alias ensures Claude always works correctly
-- Simplifies usage and prevents common errors
+- Claude Code now owns the permission/approval surface through native modes.
+- `auto` reduces routine prompts while keeping Claude's background safety checks.
+- `bypassPermissions` remains available for isolated containers, but it is not the default CUTI premise.
+- CUTI's differentiated role is provider runtime setup, state persistence, and observability.
 
 #### Rebuild to Apply Updates
-If you're using an older container image, rebuild to get the alias:
+If you're using an older container image, rebuild to get the permission-mode wrapper:
 ```bash
 cuti container --rebuild
 ```
@@ -317,8 +322,9 @@ Automatically set in container:
 - `CUTI_IN_CONTAINER=true` - Indicates running in container
 - `CUTI_AGENT_PROVIDERS` - Comma-separated enabled providers
 - `CUTI_PRIMARY_AGENT_PROVIDER` - Primary provider for prompts/help text
+- `CUTI_CLAUDE_PERMISSION_MODE=auto` - Claude Code permission mode requested by the wrapper
+- `CLAUDE_CODE_ENABLE_AUTO_MODE=1` - Enables Claude auto mode where the provider requires the flag
 - `CLAUDE_CONFIG_DIR=/home/cuti/.claude-linux` - Linux Claude config location
-- `CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true` - Skip permission checks
 - `CODEX_HOME=/home/cuti/.codex` - Codex state root
 - `HERMES_HOME=/home/cuti/.hermes` - Hermes Agent config/state root
 - `HERMES_INSTALL_DIR=/home/cuti/.hermes/hermes-agent` - persisted Hermes Agent installation
@@ -603,7 +609,7 @@ docker exec -it [container-name] bash
 ### Security Considerations
 
 - Containers do **not** run with `--privileged`
-- Claude automatically uses `--dangerously-skip-permissions` via alias (see [Claude CLI Configuration](#claude-cli-configuration))
+- Claude uses native permission modes via `CUTI_CLAUDE_PERMISSION_MODE`; `bypassPermissions` is opt-in only
 - Config directories mounted with appropriate permissions
 - No telemetry or external connections
 - Local-first approach
